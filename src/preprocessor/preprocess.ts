@@ -1,24 +1,25 @@
 import { tokenize } from './tokenize';
 import { parse } from './parse';
 import { shimmed } from './shims';
+import './genCode';
 import * as sourcemap from './sourcemap';
 
 export interface Options {
-    symbol? : string,
+    exec?      : string,
     sourcemap? : 'extract' | 'append' | null,
-    jsx? : boolean
+    jsx?       : boolean
 }
 
 export interface Params {
-    symbol : string;
-    sourcemap: 'extra' | 'append' | null,
+    exec : string;
+    sourcemap: 'extract' | 'append' | null,
     jsx: boolean;
 }
 
 export function preprocess(str : string, opts : Options) {
     opts = opts || {};
     var params = {
-        symbol:    opts.symbol    || 'Surplus',
+        exec:      opts.exec    || '',
         sourcemap: opts.sourcemap || null,
         jsx:       opts.jsx       || false
     } as Params;
@@ -31,8 +32,8 @@ export function preprocess(str : string, opts : Options) {
     var code = ast.genCode(params),
         out;
 
-    if (opts.sourcemap === 'extract') out = sourcemap.extractMap(code, str, params);
-    else if (opts.sourcemap === 'append') out = sourcemap.appendMap(code, str, params);
+    if (params.sourcemap === 'extract') out = sourcemap.extractMap(code, str, params);
+    else if (params.sourcemap === 'append') out = sourcemap.appendMap(code, str, params);
     else out = code;
 
     return out;

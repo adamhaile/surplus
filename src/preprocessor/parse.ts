@@ -21,7 +21,7 @@ export type LOC = { line: number, col: number, pos: number };
 export function parse(TOKS : string[], opts : Params) {
     var i = 0,
         EOF = TOKS.length === 0,
-        TOK = EOF ? TOKS[i] : '',
+        TOK = EOF ? '' : TOKS[i],
         LINE = 0,
         COL = 0,
         POS = 0;

@@ -73,7 +73,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 7);
+/******/ 	return __webpack_require__(__webpack_require__.s = 8);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -93,15 +93,23 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-var ASTNode = (function () {
-    function ASTNode() {
+var ASTCodeNode = (function () {
+    function ASTCodeNode() {
     }
-    ASTNode.prototype.shim = function (ctx) { };
-    ASTNode.prototype.genCode = function (params) { return ""; };
+    ASTCodeNode.prototype.shim = function (ctx) { };
+    ASTCodeNode.prototype.genCode = function (params, prior) { return ""; };
     ;
-    return ASTNode;
+    return ASTCodeNode;
 }());
-exports.ASTNode = ASTNode;
+exports.ASTCodeNode = ASTCodeNode;
+var ASTStatementNode = (function () {
+    function ASTStatementNode() {
+    }
+    ASTStatementNode.prototype.shim = function (ctx) { };
+    ASTStatementNode.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) { };
+    return ASTStatementNode;
+}());
+exports.ASTStatementNode = ASTStatementNode;
 var CodeTopLevel = (function (_super) {
     __extends(CodeTopLevel, _super);
     function CodeTopLevel(segments) {
@@ -110,7 +118,7 @@ var CodeTopLevel = (function (_super) {
         return _this;
     }
     return CodeTopLevel;
-}(ASTNode));
+}(ASTCodeNode));
 exports.CodeTopLevel = CodeTopLevel;
 var CodeText = (function (_super) {
     __extends(CodeText, _super);
@@ -121,7 +129,7 @@ var CodeText = (function (_super) {
         return _this;
     }
     return CodeText;
-}(ASTNode));
+}(ASTCodeNode));
 exports.CodeText = CodeText;
 var EmbeddedCode = (function (_super) {
     __extends(EmbeddedCode, _super);
@@ -131,7 +139,7 @@ var EmbeddedCode = (function (_super) {
         return _this;
     }
     return EmbeddedCode;
-}(ASTNode));
+}(ASTCodeNode));
 exports.EmbeddedCode = EmbeddedCode;
 var HtmlElement = (function (_super) {
     __extends(HtmlElement, _super);
@@ -142,8 +150,9 @@ var HtmlElement = (function (_super) {
         _this.content = content;
         return _this;
     }
+    HtmlElement.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) { };
     return HtmlElement;
-}(ASTNode));
+}(ASTCodeNode));
 exports.HtmlElement = HtmlElement;
 var HtmlText = (function (_super) {
     __extends(HtmlText, _super);
@@ -153,7 +162,7 @@ var HtmlText = (function (_super) {
         return _this;
     }
     return HtmlText;
-}(ASTNode));
+}(ASTStatementNode));
 exports.HtmlText = HtmlText;
 var HtmlComment = (function (_super) {
     __extends(HtmlComment, _super);
@@ -163,7 +172,7 @@ var HtmlComment = (function (_super) {
         return _this;
     }
     return HtmlComment;
-}(ASTNode));
+}(ASTStatementNode));
 exports.HtmlComment = HtmlComment;
 var HtmlInsert = (function (_super) {
     __extends(HtmlInsert, _super);
@@ -173,7 +182,7 @@ var HtmlInsert = (function (_super) {
         return _this;
     }
     return HtmlInsert;
-}(ASTNode));
+}(ASTStatementNode));
 exports.HtmlInsert = HtmlInsert;
 var StaticProperty = (function (_super) {
     __extends(StaticProperty, _super);
@@ -184,7 +193,7 @@ var StaticProperty = (function (_super) {
         return _this;
     }
     return StaticProperty;
-}(ASTNode));
+}(ASTStatementNode));
 exports.StaticProperty = StaticProperty;
 var DynamicProperty = (function (_super) {
     __extends(DynamicProperty, _super);
@@ -195,7 +204,7 @@ var DynamicProperty = (function (_super) {
         return _this;
     }
     return DynamicProperty;
-}(ASTNode));
+}(ASTStatementNode));
 exports.DynamicProperty = DynamicProperty;
 var Mixin = (function (_super) {
     __extends(Mixin, _super);
@@ -205,7 +214,7 @@ var Mixin = (function (_super) {
         return _this;
     }
     return Mixin;
-}(ASTNode));
+}(ASTStatementNode));
 exports.Mixin = Mixin;
 
 
@@ -216,14 +225,117 @@ exports.Mixin = Mixin;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var tokenize_1 = __webpack_require__(6);
-var parse_1 = __webpack_require__(3);
-var shims_1 = __webpack_require__(4);
-var sourcemap = __webpack_require__(5);
+var rx = {
+    locs: /(\n)|(\u0000(\d+),(\d+)\u0000)|(\u0000\u0000)/g
+}, vlqlast = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef", vlqcont = "ghijklmnopqrstuvwxyz0123456789+/";
+function segmentStart(loc) {
+    return "\u0000" + loc.line + "," + loc.col + "\u0000";
+}
+exports.segmentStart = segmentStart;
+function segmentEnd() {
+    return "\u0000\u0000";
+}
+exports.segmentEnd = segmentEnd;
+function extractMappings(embedded) {
+    var mappings = "", pgcol = 0, psline = 0, pscol = 0, insegment = false, linestart = 0, linecont = false;
+    var src = embedded.replace(rx.locs, function (_, nl, start, line, col, end, offset) {
+        if (nl) {
+            mappings += ";";
+            if (insegment) {
+                mappings += "AA" + vlq(1) + vlq(0 - pscol);
+                psline++;
+                pscol = 0;
+                linecont = true;
+            }
+            else {
+                linecont = false;
+            }
+            linestart = offset + nl.length;
+            pgcol = 0;
+            return nl;
+        }
+        else if (start) {
+            var gcol = offset - linestart;
+            line = parseInt(line);
+            col = parseInt(col);
+            mappings += (linecont ? "," : "")
+                + vlq(gcol - pgcol)
+                + "A" // only one file
+                + vlq(line - psline)
+                + vlq(col - pscol);
+            insegment = true;
+            linecont = true;
+            pgcol = gcol;
+            psline = line;
+            pscol = col;
+            return "";
+        }
+        else if (end) {
+            insegment = false;
+            return "";
+        }
+    });
+    return {
+        src: src,
+        mappings: mappings
+    };
+}
+function extractMap(src, original, opts) {
+    var extract = extractMappings(src), map = createMap(extract.mappings, original);
+    return {
+        src: extract.src,
+        map: map
+    };
+}
+exports.extractMap = extractMap;
+function createMap(mappings, original) {
+    return {
+        version: 3,
+        file: 'out.js',
+        sources: ['in.js'],
+        sourcesContent: [original],
+        names: [],
+        mappings: mappings
+    };
+}
+function appendMap(src, original, opts) {
+    var extract = extractMap(src, original, opts), appended = extract.src
+        + "\n//# sourceMappingURL=data:"
+        + encodeURIComponent(JSON.stringify(extract.map));
+    return appended;
+}
+exports.appendMap = appendMap;
+function vlq(num) {
+    var str = "", i;
+    // convert num sign representation from 2s complement to sign bit in lsd
+    num = num < 0 ? (-num << 1) + 1 : num << 1 + 0;
+    // convert num to base 32 number
+    var numstr = num.toString(32);
+    // convert base32 digits of num to vlq continuation digits in reverse order
+    for (i = numstr.length - 1; i > 0; i--)
+        str += vlqcont[parseInt(numstr[i], 32)];
+    // add final vlqlast digit
+    str += vlqlast[parseInt(numstr[0], 32)];
+    return str;
+}
+
+
+/***/ }),
+/* 2 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+var tokenize_1 = __webpack_require__(7);
+var parse_1 = __webpack_require__(5);
+var shims_1 = __webpack_require__(6);
+__webpack_require__(4);
+var sourcemap = __webpack_require__(1);
 function preprocess(str, opts) {
     opts = opts || {};
     var params = {
-        symbol: opts.symbol || 'Surplus',
+        exec: opts.exec || '',
         sourcemap: opts.sourcemap || null,
         jsx: opts.jsx || false
     };
@@ -231,9 +343,9 @@ function preprocess(str, opts) {
     if (shims_1.shimmed)
         ast.shim();
     var code = ast.genCode(params), out;
-    if (opts.sourcemap === 'extract')
+    if (params.sourcemap === 'extract')
         out = sourcemap.extractMap(code, str, params);
-    else if (opts.sourcemap === 'append')
+    else if (params.sourcemap === 'append')
         out = sourcemap.appendMap(code, str, params);
     else
         out = code;
@@ -243,8 +355,132 @@ exports.preprocess = preprocess;
 
 
 /***/ }),
-/* 2 */,
-/* 3 */
+/* 3 */,
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+var AST = __webpack_require__(0);
+var sourcemap = __webpack_require__(1);
+// pre-compiled regular expressions
+var rx = {
+    backslashes: /\\/g,
+    newlines: /\r?\n/g,
+    singleQuotes: /'/g,
+    indent: /\n(?=[^\n]+$)([ \t]*)/
+};
+// genCode
+AST.CodeTopLevel.prototype.genCode =
+    AST.EmbeddedCode.prototype.genCode = function (opts) { return concatResults(opts, this.segments, 'genCode'); };
+AST.CodeText.prototype.genCode = function (opts) {
+    return (opts.sourcemap ? sourcemap.segmentStart(this.loc) : "")
+        + this.text
+        + (opts.sourcemap ? sourcemap.segmentEnd() : "");
+};
+AST.HtmlElement.prototype.genCode = function (opts, prior) {
+    var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', ids = [], inits = [], exes = [];
+    this.genDOMStatements(opts, ids, inits, exes, null, 0);
+    return '(function () {' + iinl
+        + 'var ' + ids.join(', ') + ';' + iinl
+        + inits.join(iinl) + iinl
+        + exes.join(iinl) + iinl
+        + 'return __;' + inl + '})()';
+};
+// genDOMStatements
+AST.HtmlElement.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
+    var id = genIdentifier(ids, parent, this.tag, n), myexes = [];
+    createElement(inits, id, this.tag);
+    for (var i = 0; i < this.properties.length; i++) {
+        this.properties[i].genDOMStatements(opts, ids, inits, myexes, id, i);
+    }
+    for (i = 0; i < this.content.length; i++) {
+        this.content[i].genDOMStatements(opts, ids, inits, exes, id, i);
+    }
+    exes.push.apply(exes, myexes);
+    if (parent)
+        appendNode(inits, parent, id);
+};
+AST.HtmlComment.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
+    var id = genIdentifier(ids, parent, 'comment', n);
+    createComment(inits, id, this.text);
+    appendNode(inits, parent, id);
+};
+AST.HtmlText.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
+    var id = genIdentifier(ids, parent, 'text', n);
+    createText(inits, id, this.text);
+    appendNode(inits, parent, id);
+};
+AST.HtmlInsert.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
+    var id = genIdentifier(ids, parent, 'insert', n);
+    createText(inits, id, '');
+    appendNode(inits, parent, id);
+    exec(exes, opts, "function (range) { return Surplus.insert(range, " + this.code.genCode(opts) + "); }", "{ start: " + id + ", end: " + id + " }");
+};
+AST.StaticProperty.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
+    inits.push(id + "." + propName(opts, this.name) + " = " + this.value + ";");
+};
+AST.DynamicProperty.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
+    var code = this.code.genCode(opts);
+    if (this.name === "ref") {
+        inits.push(code + " = " + id + ";");
+    }
+    else {
+        exec(exes, opts, "function () { " + id + "." + propName(opts, this.name) + " = " + code + "; }", "");
+    }
+};
+AST.Mixin.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
+    var code = this.code.genCode(opts);
+    exec(exes, opts, "function (__state) { return " + code + "(" + id + ", __state); }", "");
+};
+function genIdentifier(ids, parent, tag, n) {
+    var id = parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
+    ids.push(id);
+    return id;
+}
+function createElement(stmts, id, tag) {
+    stmts.push(id + ' = document.createElement(\'' + tag + '\');');
+}
+function createComment(stmts, id, text) {
+    stmts.push(id + ' = document.createComment(' + codeStr(text) + ');');
+}
+function createText(stmts, id, text) {
+    stmts.push(id + ' = document.createTextNode(' + codeStr(text) + ');');
+}
+function appendNode(stmts, parent, child) {
+    stmts.push(parent + '.appendChild(' + child + ');');
+}
+function exec(execs, opts, fn, val) {
+    fn = opts.exec ? (opts.exec + '(' + fn + (val ? ', ' + val : '') + ');') : ('(' + fn + ')(' + val + ');');
+    execs.push(fn);
+}
+function propName(opts, name) {
+    return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
+}
+function concatResults(opts, children, method, sep) {
+    var result = "", i;
+    for (i = 0; i < children.length; i++) {
+        if (i && sep)
+            result += sep;
+        result += children[i][method](opts, result);
+    }
+    return result;
+}
+function indent(prior) {
+    var m = rx.indent.exec(prior || '');
+    return m ? m[1] : '';
+}
+function codeStr(str) {
+    return "'" + str.replace(rx.backslashes, "\\\\")
+        .replace(rx.singleQuotes, "\\'")
+        .replace(rx.newlines, "\\\n")
+        + "'";
+}
+
+
+/***/ }),
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -265,7 +501,7 @@ var parens = {
     "{": "}"
 };
 function parse(TOKS, opts) {
-    var i = 0, EOF = TOKS.length === 0, TOK = EOF ? TOKS[i] : '', LINE = 0, COL = 0, POS = 0;
+    var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
     return codeTopLevel();
     function codeTopLevel() {
         var segments = [], text = "", loc = LOC();
@@ -566,7 +802,7 @@ exports.parse = parse;
 
 
 /***/ }),
-/* 4 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -579,10 +815,10 @@ var rx = {
 };
 exports.shimmed = false;
 // add base shim methods that visit AST
-AST.CodeTopLevel.prototype.shim = function (ctx) { shimSiblings(this, this.segments, ctx); };
-AST.HtmlElement.prototype.shim = function (ctx) { shimSiblings(this, this.content, ctx); };
+AST.CodeTopLevel.prototype.shim = function (ctx) { shimSiblings(this, this.segments); };
+AST.HtmlElement.prototype.shim = function (ctx) { shimSiblings(this, this.content); };
 AST.HtmlInsert.prototype.shim = function (ctx) { this.code.shim(ctx); };
-AST.EmbeddedCode.prototype.shim = function (ctx) { shimSiblings(this, this.segments, ctx); };
+AST.EmbeddedCode.prototype.shim = function (ctx) { shimSiblings(this, this.segments); };
 AST.CodeText.prototype.shim =
     AST.HtmlText.prototype.shim =
         AST.HtmlComment.prototype.shim = function (ctx) { };
@@ -629,7 +865,7 @@ function insertTextNodeBeforeInitialComments() {
         }
     });
 }
-function shimSiblings(parent, siblings, prevCtx) {
+function shimSiblings(parent, siblings) {
     var ctx = { index: 0, parent: parent, siblings: siblings, prune: false };
     for (; ctx.index < siblings.length; ctx.index++) {
         siblings[ctx.index].shim(ctx);
@@ -663,109 +899,7 @@ function insertAfter(node, ctx) {
 
 
 /***/ }),
-/* 5 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-var rx = {
-    locs: /(\n)|(\u0000(\d+),(\d+)\u0000)|(\u0000\u0000)/g
-}, vlqlast = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef", vlqcont = "ghijklmnopqrstuvwxyz0123456789+/";
-function segmentStart(loc) {
-    return "\u0000" + loc.line + "," + loc.col + "\u0000";
-}
-exports.segmentStart = segmentStart;
-function segmentEnd() {
-    return "\u0000\u0000";
-}
-exports.segmentEnd = segmentEnd;
-function extractMappings(embedded) {
-    var mappings = "", pgcol = 0, psline = 0, pscol = 0, insegment = false, linestart = 0, linecont = false;
-    var src = embedded.replace(rx.locs, function (_, nl, start, line, col, end, offset) {
-        if (nl) {
-            mappings += ";";
-            if (insegment) {
-                mappings += "AA" + vlq(1) + vlq(0 - pscol);
-                psline++;
-                pscol = 0;
-                linecont = true;
-            }
-            else {
-                linecont = false;
-            }
-            linestart = offset + nl.length;
-            pgcol = 0;
-            return nl;
-        }
-        else if (start) {
-            var gcol = offset - linestart;
-            line = parseInt(line);
-            col = parseInt(col);
-            mappings += (linecont ? "," : "")
-                + vlq(gcol - pgcol)
-                + "A" // only one file
-                + vlq(line - psline)
-                + vlq(col - pscol);
-            insegment = true;
-            linecont = true;
-            pgcol = gcol;
-            psline = line;
-            pscol = col;
-            return "";
-        }
-        else if (end) {
-            insegment = false;
-            return "";
-        }
-    });
-    return {
-        src: src,
-        mappings: mappings
-    };
-}
-function extractMap(src, original, opts) {
-    var extract = extractMappings(src), map = createMap(extract.mappings, original);
-    return {
-        src: extract.src,
-        map: map
-    };
-}
-exports.extractMap = extractMap;
-function createMap(mappings, original) {
-    return {
-        version: 3,
-        file: 'out.js',
-        sources: ['in.js'],
-        sourcesContent: [original],
-        names: [],
-        mappings: mappings
-    };
-}
-function appendMap(src, original, opts) {
-    var extract = extractMap(src, original, opts), appended = extract.src
-        + "\n//# sourceMappingURL=data:"
-        + encodeURIComponent(JSON.stringify(extract.map));
-    return appended;
-}
-exports.appendMap = appendMap;
-function vlq(num) {
-    var str = "", i;
-    // convert num sign representation from 2s complement to sign bit in lsd
-    num = num < 0 ? (-num << 1) + 1 : num << 1 + 0;
-    // convert num to base 32 number
-    var numstr = num.toString(32);
-    // convert base32 digits of num to vlq continuation digits in reverse order
-    for (i = numstr.length - 1; i > 0; i--)
-        str += vlqcont[parseInt(numstr[i], 32)];
-    // add final vlqlast digit
-    str += vlqlast[parseInt(numstr[0], 32)];
-    return str;
-}
-
-
-/***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -806,13 +940,13 @@ exports.tokenize = tokenize;
 
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var preprocess_1 = __webpack_require__(1);
+var preprocess_1 = __webpack_require__(2);
 exports.preprocess = preprocess_1.preprocess;
 
 

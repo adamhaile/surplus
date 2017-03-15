@@ -5,15 +5,19 @@ const rx = {
     ws: /^\s*$/
 };
 
+export interface IShimmable {
+    shim(ctx? : Context) : void;
+}
+
 export let shimmed = false;
 
-export type Context = { index: number, parent: AST.ASTNode, siblings: AST.ASTNode[], prune: boolean }
+export type Context = { index: number, parent: IShimmable, siblings: IShimmable[], prune: boolean }
 
 // add base shim methods that visit AST
-AST.CodeTopLevel.prototype.shim = function (ctx : Context) { shimSiblings(this, this.segments, ctx); };
-AST.HtmlElement.prototype.shim  = function (ctx : Context) { shimSiblings(this, this.content, ctx); };
+AST.CodeTopLevel.prototype.shim = function (ctx) { shimSiblings(this, this.segments); };
+AST.HtmlElement.prototype.shim  = function (ctx) { shimSiblings(this, this.content); };
 AST.HtmlInsert.prototype.shim   = function (ctx) { this.code.shim(ctx); };
-AST.EmbeddedCode.prototype.shim = function (ctx : Context) { shimSiblings(this, this.segments, ctx) };
+AST.EmbeddedCode.prototype.shim = function (ctx) { shimSiblings(this, this.segments) };
 AST.CodeText.prototype.shim     =
 AST.HtmlText.prototype.shim     =
 AST.HtmlComment.prototype.shim  = function (ctx) {};
@@ -69,7 +73,7 @@ function insertTextNodeBeforeInitialComments() {
     })
 }
 
-function shimSiblings(parent : AST.ASTNode, siblings : AST.ASTNode[], prevCtx : Context) {
+function shimSiblings(parent : IShimmable, siblings : IShimmable[]) {
     var ctx : Context = { index: 0, parent: parent, siblings: siblings, prune: false };
     for (; ctx.index < siblings.length; ctx.index++) {
         siblings[ctx.index].shim(ctx);
@@ -94,12 +98,12 @@ function prune(ctx : Context) {
     ctx.prune = true;
 }
 
-function insertBefore(node : AST.ASTNode, ctx : Context) {
+function insertBefore(node : IShimmable, ctx : Context) {
     ctx.siblings.splice(ctx.index, 0, node);
     node.shim(ctx);
     ctx.index++;
 }
 
-function insertAfter(node : AST.ASTNode, ctx : Context) {
+function insertAfter(node : IShimmable, ctx : Context) {
     ctx.siblings.splice(ctx.index + 1, 0, node);
 }
