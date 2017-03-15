@@ -3,12 +3,12 @@ var webpack = require('webpack');
 module.exports = {
     entry: {
         Surplus: "./src/runtime/Surplus.ts",
-        preprocessor: "./src/preprocessor/preprocessor.ts"
+        "surplus-preprocessor": "./src/preprocessor/preprocessor.ts"
     },
 
     output: {
-        path: ".",
-        filename: "[name].js",
+        path: "./packages",
+        filename: "[name]/index.js",
         library: "[name]",
         libraryTarget: "umd"
     },

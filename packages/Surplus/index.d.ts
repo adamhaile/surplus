@@ -1,15 +1,5 @@
 interface Surplus {
 	insert(node : HTMLElement, value : any, state : HTMLElement) : HTMLElement;
-	data(data : (v? : any) => any, event? : string) : HtmlMixin;
-	focus(flag : Boolean, start? : number, end? : number) : HtmlMixin;
-	onkey : {
-		(key : string, callback : (key : KeyboardEvent) => void) : HtmlMixin;
-		(key : string, event : string, callback : (key : KeyboardEvent) => void) : HtmlMixin;
-	};
-	class : {
-		(name : string, flag : Boolean) : void;
-		(name : string, alternate : string, flag : Boolean) : HtmlMixin;
-	};
 }
 
 interface SurplusMixin {
@@ -20,7 +10,7 @@ declare var Surplus : Surplus;
 
 export = Surplus;
 
-// JSX type definitions for HTMLLiterals based on those for React v0.14
+// JSX type definitions for Surplus initially based on those for React v0.14
 // React definitions by: Asana <https://asana.com>, AssureSign <http://www.assuresign.com>, Microsoft <https://microsoft.com>, John Reilly <https://github.com/johnnyreilly/>
 
 declare global {

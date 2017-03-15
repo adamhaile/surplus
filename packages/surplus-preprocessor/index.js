@@ -4,9 +4,9 @@
 	else if(typeof define === 'function' && define.amd)
 		define([], factory);
 	else if(typeof exports === 'object')
-		exports["preprocessor"] = factory();
+		exports["surplus-preprocessor"] = factory();
 	else
-		root["preprocessor"] = factory();
+		root["surplus-preprocessor"] = factory();
 })(this, function() {
 return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
@@ -416,7 +416,7 @@ AST.HtmlInsert.prototype.genDOMStatements = function (opts, ids, inits, exes, pa
     var id = genIdentifier(ids, parent, 'insert', n);
     createText(inits, id, '');
     appendNode(inits, parent, id);
-    exec(exes, opts, "function (range) { return Surplus.insert(range, " + this.code.genCode(opts) + "); }", "{ start: " + id + ", end: " + id + " }");
+    exec(exes, opts, "function (range) { return Surplus.insert(range, " + this.code.genCode(opts) + ", " + (opts.exec || "null") + "); }", "{ start: " + id + ", end: " + id + " }");
 };
 AST.StaticProperty.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
     inits.push(id + "." + propName(opts, this.name) + " = " + this.value + ";");

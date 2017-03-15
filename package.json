@@ -1,19 +1,10 @@
 {
-  "name": "surplus",
+  "name": "surplus-repo",
   "version": "0.0.1",
   "description": "Javascript pre-processor that converts JSX syntax into inline DOM instructions",
-  "main": "Surplus.js",
   "scripts": {
     "test": "karma start"
   },
-  "keywords": [
-    "javascript",
-    "html",
-    "JSX",
-    "DOM",
-    "template",
-    "templating"
-  ],
   "author": "Adam Haile",
   "license": "MIT",
   "devDependencies": {

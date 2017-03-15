@@ -1,6 +1,6 @@
 describe("HTML dynamic property", function () {
     it("sets a property to the value of a javascript expression", function () {
-        eval(preprocessor.preprocess('                      \
+        eval(window['surplus-preprocessor'].preprocess('                      \
             var val = "foo",                                \
                 input = <input value = val />;              \
                                                             \

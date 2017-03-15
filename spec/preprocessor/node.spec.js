@@ -1,6 +1,6 @@
 describe("HTML node literal", function () {
     it("converts inline HTML to DOM objects", function () {
-        eval(preprocessor.preprocess('                                         \
+        eval(window['surplus-preprocessor'].preprocess('                                         \
             var div = <div></div>,                                             \
                 h1 = <h1>title</h1>,                                           \
                 ul  = <ul>                                                     \
@@ -35,7 +35,7 @@ describe("HTML node literal", function () {
     });
 
     it("preserves static attributes", function () {
-        eval(preprocessor.preprocess('                          \
+        eval(window['surplus-preprocessor'].preprocess('                          \
             var a = <a href="#" target="top"></a>;              \
                                                                 \
             expect(a.getAttribute("href")).toBe("#");           \

@@ -1,0 +1,15 @@
+{
+  "name": "surplus",
+  "version": "0.0.1",
+  "description": "Javascript pre-processor that converts JSX syntax into inline DOM instructions",
+  "keywords": [
+    "javascript",
+    "html",
+    "JSX",
+    "DOM",
+    "template",
+    "templating"
+  ],
+  "author": "Adam Haile",
+  "license": "MIT"
+}

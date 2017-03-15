@@ -15,8 +15,8 @@ module.exports = function(config) {
 
     // list of files / patterns to load in the browser
     files: [
-      'preprocessor.js',
-      'Surplus.js',
+      'dist/surplus-preprocessor/index.js',
+      'dist/Surplus/index.js',
       'spec/runtime/*.js',
       'spec/preprocessor/*.js',
     ],
@@ -58,7 +58,7 @@ module.exports = function(config) {
 
     // start these browsers
     // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher
-    browsers: ['PhantomJS'],
+    browsers: [],
 
 
     // Continuous Integration mode
