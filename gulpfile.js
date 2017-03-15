@@ -1,26 +1,38 @@
 var gulp = require('gulp'),
-    concat = require('gulp-concat'),
-    uglify = require('gulp-uglify'),
-    rename = require('gulp-rename');
+    concat = require('gulp-concat');
 
-gulp.task('dist', function() {
+gulp.task('preprocessor', function() {
     gulp.src([
-        "src/_preamble.js",
-        "src/sourcemap.js",
-        "src/tokenize.js",
-        "src/AST.js",
-        "src/parse.js",
-        "src/genCode.js",
-        "src/shims.js",
-        "src/preprocess.js",
-        "src/_postamble.js"
+        "src/preprocessor/_preamble.js",
+        "src/preprocessor/sourcemap.js",
+        "src/preprocessor/tokenize.js",
+        "src/preprocessor/AST.js",
+        "src/preprocessor/parse.js",
+        "src/preprocessor/genCode.js",
+        "src/preprocessor/shims.js",
+        "src/preprocessor/preprocess.js",
+        "src/preprocessor/_postamble.js"
     ])
-    .pipe(concat("htmlliterals-preprocessor.js"))
-    .pipe(gulp.dest("dist"))
-    .pipe(rename("htmlliterals-preprocessor.min.js"))
-    .pipe(uglify())
-    .pipe(gulp.dest("dist"));
+    .pipe(concat("preprocessor.js"))
+    .pipe(gulp.dest("."));
 });
 
-gulp.task('default', ['dist']);
-gulp.watch('src/*.js', ['dist']);
+gulp.task('runtime', function() {
+    gulp.src([
+        "src/runtime/_preamble.js",
+        "src/runtime/domlib.js",
+        "src/runtime/Html.js",
+        "src/runtime/insert.js",
+        //"src/runtime/mixins/*.js",
+        "src/runtime/_postamble.js"
+    ])
+    .pipe(concat("index.js"))
+    .pipe(gulp.dest("."));
+});
+
+gulp.task('w', function () {
+    gulp.watch('src/preprocessor/*.js', ['preprocessor']);
+    gulp.watch('src/runtime/*.js', ['runtime']);
+});
+
+gulp.task('default', ['preprocessor', 'runtime']);

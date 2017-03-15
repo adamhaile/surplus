@@ -1,4 +1,4 @@
-interface Html {
+interface Surplus {
 	insert(node : HTMLElement, value : any, state : HTMLElement) : HTMLElement;
 	data(data : (v? : any) => any, event? : string) : HtmlMixin;
 	focus(flag : Boolean, start? : number, end? : number) : HtmlMixin;
@@ -10,17 +10,15 @@ interface Html {
 		(name : string, flag : Boolean) : void;
 		(name : string, alternate : string, flag : Boolean) : HtmlMixin;
 	};
-	exec(fn : (state? : any) => any) : any;
-	cleanup(fn : () => void) : void;
 }
 
-interface HtmlMixin {
+interface SurplusMixin {
 	(node : HTMLElement, state : any) : any;
 }
 
-declare var Html : Html;
+declare var Surplus : Surplus;
 
-export = Html;
+export = Surplus;
 
 // JSX type definitions for HTMLLiterals based on those for React v0.14
 // React definitions by: Asana <https://asana.com>, AssureSign <http://www.assuresign.com>, Microsoft <https://microsoft.com>, John Reilly <https://github.com/johnnyreilly/>

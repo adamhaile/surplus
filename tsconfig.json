@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "module": "commonjs",
+        "target": "es5"
+    },
+    "files": [
+        "src/runtime/Surplus.ts",
+        "src/preprocessor/preprocessor.ts"
+    ]
+}

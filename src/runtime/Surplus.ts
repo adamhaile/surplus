@@ -1,0 +1,1 @@
+export { insert } from './insert';

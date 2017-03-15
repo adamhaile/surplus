@@ -1,19 +1,7 @@
-(function (package) {
-    if (typeof exports === 'object')
-        package(require('S'), require('htmlliterals-runtime')); // CommonJS
-    else if (typeof define === 'function')
-        define(['S', 'htmlliterals-runtime'], package); // AMD
-    else package(S, Html); // globals
-})(function (S, Html) {
-    "use strict";
+define('Surplus.data', ['Surplus', 'domlib'], function (Surplus, domlib) {
+   "use strict";
 
-    Html.exec = S;
-
-    Html.cleanup = function cleanup(node, fn) {
-        S.cleanup(fn);
-    };
-    
-    Html.data = function(signal, arg1, arg2) {
+    Surplus.data = function(signal, arg1, arg2) {
         return function (node) {
             var tag = node.nodeName,
                 type = node.type && node.type.toUpperCase(),
@@ -25,7 +13,7 @@
                         null) :
                     tag === 'TEXTAREA'                  ? valueData       :
                     tag === 'SELECT'                    ? valueData       :
-                    Html.domlib.isContentEditable(node) ? textContentData :
+                    domlib.isContentEditable(node)      ? textContentData :
                     null;
     
             if (!handler)
@@ -43,8 +31,8 @@
                     node.value = signal();
                 });
 
-                Html.domlib.addEventListener(node, event, valueListener);
-                S.cleanup(function () { Html.domlib.removeEventListener(node, event, valueListener); });
+                domlib.addEventListener(node, event, valueListener);
+                Surplus.cleanup(function () { domlib.removeEventListener(node, event, valueListener); });
 
                 function valueListener() {
                     var cur = S.sample(signal),
@@ -62,8 +50,8 @@
                     node.checked = (signal() === on);
                 });
 
-                Html.domlib.addEventListener(node, "change", checkboxListener);
-                S.cleanup(function () { Html.domlib.removeEventListener(node, "change", checkboxListener); });
+                domlib.addEventListener(node, "change", checkboxListener);
+                Surplus.cleanup(function () { domlib.removeEventListener(node, "change", checkboxListener); });
 
                 function checkboxListener() {
                     signal(node.checked ? on : off);
@@ -78,8 +66,8 @@
                     node.checked = (signal() === on);
                 });
 
-                Html.domlib.addEventListener(node, "change", radioListener);
-                S.cleanup(function () { Html.domlib.removeEventListener(node, "change", radioListener); });
+                domlib.addEventListener(node, "change", radioListener);
+                Surplus.cleanup(function () { domlib.removeEventListener(node, "change", radioListener); });
 
                 function radioListener() {
                     if (node.checked) signal(on);
@@ -94,8 +82,8 @@
                     node.textContent = signal();
                 });
 
-                Html.domlib.addEventListener(node, event, textContentListener);
-                S.cleanup(function () { Html.domlib.removeEventListener(node, event, textContentListener); });
+                domlib.addEventListener(node, event, textContentListener);
+                Surplus.cleanup(function () { domlib.removeEventListener(node, event, textContentListener); });
 
                 function textContentListener() {
                     var cur = S.sample(signal),
@@ -106,24 +94,4 @@
             }
         };
     };
-    
-    Html.animationFrame = function animationFrame(go) {
-        var scheduled = false,
-            args = null;
-    
-        return tick;
-    
-        function tick() {
-            args = Array.prototype.slice.apply(arguments);
-            if (!scheduled) {
-                scheduled = true;
-                requestAnimationFrame(run);
-            }
-        }
-        
-        function run() {
-            scheduled = false;
-            go.apply(null, args);
-        }
-    }
 });

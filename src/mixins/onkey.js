@@ -1,5 +1,5 @@
-define('Html.onkey', ['Html', 'domlib'], function (Html, domlib) {
-    Html.onkey = function onkey(key, event, fn) {
+define('Surplus.onkey', ['Surplus', 'domlib'], function (Surplus, domlib) {
+    Surplus.onkey = function onkey(key, event, fn) {
         if (arguments.length < 3) fn = event, event = 'down';
 
         var parts = key.toLowerCase().split('-', 2),
@@ -7,14 +7,14 @@ define('Html.onkey', ['Html', 'domlib'], function (Html, domlib) {
             mod = parts.length > 1 ? parts[0] + "Key" : null;
 
         if (keyCode === undefined)
-            throw new Error("@Html.onkey: unrecognized key identifier '" + key + "'");
+            throw new Error("@SurplusMixins.onkey: unrecognized key identifier '" + key + "'");
 
         if (typeof fn !== 'function')
-            throw new Error("@Html.onkey: must supply a function to call when the key is entered");
+            throw new Error("@SurplusMixins.onkey: must supply a function to call when the key is entered");
             
         return function (node) {
             domlib.addEventListener(node, 'key' + event, onkeyListener);
-            Html.cleanup(node, function () { domlib.removeEventListener(node, 'key' + event, onkeyListener); });
+            Surplus.cleanup(node, function () { domlib.removeEventListener(node, 'key' + event, onkeyListener); });
         };
         
         function onkeyListener(e) {

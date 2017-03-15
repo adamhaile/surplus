@@ -1,8 +1,8 @@
-define('Html.content', ['Html'], function (Html) {
+define('Surplus.content', ['Surplus'], function (Surplus) {
     var TEXT_NODE = 3;
         
     // value : null | undefined | string | number | boolean | Node | (null | undefined | string | number | boolean | Node)[]
-    Html.content = function content(container, value) {
+    Surplus.content = function content(container, value) {
         var t = typeof value;
 
         if (t === 'string' || t === 'number' || t === 'boolean') {
@@ -11,7 +11,7 @@ define('Html.content', ['Html'], function (Html) {
             node.textContent = '';
         } else if (t === 'function') {
             // TODO: fast path for SArrays
-            Html.exec(function () {
+            Surplus.exec(function () {
                 content(container, value());
             });
         } else if (value instanceof Node) {

@@ -61,7 +61,7 @@ define('genCode', ['AST', 'sourcemap'], function (AST, sourcemap) {
         var id = genIdentifier(ids, parent, 'insert', n);
         createText(inits, id, '');
         appendNode(inits, parent, id);
-        exes.push(opts.symbol + ".exec(function (range) { return Html.insert(range, " + this.code.genCode(opts) + "); }, { start: " + id + ", end: " + id + " });");
+        exes.push(opts.symbol + ".exec(function (range) { return Surplus.insert(range, " + this.code.genCode(opts) + "); }, { start: " + id + ", end: " + id + " });");
     };
     AST.StaticProperty.prototype.genDOMStatements  = function (opts, ids, inits, exes, id, n) {
         inits.push(id + "." + propName(opts, this.name) + " = " + this.value + ";");

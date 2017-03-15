@@ -1,4 +1,4 @@
-describe("Html::insert", function () { 
+describe("Surplus.insert", function () { 
     // <div>before<!-- insert -->after</div>
     var container = document.createElement("div");
     container.appendChild(document.createTextNode("before"));
@@ -102,19 +102,19 @@ describe("Html::insert", function () {
         div2.innerText = "2";
         span3.innerText = "3"
 
-        Html.insert(range, []);
+        Surplus.insert(range, []);
         expect(container.innerHTML)
         .toBe("");
 
-        Html.insert(range, [span1, div2, span3]);
+        Surplus.insert(range, [span1, div2, span3]);
         expect(container.innerHTML)
         .toBe("<span>1</span><div>2</div><span>3</span>");
 
-        Html.insert(range, [div2, span3]);
+        Surplus.insert(range, [div2, span3]);
         expect(container.innerHTML)
         .toBe("<div>2</div><span>3</span>");
 
-        Html.insert(range, [div2, span3]);
+        Surplus.insert(range, [div2, span3]);
         expect(container.innerHTML)
         .toBe("<div>2</div><span>3</span>");
     });
@@ -132,7 +132,7 @@ describe("Html::insert", function () {
         var container = newContainer(),
             range = newRange(container);
 
-        Html.insert(range, val);
+        Surplus.insert(range, val);
 
         return container;
     }

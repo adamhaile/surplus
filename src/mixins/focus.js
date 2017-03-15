@@ -1,4 +1,4 @@
-define('Html.focus', ['Html', 'domlib'], function (Html, domlib) {
+define('Surplus.focus', ['Surplus', 'domlib'], function (Surplus, domlib) {
     /**
      * In htmlliterals, directives run when a node is created, meaning before it has usually
      * been inserted into the document.  This causes a problem for the @focus directive, as only
@@ -12,7 +12,7 @@ define('Html.focus', ['Html', 'domlib'], function (Html, domlib) {
         endPos = NaN,
         scheduled = false;
     
-    Html.focus = function focus(flag, start, end) {
+    Surplus.focus = function focus(flag, start, end) {
         start = arguments.length > 1 ? start : NaN;
         end = arguments.length > 2 ? end : start;
         

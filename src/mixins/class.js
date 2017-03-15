@@ -1,5 +1,5 @@
-define('Html.class', ['Html', 'domlib'], function (Html, domlib) {
-    Html.class = function classMixin(on, off, flag) {            
+define('Surplus.class', ['Surplus', 'domlib'], function (Surplus, domlib) {
+    Surplus.class = function classMixin(on, off, flag) {            
         if (arguments.length < 3) flag = off, off = null;
             
         return function classMixin(node, state) {

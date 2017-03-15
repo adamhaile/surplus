@@ -15,9 +15,10 @@ module.exports = function(config) {
 
     // list of files / patterns to load in the browser
     files: [
-      'dist/htmlliterals-preprocessor.js',
-      '../htmlliterals-runtime/dist/htmlliterals-runtime.js',
-      'spec/*.js'
+      'preprocessor.js',
+      'Surplus.js',
+      'spec/runtime/*.js',
+      'spec/preprocessor/*.js',
     ],
 
 

@@ -4,7 +4,7 @@ describe("HTML mixin", function () {
         test = argsSpy;
 
     it("is called with its args then the node", function () {
-        eval(htmlliterals.preprocess('                          \
+        eval(preprocessor.preprocess('                          \
             argsSpy.calls.reset(), nodeSpy.calls.reset();       \
                                                                 \
             var a = <a @test("foo", 2) />;                      \
