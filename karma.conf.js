@@ -15,8 +15,8 @@ module.exports = function(config) {
 
     // list of files / patterns to load in the browser
     files: [
-      'dist/surplus-preprocessor/index.js',
-      'dist/Surplus/index.js',
+      'packages/surplus-preprocessor/index.js',
+      'packages/Surplus/index.js',
       'spec/runtime/*.js',
       'spec/preprocessor/*.js',
     ],

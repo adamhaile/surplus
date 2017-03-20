@@ -73,7 +73,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 8);
+/******/ 	return __webpack_require__(__webpack_require__.s = 9);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -327,10 +327,10 @@ function vlq(num) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var tokenize_1 = __webpack_require__(7);
-var parse_1 = __webpack_require__(5);
-var shims_1 = __webpack_require__(6);
-__webpack_require__(4);
+var tokenize_1 = __webpack_require__(8);
+var parse_1 = __webpack_require__(6);
+var shims_1 = __webpack_require__(7);
+__webpack_require__(5);
 var sourcemap = __webpack_require__(1);
 function preprocess(str, opts) {
     opts = opts || {};
@@ -356,7 +356,8 @@ exports.preprocess = preprocess;
 
 /***/ }),
 /* 3 */,
-/* 4 */
+/* 4 */,
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -368,6 +369,8 @@ var sourcemap = __webpack_require__(1);
 var rx = {
     backslashes: /\\/g,
     newlines: /\r?\n/g,
+    hasParen: /\(/,
+    loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     singleQuotes: /'/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
@@ -380,13 +383,20 @@ AST.CodeText.prototype.genCode = function (opts) {
         + (opts.sourcemap ? sourcemap.segmentEnd() : "");
 };
 AST.HtmlElement.prototype.genCode = function (opts, prior) {
-    var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', ids = [], inits = [], exes = [];
-    this.genDOMStatements(opts, ids, inits, exes, null, 0);
-    return '(function () {' + iinl
-        + 'var ' + ids.join(', ') + ';' + iinl
-        + inits.join(iinl) + iinl
-        + exes.join(iinl) + iinl
-        + 'return __;' + inl + '})()';
+    if (this.properties.length === 0 && this.content.length === 0) {
+        // optimization: don't need IIFE for simple single nodes
+        return "document.createElement(\"" + this.tag + "\")";
+    }
+    else {
+        var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', ids = [], inits = [], exes = [];
+        this.genDOMStatements(opts, ids, inits, exes, null, 0);
+        return '(function () {' + iinl
+            + 'var ' + ids.join(', ') + ';' + iinl
+            + inits.join(iinl) + iinl
+            + exes.join(iinl) + iinl
+            + 'return __;' + inl
+            + '})()';
+    }
 };
 // genDOMStatements
 AST.HtmlElement.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
@@ -413,10 +423,15 @@ AST.HtmlText.prototype.genDOMStatements = function (opts, ids, inits, exes, pare
     appendNode(inits, parent, id);
 };
 AST.HtmlInsert.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
-    var id = genIdentifier(ids, parent, 'insert', n);
+    var id = genIdentifier(ids, parent, 'insert', n), code = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
     createText(inits, id, '');
     appendNode(inits, parent, id);
-    exec(exes, opts, "function (range) { return Surplus.insert(range, " + this.code.genCode(opts) + ", " + (opts.exec || "null") + "); }", "{ start: " + id + ", end: " + id + " }");
+    if (!opts.exec || noApparentSignals(code)) {
+        exes.push("Surplus.insert(" + range + ", " + code + ");");
+    }
+    else {
+        exe(exes, opts, "Surplus.insert(range, " + code + ", " + (opts.exec || "null") + ");", "range", range);
+    }
 };
 AST.StaticProperty.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
     inits.push(id + "." + propName(opts, this.name) + " = " + this.value + ";");
@@ -427,12 +442,18 @@ AST.DynamicProperty.prototype.genDOMStatements = function (opts, ids, inits, exe
         inits.push(code + " = " + id + ";");
     }
     else {
-        exec(exes, opts, "function () { " + id + "." + propName(opts, this.name) + " = " + code + "; }", "");
+        var prop = propName(opts, this.name), setter = id + "." + prop + " = " + code + ";";
+        if (noApparentSignals(code)) {
+            exes.push(setter);
+        }
+        else {
+            exe(exes, opts, setter, "", "");
+        }
     }
 };
 AST.Mixin.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
     var code = this.code.genCode(opts);
-    exec(exes, opts, "function (__state) { return " + code + "(" + id + ", __state); }", "");
+    exe(exes, opts, "(" + code + ")(" + id + ", __state);", "__state", "");
 };
 function genIdentifier(ids, parent, tag, n) {
     var id = parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -451,12 +472,25 @@ function createText(stmts, id, text) {
 function appendNode(stmts, parent, child) {
     stmts.push(parent + '.appendChild(' + child + ');');
 }
-function exec(execs, opts, fn, val) {
-    fn = opts.exec ? (opts.exec + '(' + fn + (val ? ', ' + val : '') + ');') : ('(' + fn + ')(' + val + ');');
-    execs.push(fn);
+function exe(execs, opts, code, varname, seed) {
+    if (opts.exec) {
+        if (varname) {
+            code = opts.exec + "(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");";
+        }
+        else {
+            code = opts.exec + "(function () { " + code + " });";
+        }
+    }
+    else if (varname) {
+        code = "(function (" + varname + ") { return " + code + " })(" + seed + ");";
+    }
+    execs.push(code);
 }
 function propName(opts, name) {
     return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
+}
+function noApparentSignals(code) {
+    return !rx.hasParen.test(code) || rx.loneFunction.test(code);
 }
 function concatResults(opts, children, method, sep) {
     var result = "", i;
@@ -480,7 +514,7 @@ function codeStr(str) {
 
 
 /***/ }),
-/* 5 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -668,11 +702,11 @@ function parse(TOKS, opts) {
         if (NOT('{'))
             ERR("not at start of JSX embedded code");
         var segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
-        // replace opening and closing '{' and '}' with '(' and ')'
-        last = last.substr(0, last.length - 1) + ')';
+        // remove opening and closing '{' and '}'
+        last = last.substr(0, last.length - 1);
         segments.push(new AST.CodeText(last, loc));
         var first = segments[0];
-        first.text = '(' + first.text.substr(1);
+        first.text = first.text.substr(1);
         return new AST.EmbeddedCode(segments);
     }
     function balancedParens(segments, text, loc) {
@@ -802,7 +836,7 @@ exports.parse = parse;
 
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -899,7 +933,7 @@ function insertAfter(node, ctx) {
 
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -940,7 +974,7 @@ exports.tokenize = tokenize;
 
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

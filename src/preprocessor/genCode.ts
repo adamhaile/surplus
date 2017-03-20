@@ -6,6 +6,8 @@ import { Params } from './preprocess';
 const rx = {
     backslashes : /\\/g,
     newlines    : /\r?\n/g,
+    hasParen    : /\(/,
+    loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     singleQuotes: /'/g,
     indent      : /\n(?=[^\n]+$)([ \t]*)/
 };
@@ -27,20 +29,26 @@ AST.CodeText.prototype.genCode       = function (opts) {
         + (opts.sourcemap ? sourcemap.segmentEnd() : "");
 };
 AST.HtmlElement.prototype.genCode = function (opts, prior?) {
-    var nl = "\r\n" + indent(prior),
-        inl = nl + '    ',
-        iinl = inl + '    ',
-        ids = [] as string[],
-        inits = [] as string[],
-        exes = [] as string[];
-    
-    this.genDOMStatements(opts, ids, inits, exes, null, 0);
+    if (this.properties.length === 0 && this.content.length === 0) {
+        // optimization: don't need IIFE for simple single nodes
+        return `document.createElement("${this.tag}")`;
+    } else {
+        var nl = "\r\n" + indent(prior),
+            inl = nl + '    ',
+            iinl = inl + '    ',
+            ids = [] as string[],
+            inits = [] as string[],
+            exes = [] as string[];
+        
+        this.genDOMStatements(opts, ids, inits, exes, null, 0);
 
-    return '(function () {' + iinl 
-        + 'var ' + ids.join(', ') + ';' + iinl
-        + inits.join(iinl) + iinl 
-        + exes.join(iinl) + iinl
-        + 'return __;' + inl +  '})()';
+        return '(function () {' + iinl 
+            + 'var ' + ids.join(', ') + ';' + iinl
+            + inits.join(iinl) + iinl 
+            + exes.join(iinl) + iinl
+            + 'return __;' + inl 
+            +  '})()';
+        }
 };
 
 // genDOMStatements
@@ -68,10 +76,16 @@ AST.HtmlText.prototype.genDOMStatements        = function (opts, ids, inits, exe
     appendNode(inits, parent, id);
 };
 AST.HtmlInsert.prototype.genDOMStatements      = function (opts, ids, inits, exes, parent, n) {
-    var id = genIdentifier(ids, parent, 'insert', n);
+    var id = genIdentifier(ids, parent, 'insert', n),
+        code = this.code.genCode(opts),
+        range = `{ start: ${id}, end: ${id} }`;
     createText(inits, id, '');
     appendNode(inits, parent, id);
-    exec(exes, opts, "function (range) { return Surplus.insert(range, " + this.code.genCode(opts) + ", " + (opts.exec || "null") + "); }", "{ start: " + id + ", end: " + id + " }");
+    if (!opts.exec || noApparentSignals(code)) {
+        exes.push(`Surplus.insert(${range}, ${code});`);   
+    } else { 
+        exe(exes, opts, `Surplus.insert(range, ${code}, ${opts.exec || "null"});`, "range", range);
+    }
 };
 AST.StaticProperty.prototype.genDOMStatements  = function (opts, ids, inits, exes, id, n) {
     inits.push(id + "." + propName(opts, this.name) + " = " + this.value + ";");
@@ -81,12 +95,18 @@ AST.DynamicProperty.prototype.genDOMStatements = function (opts, ids, inits, exe
     if (this.name === "ref") {
         inits.push(code + " = " + id + ";");
     } else {
-        exec(exes, opts, "function () { " + id + "." + propName(opts, this.name) + " = " + code + "; }", "");
+        var prop = propName(opts, this.name),
+            setter = `${id}.${prop} = ${code};`;
+        if (noApparentSignals(code)) {
+            exes.push(setter);
+        } else {
+            exe(exes, opts, setter, "", "");
+        }
     }
 };
 AST.Mixin.prototype.genDOMStatements           = function (opts, ids, inits, exes, id, n) {
     var code = this.code.genCode(opts);
-    exec(exes, opts, "function (__state) { return " + code + "(" + id + ", __state); }", "");
+    exe(exes, opts, `(${code})(${id}, __state);`, "__state", "");
 };
 
 function genIdentifier(ids : string[], parent : string, tag : string, n : number) {
@@ -111,13 +131,25 @@ function appendNode(stmts : string[], parent : string, child : string) {
     stmts.push(parent + '.appendChild(' + child + ');');
 }
 
-function exec(execs : string[], opts : Params, fn : string, val : string) {
-    fn = opts.exec ? (opts.exec + '(' + fn + (val ? ', ' + val : '') + ');') : ('(' + fn + ')(' + val + ');');
-    execs.push(fn);
+function exe(execs : string[], opts : Params, code : string, varname : string , seed : string) {
+    if (opts.exec) {
+        if (varname) {
+            code = `${opts.exec}(function (${varname}) { return ${code} }${seed ? `, ${seed}` : ''});`;
+        } else {
+            code = `${opts.exec}(function () { ${code} });`;    
+        }
+    } else if (varname) {
+        code = `(function (${varname}) { return ${code} })(${seed});`;
+    }
+    execs.push(code);
 }
 
 function propName(opts : Params, name : string) {
     return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
+}
+
+function noApparentSignals(code : string) {
+    return !rx.hasParen.test(code) || rx.loneFunction.test(code);
 }
 
 function concatResults(opts : Params, children : any[], method : string, sep? : string) {

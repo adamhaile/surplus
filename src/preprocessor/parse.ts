@@ -224,12 +224,12 @@ export function parse(TOKS : string[], opts : Params) {
             loc = LOC(),
             last = balancedParens(segments, "", loc);
         
-        // replace opening and closing '{' and '}' with '(' and ')'
-        last = last.substr(0, last.length - 1) + ')';
+        // remove opening and closing '{' and '}'
+        last = last.substr(0, last.length - 1);
         segments.push(new AST.CodeText(last, loc));
 
         var first = segments[0] as AST.CodeText;
-        first.text = '(' + first.text.substr(1);
+        first.text = first.text.substr(1);
 
         return new AST.EmbeddedCode(segments);
     }

@@ -1,6 +1,6 @@
 describe("HTML node literal", function () {
     it("converts inline HTML to DOM objects", function () {
-        eval(window['surplus-preprocessor'].preprocess('                                         \
+        eval(window['surplus-preprocessor'].preprocess('                       \
             var div = <div></div>,                                             \
                 h1 = <h1>title</h1>,                                           \
                 ul  = <ul>                                                     \
