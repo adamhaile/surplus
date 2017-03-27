@@ -1,35 +1,17 @@
-describe("JSX syntax", function () {
-    it("sets a property to the value of a JSX expression", function () {
-        eval(window['surplus-preprocessor'].preprocess('                      \
-            var val = "foo",                                \
-                input = <input value = {val} />;            \
-                                                            \
-            expect(input.value).toBe("foo");                \
-        ', { jsx: true }));
-    });
-
-    it("inserts the value of a JSX expression into a node's children", function () {
-        eval(window['surplus-preprocessor'].preprocess('                      \
-            var val = "foo",                                \
-                span = <span>{val}</span>;                  \
-                                                            \
-            expect(span.innerText).toBe("foo");             \
-        ', { jsx: true }));
-    });
-
-    it("calls upper-cased sub-components", function () {
+describe("upper-case subcomponent", function () {
+    it("is called with a property object", function () {
         var code = window['surplus-preprocessor'].preprocess('          \
             var props = null,                                           \
                 SubComponent = p => props = p,                          \
-                sub = <SubComponent foo="2" bar={3}/>;                  \
+                sub = <SubComponent foo="2" bar=3/>;                    \
                                                                         \
             expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \
-        ', { jsx: true });
+        ');
 
         eval(code);
     });
 
-    it("can have sub-components with children", function () {
+    it("can have children", function () {
         var code = window['surplus-preprocessor'].preprocess('              \
             var props = null,                                               \
                 SubComponent = p => props = p,                              \
@@ -48,14 +30,14 @@ describe("JSX syntax", function () {
             expect(props.children[1]).toBe("some words");                   \
             expect(props.children[2] instanceof Comment).toBe(true);        \
             expect(props.children[2].data).toBe(" comment ");               \
-        ', { jsx: true });
+        ');
 
         eval(code);
     });
 
-    it("can have sub-components as children", function () {
+    it("can be children", function () {
         var code = window['surplus-preprocessor'].preprocess('              \
-            var SubComponent = p => <span>{p.text}</span>,                  \
+            var SubComponent = p => <span>@p.text</span>,                   \
                 div =                                                       \
                     <div>                                                   \
                         <SubComponent text="foo" />                         \
@@ -65,7 +47,7 @@ describe("JSX syntax", function () {
             expect(div.childNodes.length).toBe(1);                          \
             expect(div.childNodes[0] instanceof HTMLSpanElement).toBe(true);\
             expect(div.childNodes[0].innerText).toBe("foo");                \
-        ', { jsx: true });
+        ');
 
         eval(code);
     });

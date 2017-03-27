@@ -1,6 +1,6 @@
 describe("HTML node literal", function () {
     it("converts inline HTML to DOM objects", function () {
-        eval(window['surplus-preprocessor'].preprocess('                       \
+        var code = window['surplus-preprocessor'].preprocess('                 \
             var div = <div></div>,                                             \
                 h1 = <h1>title</h1>,                                           \
                 ul  = <ul>                                                     \
@@ -31,14 +31,18 @@ describe("HTML node literal", function () {
             expect(a.childNodes.length).toBe(1);                               \
             expect(a.childNodes[0] instanceof Text).toBe(true);                \
             expect(a.childNodes[0].data).toBe("link");                         \
-        '));
+        ');
+
+        eval(code);
     });
 
     it("preserves static attributes", function () {
-        eval(window['surplus-preprocessor'].preprocess('                          \
+        var code = window['surplus-preprocessor'].preprocess('                          \
             var a = <a href="#" target="top"></a>;              \
                                                                 \
             expect(a.getAttribute("href")).toBe("#");           \
-        '));
+        ');
+
+        eval(code);
     });
 });

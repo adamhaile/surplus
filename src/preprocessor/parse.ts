@@ -3,7 +3,7 @@ import { Params } from './preprocess';
 
 // pre-compiled regular expressions
 const rx = {
-    identifier       : /^[a-z]\w*/,
+    identifier       : /^[a-zA-Z]\w*/,
     stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
     leadingWs        : /^\s+/,
     codeTerminator   : /^[\s<>/,;)\]}]/,
@@ -138,13 +138,15 @@ export function parse(TOKS : string[], opts : Params) {
         var start = LOC(),
             text = "";
 
+        NEXT(); // skip '<!--'
+
         while (!EOF && NOT('-->')) {
             text += TOK, NEXT();
         }
 
         if (EOF) ERR("unterminated html comment", start);
 
-        text += TOK, NEXT();
+        NEXT(); // skip '-->'
 
         return new AST.HtmlComment(text);
     }

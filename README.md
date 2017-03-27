@@ -40,6 +40,7 @@ a.href === "http://bar";
 
 Supported JSX features
 - creation of DOM elements (lower-cased): `<a></a>`
+- creation of sub-components (upper-cased): `<Foo bar="1"/>`
 - static properties on DOM elements: `<a href="http://foo"><a/>`
 - JSX expressions setting properties: `<a href={url()}></a>`
 - JSX expressions inserting children: `<a>{link()}</a>`
@@ -48,7 +49,6 @@ Extensions to JSX
 - 'ref' properties take a variable to assign the node to, not a function: `<a ref={a_node}></a>`
 
 Planned but currently unsupported JSX features
-- upper-case JSX elements are calls to "functional" components: `<Foo bar="1"/>`
 - spread properties: `<a {... props}></a>`
 
 Planned but currently unimplemented extensions to JSX syntax

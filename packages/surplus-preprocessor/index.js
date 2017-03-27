@@ -73,7 +73,7 @@ return /******/ (function(modules) { // webpackBootstrap
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 9);
+/******/ 	return __webpack_require__(__webpack_require__.s = 8);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -327,10 +327,10 @@ function vlq(num) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-var tokenize_1 = __webpack_require__(8);
-var parse_1 = __webpack_require__(6);
-var shims_1 = __webpack_require__(7);
-__webpack_require__(5);
+var tokenize_1 = __webpack_require__(7);
+var parse_1 = __webpack_require__(5);
+var shims_1 = __webpack_require__(6);
+__webpack_require__(4);
 var sourcemap = __webpack_require__(1);
 function preprocess(str, opts) {
     opts = opts || {};
@@ -356,8 +356,7 @@ exports.preprocess = preprocess;
 
 /***/ }),
 /* 3 */,
-/* 4 */,
-/* 5 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -371,6 +370,7 @@ var rx = {
     newlines: /\r?\n/g,
     hasParen: /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
+    upperStart: /^[A-Z]/,
     singleQuotes: /'/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
@@ -383,7 +383,10 @@ AST.CodeText.prototype.genCode = function (opts) {
         + (opts.sourcemap ? sourcemap.segmentEnd() : "");
 };
 AST.HtmlElement.prototype.genCode = function (opts, prior) {
-    if (this.properties.length === 0 && this.content.length === 0) {
+    if (rx.upperStart.test(this.tag)) {
+        return genSubComponent(this, opts, prior);
+    }
+    else if (this.properties.length === 0 && this.content.length === 0) {
         // optimization: don't need IIFE for simple single nodes
         return "document.createElement(\"" + this.tag + "\")";
     }
@@ -398,33 +401,63 @@ AST.HtmlElement.prototype.genCode = function (opts, prior) {
             + '})()';
     }
 };
+function genSubComponent(cmp, opts, prior) {
+    var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = cmp.properties.map(function (p) {
+        return p instanceof AST.StaticProperty ? propName(opts, p.name) + ": " + p.value + "," :
+            p instanceof AST.DynamicProperty ? propName(opts, p.name) + ": " + p.code.genCode(opts, prior) + "," :
+                '';
+    }), children = cmp.content.map(function (c) {
+        return c instanceof AST.HtmlElement ? c.genCode(opts, prior) :
+            c instanceof AST.HtmlText ? codeStr(c.text.trim()) :
+                c instanceof AST.HtmlInsert ? c.code.genCode(opts, prior) :
+                    createComment(c.text);
+    });
+    return cmp.tag + "({" + inl
+        + props.join(inl) + inl
+        + 'children: [' + iinl
+        + children.join(',' + iinl) + inl
+        + ']})';
+}
 // genDOMStatements
 AST.HtmlElement.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
-    var id = genIdentifier(ids, parent, this.tag, n), myexes = [];
-    createElement(inits, id, this.tag);
-    for (var i = 0; i < this.properties.length; i++) {
-        this.properties[i].genDOMStatements(opts, ids, inits, myexes, id, i);
+    var id = genIdentifier(ids, parent, this.tag, n);
+    if (rx.upperStart.test(this.tag)) {
+        var code = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
+        assign(inits, id, createText(''));
+        if (!opts.exec) {
+            exes.push("Surplus.insert(" + range + ", " + code + ");");
+        }
+        else {
+            exe(exes, opts, "Surplus.insert(range, " + code + ", " + opts.exec + ");", "range", range);
+        }
     }
-    for (i = 0; i < this.content.length; i++) {
-        this.content[i].genDOMStatements(opts, ids, inits, exes, id, i);
+    else {
+        var myexes = [];
+        assign(inits, id, createElement(this.tag));
+        for (var i = 0; i < this.properties.length; i++) {
+            this.properties[i].genDOMStatements(opts, ids, inits, myexes, id, i);
+        }
+        for (i = 0; i < this.content.length; i++) {
+            this.content[i].genDOMStatements(opts, ids, inits, exes, id, i);
+        }
+        exes.push.apply(exes, myexes);
     }
-    exes.push.apply(exes, myexes);
     if (parent)
         appendNode(inits, parent, id);
 };
 AST.HtmlComment.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
     var id = genIdentifier(ids, parent, 'comment', n);
-    createComment(inits, id, this.text);
+    assign(inits, id, createComment(this.text));
     appendNode(inits, parent, id);
 };
 AST.HtmlText.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
     var id = genIdentifier(ids, parent, 'text', n);
-    createText(inits, id, this.text);
+    assign(inits, id, createText(this.text));
     appendNode(inits, parent, id);
 };
 AST.HtmlInsert.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
     var id = genIdentifier(ids, parent, 'insert', n), code = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
-    createText(inits, id, '');
+    assign(inits, id, createText(''));
     appendNode(inits, parent, id);
     if (!opts.exec || noApparentSignals(code)) {
         exes.push("Surplus.insert(" + range + ", " + code + ");");
@@ -455,37 +488,27 @@ AST.Mixin.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) 
     var code = this.code.genCode(opts);
     exe(exes, opts, "(" + code + ")(" + id + ", __state);", "__state", "");
 };
-function genIdentifier(ids, parent, tag, n) {
+var genIdentifier = function (ids, parent, tag, n) {
     var id = parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
     ids.push(id);
     return id;
-}
-function createElement(stmts, id, tag) {
-    stmts.push(id + ' = document.createElement(\'' + tag + '\');');
-}
-function createComment(stmts, id, text) {
-    stmts.push(id + ' = document.createComment(' + codeStr(text) + ');');
-}
-function createText(stmts, id, text) {
-    stmts.push(id + ' = document.createTextNode(' + codeStr(text) + ');');
-}
-function appendNode(stmts, parent, child) {
-    stmts.push(parent + '.appendChild(' + child + ');');
-}
-function exe(execs, opts, code, varname, seed) {
-    if (opts.exec) {
-        if (varname) {
-            code = opts.exec + "(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");";
-        }
-        else {
-            code = opts.exec + "(function () { " + code + " });";
-        }
-    }
-    else if (varname) {
-        code = "(function (" + varname + ") { return " + code + " })(" + seed + ");";
-    }
-    execs.push(code);
-}
+}, assign = function (stmts, id, expr) {
+    return stmts.push(id + " = " + expr + ";");
+}, appendNode = function (stmts, parent, child) {
+    return stmts.push(parent + '.appendChild(' + child + ');');
+}, createElement = function (tag) {
+    return "document.createElement('" + tag + "')";
+}, createComment = function (text) {
+    return "document.createComment(" + codeStr(text) + ")";
+}, createText = function (text) {
+    return "document.createTextNode(" + codeStr(text) + ")";
+}, exe = function (execs, opts, code, varname, seed) {
+    return execs.push(opts.exec ?
+        (varname ? opts.exec + "(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
+            : opts.exec + "(function () { " + code + " });") :
+        varname ? "(function (" + varname + ") { return " + code + " })(" + seed + ");" :
+            code);
+};
 function propName(opts, name) {
     return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
 }
@@ -514,7 +537,7 @@ function codeStr(str) {
 
 
 /***/ }),
-/* 6 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -523,7 +546,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var AST = __webpack_require__(0);
 // pre-compiled regular expressions
 var rx = {
-    identifier: /^[a-z]\w*/,
+    identifier: /^[a-zA-Z]\w*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
     leadingWs: /^\s+/,
     codeTerminator: /^[\s<>/,;)\]}]/,
@@ -633,12 +656,13 @@ function parse(TOKS, opts) {
         if (NOT('<!--'))
             ERR("not in HTML comment");
         var start = LOC(), text = "";
+        NEXT(); // skip '<!--'
         while (!EOF && NOT('-->')) {
             text += TOK, NEXT();
         }
         if (EOF)
             ERR("unterminated html comment", start);
-        text += TOK, NEXT();
+        NEXT(); // skip '-->'
         return new AST.HtmlComment(text);
     }
     function htmlInsert() {
@@ -836,7 +860,7 @@ exports.parse = parse;
 
 
 /***/ }),
-/* 7 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -933,7 +957,7 @@ function insertAfter(node, ctx) {
 
 
 /***/ }),
-/* 8 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -974,7 +998,7 @@ exports.tokenize = tokenize;
 
 
 /***/ }),
-/* 9 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
