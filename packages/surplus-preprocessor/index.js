@@ -106,7 +106,7 @@ var ASTStatementNode = (function () {
     function ASTStatementNode() {
     }
     ASTStatementNode.prototype.shim = function (ctx) { };
-    ASTStatementNode.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) { };
+    ASTStatementNode.prototype.genDOMStatements = function (opts, code, parent, n) { };
     return ASTStatementNode;
 }());
 exports.ASTStatementNode = ASTStatementNode;
@@ -150,7 +150,7 @@ var HtmlElement = (function (_super) {
         _this.content = content;
         return _this;
     }
-    HtmlElement.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) { };
+    HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) { };
     return HtmlElement;
 }(ASTCodeNode));
 exports.HtmlElement = HtmlElement;
@@ -391,14 +391,9 @@ AST.HtmlElement.prototype.genCode = function (opts, prior) {
         return "document.createElement(\"" + this.tag + "\")";
     }
     else {
-        var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', ids = [], inits = [], exes = [];
-        this.genDOMStatements(opts, ids, inits, exes, null, 0);
-        return '(function () {' + iinl
-            + 'var ' + ids.join(', ') + ';' + iinl
-            + inits.join(iinl) + iinl
-            + exes.join(iinl) + iinl
-            + 'return __;' + inl
-            + '})()';
+        var code = new CodeBlock();
+        this.genDOMStatements(opts, code, null, 0);
+        return code.toCode(indent(prior));
     }
 };
 function genSubComponent(cmp, opts, prior) {
@@ -418,96 +413,116 @@ function genSubComponent(cmp, opts, prior) {
         + children.join(',' + iinl) + inl
         + ']})';
 }
+var CodeBlock = (function () {
+    function CodeBlock() {
+        this.ids = [];
+        this.inits = [];
+        this.exes = [];
+    }
+    CodeBlock.prototype.id = function (id) { this.ids.push(id); return id; };
+    CodeBlock.prototype.init = function (stmt) { this.inits.push(stmt); return stmt; };
+    CodeBlock.prototype.exe = function (stmt) { this.exes.push(stmt); return stmt; };
+    CodeBlock.prototype.toCode = function (indent) {
+        var nl = "\r\n" + indent, inl = nl + '    ', iinl = inl + '    ';
+        return '(function () {' + iinl
+            + 'var ' + this.ids.join(', ') + ';' + iinl
+            + this.inits.join(iinl) + iinl
+            + this.exes.join(iinl) + iinl
+            + 'return __;' + inl
+            + '})()';
+    };
+    return CodeBlock;
+}());
+exports.CodeBlock = CodeBlock;
 // genDOMStatements
-AST.HtmlElement.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
-    var id = genIdentifier(ids, parent, this.tag, n);
+AST.HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) {
+    var id = code.id(genIdentifier(parent, this.tag, n));
     if (rx.upperStart.test(this.tag)) {
-        var code = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
-        assign(inits, id, createText(''));
+        var expr = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
+        code.init(assign(id, createText('')));
         if (!opts.exec) {
-            exes.push("Surplus.insert(" + range + ", " + code + ");");
+            code.exe("Surplus.insert(" + range + ", " + expr + ");");
         }
         else {
-            exe(exes, opts, "Surplus.insert(range, " + code + ", " + opts.exec + ");", "range", range);
+            code.exe(exe(opts, "Surplus.insert(range, " + expr + ", " + opts.exec + ");", "range", range));
         }
     }
     else {
-        var myexes = [];
-        assign(inits, id, createElement(this.tag));
+        var exelen = code.exes.length;
+        code.init(assign(id, createElement(this.tag)));
         for (var i = 0; i < this.properties.length; i++) {
-            this.properties[i].genDOMStatements(opts, ids, inits, myexes, id, i);
+            this.properties[i].genDOMStatements(opts, code, id, i);
         }
+        var myexes = code.exes.splice(exelen);
         for (i = 0; i < this.content.length; i++) {
-            this.content[i].genDOMStatements(opts, ids, inits, exes, id, i);
+            this.content[i].genDOMStatements(opts, code, id, i);
         }
-        exes.push.apply(exes, myexes);
+        code.exes = code.exes.concat(myexes);
     }
     if (parent)
-        appendNode(inits, parent, id);
+        code.init(appendNode(parent, id));
 };
-AST.HtmlComment.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
-    var id = genIdentifier(ids, parent, 'comment', n);
-    assign(inits, id, createComment(this.text));
-    appendNode(inits, parent, id);
+AST.HtmlComment.prototype.genDOMStatements = function (opts, code, parent, n) {
+    var id = code.id(genIdentifier(parent, 'comment', n));
+    code.init(assign(id, createComment(this.text)));
+    code.init(appendNode(parent, id));
 };
-AST.HtmlText.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
-    var id = genIdentifier(ids, parent, 'text', n);
-    assign(inits, id, createText(this.text));
-    appendNode(inits, parent, id);
+AST.HtmlText.prototype.genDOMStatements = function (opts, code, parent, n) {
+    var id = code.id(genIdentifier(parent, 'text', n));
+    code.init(assign(id, createText(this.text)));
+    code.init(appendNode(parent, id));
 };
-AST.HtmlInsert.prototype.genDOMStatements = function (opts, ids, inits, exes, parent, n) {
-    var id = genIdentifier(ids, parent, 'insert', n), code = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
-    assign(inits, id, createText(''));
-    appendNode(inits, parent, id);
-    if (!opts.exec || noApparentSignals(code)) {
-        exes.push("Surplus.insert(" + range + ", " + code + ");");
+AST.HtmlInsert.prototype.genDOMStatements = function (opts, code, parent, n) {
+    var id = code.id(genIdentifier(parent, 'insert', n)), ins = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
+    code.init(assign(id, createText('')));
+    code.init(appendNode(parent, id));
+    if (!opts.exec || noApparentSignals(ins)) {
+        code.exe("Surplus.insert(" + range + ", " + ins + ");");
     }
     else {
-        exe(exes, opts, "Surplus.insert(range, " + code + ", " + (opts.exec || "null") + ");", "range", range);
+        code.exe(exe(opts, "Surplus.insert(range, " + ins + ", " + (opts.exec || "null") + ");", "range", range));
     }
 };
-AST.StaticProperty.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
-    inits.push(id + "." + propName(opts, this.name) + " = " + this.value + ";");
+AST.StaticProperty.prototype.genDOMStatements = function (opts, code, id, n) {
+    code.init(id + "." + propName(opts, this.name) + " = " + this.value + ";");
 };
-AST.DynamicProperty.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
-    var code = this.code.genCode(opts);
+AST.DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
+    var expr = this.code.genCode(opts);
     if (this.name === "ref") {
-        inits.push(code + " = " + id + ";");
+        code.init(expr + " = " + id + ";");
     }
     else {
-        var prop = propName(opts, this.name), setter = id + "." + prop + " = " + code + ";";
-        if (noApparentSignals(code)) {
-            exes.push(setter);
+        var prop = propName(opts, this.name), setter = id + "." + prop + " = " + expr + ";";
+        if (noApparentSignals(expr)) {
+            code.exe(setter);
         }
         else {
-            exe(exes, opts, setter, "", "");
+            code.exe(exe(opts, setter, "", ""));
         }
     }
 };
-AST.Mixin.prototype.genDOMStatements = function (opts, ids, inits, exes, id, n) {
-    var code = this.code.genCode(opts);
-    exe(exes, opts, "(" + code + ")(" + id + ", __state);", "__state", "");
+AST.Mixin.prototype.genDOMStatements = function (opts, code, id, n) {
+    var expr = this.code.genCode(opts);
+    code.exe(exe(opts, "(" + expr + ")(" + id + ", __state);", "__state", ""));
 };
-var genIdentifier = function (ids, parent, tag, n) {
-    var id = parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
-    ids.push(id);
-    return id;
-}, assign = function (stmts, id, expr) {
-    return stmts.push(id + " = " + expr + ";");
-}, appendNode = function (stmts, parent, child) {
-    return stmts.push(parent + '.appendChild(' + child + ');');
+var genIdentifier = function (parent, tag, n) {
+    return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
+}, assign = function (id, expr) {
+    return id + " = " + expr + ";";
+}, appendNode = function (parent, child) {
+    return parent + '.appendChild(' + child + ');';
 }, createElement = function (tag) {
     return "document.createElement('" + tag + "')";
 }, createComment = function (text) {
     return "document.createComment(" + codeStr(text) + ")";
 }, createText = function (text) {
     return "document.createTextNode(" + codeStr(text) + ")";
-}, exe = function (execs, opts, code, varname, seed) {
-    return execs.push(opts.exec ?
+}, exe = function (opts, code, varname, seed) {
+    return opts.exec ?
         (varname ? opts.exec + "(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
             : opts.exec + "(function () { " + code + " });") :
         varname ? "(function (" + varname + ") { return " + code + " })(" + seed + ");" :
-            code);
+            code;
 };
 function propName(opts, name) {
     return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
