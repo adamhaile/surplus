@@ -41,7 +41,7 @@ a.href === "http://bar";
 Supported JSX features
 - creation of DOM elements (lower-cased): `<a></a>`
 - creation of sub-components (upper-cased): `<Foo bar="1"/>`
-- static properties on DOM elements: `<a href="http://foo"><a/>`
+- static properties: `<a href="http://foo"><a/>`
 - JSX expressions setting properties: `<a href={url()}></a>`
 - JSX expressions inserting children: `<a>{link()}</a>`
 

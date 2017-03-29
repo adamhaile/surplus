@@ -18,7 +18,7 @@ export interface ICodeGenerator {
 }
 
 export interface IStatementGenerator {
-    genDOMStatements(opts : Params, code : CodeBlock, parent : string, n : number) : void;
+    genDOMStatements(opts : Params, code : CodeBlock, parent : string, n : number) : string | void;
 }
 
 // genCode
@@ -36,9 +36,9 @@ AST.HtmlElement.prototype.genCode = function (opts, prior?) {
         // optimization: don't need IIFE for simple single nodes
         return `document.createElement("${this.tag}")`;
     } else {
-        var code = new CodeBlock();
-        this.genDOMStatements(opts, code, null, 0);
-        return code.toCode(indent(prior));
+        var code = new CodeBlock(),
+            expr = this.genDOMStatements(opts, code, null, 0);
+        return code.toCode(expr, indent(prior));
     }
 };
 
@@ -72,7 +72,7 @@ export class CodeBlock {
     init(stmt : string) { this.inits.push(stmt); return stmt; }
     exe(stmt : string)  { this.exes.push(stmt);  return stmt; }
 
-    toCode(indent : string) {
+    toCode(expr : string, indent : string) {
         var nl = "\r\n" + indent,
             inl = nl + '    ',
             iinl = inl + '    ';
@@ -81,7 +81,7 @@ export class CodeBlock {
             + 'var ' + this.ids.join(', ') + ';' + iinl
             + this.inits.join(iinl) + iinl 
             + this.exes.join(iinl) + iinl
-            + 'return __;' + inl 
+            + 'return ' + expr + ';' + inl 
             +  '})()';
     }
 }
@@ -106,33 +106,34 @@ AST.HtmlElement.prototype.genDOMStatements     = function (opts, code, parent, n
         }
         var myexes = code.exes.splice(exelen);
         for (i = 0; i < this.content.length; i++) {
-            this.content[i].genDOMStatements(opts, code, id, i);
+            var child = this.content[i].genDOMStatements(opts, code, id, i);
+            if (child) code.init(appendNode(id, child));
         }
         code.exes = code.exes.concat(myexes);
     }
-    if (parent) code.init(appendNode(parent, id));
+    return id;
 };
 AST.HtmlComment.prototype.genDOMStatements     = function (opts, code, parent, n) {
-    var id = code.id(genIdentifier(parent, 'comment', n));
-    code.init(assign(id, createComment(this.text)));
-    code.init(appendNode(parent, id));
+    return createComment(this.text);
 }
 AST.HtmlText.prototype.genDOMStatements        = function (opts, code, parent, n) { 
-    var id = code.id(genIdentifier(parent, 'text', n));
-    code.init(assign(id, createText(this.text)));
-    code.init(appendNode(parent, id));
+    if (n === 0) {
+        code.init(`${parent}.innerText = ${codeStr(this.text)}`);
+    } else {
+        return createText(this.text);
+    }
 };
 AST.HtmlInsert.prototype.genDOMStatements      = function (opts, code, parent, n) {
     var id = code.id(genIdentifier(parent, 'insert', n)),
         ins = this.code.genCode(opts),
         range = `{ start: ${id}, end: ${id} }`;
     code.init(assign(id, createText('')));
-    code.init(appendNode(parent, id));
     if (!opts.exec || noApparentSignals(ins)) {
-        code.exe(`Surplus.insert(${range}, ${ins});`);   
+        code.exe(`Surplus.insert(${range}, ${ins}, ${opts.exec || "null"});`);
     } else { 
         code.exe(exe(opts, `Surplus.insert(range, ${ins}, ${opts.exec || "null"});`, "range", range));
     }
+    return id;
 };
 AST.StaticProperty.prototype.genDOMStatements  = function (opts, code, id, n) {
     code.init(id + "." + propName(opts, this.name) + " = " + this.value + ";");
