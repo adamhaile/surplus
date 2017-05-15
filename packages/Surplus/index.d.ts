@@ -1,14 +1,4 @@
-interface Surplus {
-	insert(node : HTMLElement, value : any, state : HTMLElement) : HTMLElement;
-}
-
-interface SurplusMixin {
-	(node : HTMLElement, state : any) : any;
-}
-
-declare var Surplus : Surplus;
-
-export = Surplus;
+export * from './es/Surplus';
 
 // JSX type definitions for Surplus initially based on those for React v0.14
 // React definitions by: Asana <https://asana.com>, AssureSign <http://www.assuresign.com>, Microsoft <https://microsoft.com>, John Reilly <https://github.com/johnnyreilly/>
@@ -196,7 +186,6 @@ declare global {
 		}
 
 		interface SurplusAtributes<T> {
-			(node : T, state? : any) : any;
 			ref?: T;
 		}
 

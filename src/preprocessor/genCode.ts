@@ -38,7 +38,7 @@ AST.HtmlElement.prototype.genCode = function (opts, prior?) {
     } else {
         var code = new CodeBlock(),
             expr = this.genDOMStatements(opts, code, null, 0);
-        return code.toCode(expr, indent(prior));
+        return code.toCode(expr!, indent(prior));
     }
 };
 
@@ -157,18 +157,18 @@ AST.Mixin.prototype.genDOMStatements           = function (opts, code, id, n) {
     code.exe(exe(opts, `(${expr})(${id}, __state);`, "__state", ""));
 };
 
-let genIdentifier = (parent : string, tag : string, n : number) =>
+let genIdentifier = (parent : string | null, tag : string, n : number) =>
         parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1),
     assign = (id : string, expr : string) => 
         `${id} = ${expr};`,
     appendNode = (parent : string, child : string) =>
-        parent + '.appendChild(' + child + ');',
+        `Surplus.appendChild(${parent}, ${child});`,
     createElement = (tag : string)  => 
-        `document.createElement(\'${tag}\')`,
+        `Surplus.createElement(\'${tag}\')`,
     createComment = (text : string) => 
-        `document.createComment(${codeStr(text)})`,
+        `Surplus.createComment(${codeStr(text)})`,
     createText    = (text : string) => 
-        `document.createTextNode(${codeStr(text)})`,
+        `Surplus.createTextNode(${codeStr(text)})`,
     exe = (opts : Params, code : string, varname : string , seed : string) =>
         opts.exec ?
             (varname ? `${opts.exec}(function (${varname}) { return ${code} }${seed ? `, ${seed}` : ''});`

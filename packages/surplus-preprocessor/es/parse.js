@@ -1,379 +1,313 @@
 import * as AST from './AST';
-import { Params } from './preprocess';
-
 // pre-compiled regular expressions
-const rx = {
-    identifier       : /^[a-zA-Z]\w*/,
-    stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
-    leadingWs        : /^\s+/,
-    codeTerminator   : /^[\s<>/,;)\]}]/,
-    codeContinuation : /^[^\s<>/,;)\]}]+/
+var rx = {
+    identifier: /^[a-zA-Z]\w*/,
+    stringEscapedEnd: /[^\\](\\\\)*\\$/,
+    leadingWs: /^\s+/,
+    codeTerminator: /^[\s<>/,;)\]}]/,
+    codeContinuation: /^[^\s<>/,;)\]}]+/
 };
-
-const parens : { [p : string] : string } = {
+var parens = {
     "(": ")",
     "[": "]",
     "{": "}"
 };
-
-export type LOC = { line: number, col: number, pos: number };
-
-export function parse(TOKS : string[], opts : Params) {
-    var i = 0,
-        EOF = TOKS.length === 0,
-        TOK = EOF ? '' : TOKS[i],
-        LINE = 0,
-        COL = 0,
-        POS = 0;
-
+export function parse(TOKS, opts) {
+    var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
     return codeTopLevel();
-
     function codeTopLevel() {
-        var segments = [],
-            text = "",
-            loc = LOC();
-
+        var segments = [], text = "", loc = LOC();
         while (!EOF) {
             if (IS('<')) {
-                if (text) segments.push(new AST.CodeText(text, loc));
+                if (text)
+                    segments.push(new AST.CodeText(text, loc));
                 text = "";
                 segments.push(htmlElement());
                 loc = LOC();
-            } else if (IS('"') || IS("'")) {
+            }
+            else if (IS('"') || IS("'")) {
                 text += quotedString();
-            } else if (IS('//')) {
+            }
+            else if (IS('//')) {
                 text += codeSingleLineComment();
-            } else if (IS('/*')) {
+            }
+            else if (IS('/*')) {
                 text += codeMultiLineComment();
-            } else {
+            }
+            else {
                 text += TOK, NEXT();
             }
         }
-
-        if (text) segments.push(new AST.CodeText(text, loc));
-
+        if (text)
+            segments.push(new AST.CodeText(text, loc));
         return new AST.CodeTopLevel(segments);
     }
-
-    function htmlElement() : AST.HtmlElement {
-        if (NOT('<')) ERR("not at start of html element");
-
-        var start = LOC(),
-            tag = "",
-            properties = [],
-            content = [],
-            hasContent = true;
-
+    function htmlElement() {
+        if (NOT('<'))
+            ERR("not at start of html element");
+        var start = LOC(), tag = "", properties = [], content = [], hasContent = true;
         NEXT(); // pass '<'
-
         tag = SPLIT(rx.identifier);
-
-        if (!tag) ERR("bad element name", start);
-
+        if (!tag)
+            ERR("bad element name", start);
         SPLIT(rx.leadingWs);
-
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
                 properties.push(property());
-            } else if (!opts.jsx && IS('@')) {
+            }
+            else if (!opts.jsx && IS('@')) {
                 properties.push(mixin());
-            } else if (opts.jsx && IS('{...')) {
+            }
+            else if (opts.jsx && IS('{...')) {
                 ERR("JSX spread operator not supported");
-            } else {
+            }
+            else {
                 ERR("unrecognized content in begin tag");
             }
-
             SPLIT(rx.leadingWs);
         }
-
-        if (EOF) ERR("unterminated start node", start);
-
+        if (EOF)
+            ERR("unterminated start node", start);
         hasContent = IS('>');
-
         NEXT(); // pass '>' or '/>'
-
         if (hasContent) {
             while (!EOF && NOT('</')) {
                 if (IS('<')) {
                     content.push(htmlElement());
-                } else if (!opts.jsx && IS('@')) {
+                }
+                else if (!opts.jsx && IS('@')) {
                     content.push(htmlInsert());
-                } else if (opts.jsx && IS('{')) {
+                }
+                else if (opts.jsx && IS('{')) {
                     content.push(jsxHtmlInsert());
-                } else if (IS('<!--')) {
+                }
+                else if (IS('<!--')) {
                     content.push(htmlComment());
-                } else {
+                }
+                else {
                     content.push(htmlText());
                 }
             }
-
-            if (EOF) ERR("element missing close tag", start);
-
+            if (EOF)
+                ERR("element missing close tag", start);
             NEXT(); // pass '</'
-
-            if (tag !== SPLIT(rx.identifier)) ERR("mismatched open and close tags", start);
-
-            if (NOT('>')) ERR("malformed close tag");
-
+            if (tag !== SPLIT(rx.identifier))
+                ERR("mismatched open and close tags", start);
+            if (NOT('>'))
+                ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-
         return new AST.HtmlElement(tag, properties, content);
     }
-
     function htmlText() {
         var text = "";
-
         while (!EOF && NOT('<') && NOT('<!--') && (opts.jsx ? NOT('{') : NOT('@')) && NOT('</')) {
             text += TOK, NEXT();
         }
-
         return new AST.HtmlText(text);
     }
-
     function htmlComment() {
-        if (NOT('<!--')) ERR("not in HTML comment");
-
-        var start = LOC(),
-            text = "";
-
+        if (NOT('<!--'))
+            ERR("not in HTML comment");
+        var start = LOC(), text = "";
         NEXT(); // skip '<!--'
-
         while (!EOF && NOT('-->')) {
             text += TOK, NEXT();
         }
-
-        if (EOF) ERR("unterminated html comment", start);
-
+        if (EOF)
+            ERR("unterminated html comment", start);
         NEXT(); // skip '-->'
-
         return new AST.HtmlComment(text);
     }
-
     function htmlInsert() {
-        if (NOT('@')) ERR("not at start of code insert");
-
+        if (NOT('@'))
+            ERR("not at start of code insert");
         NEXT(); // pass '@'
-
         return new AST.HtmlInsert(embeddedCode());
     }
-
     function jsxHtmlInsert() {
         return new AST.HtmlInsert(jsxEmbeddedCode());
     }
-
     function property() {
-        if (!MATCH(rx.identifier)) ERR("not at start of property declaration");
-
+        if (!MATCH(rx.identifier))
+            ERR("not at start of property declaration");
         var name = SPLIT(rx.identifier);
-
         SPLIT(rx.leadingWs); // pass name
-
-        if (NOT('=')) ERR("expected equals sign after property name");
-
+        if (NOT('='))
+            ERR("expected equals sign after property name");
         NEXT(); // pass '='
-
         SPLIT(rx.leadingWs);
-
         if (IS('"') || IS("'")) {
             return new AST.StaticProperty(name, quotedString());
-        } else if (opts.jsx && IS('{')) {
+        }
+        else if (opts.jsx && IS('{')) {
             return new AST.DynamicProperty(name, jsxEmbeddedCode());
-        } else if (!opts.jsx) {
+        }
+        else if (!opts.jsx) {
             return new AST.DynamicProperty(name, embeddedCode());
-        } else {
+        }
+        else {
             return ERR("unexepected value for JSX property");
         }
     }
-
     function mixin() {
-        if (NOT('@')) ERR("not at start of mixin");
-
+        if (NOT('@'))
+            ERR("not at start of mixin");
         NEXT(); // pass '@'
-
         return new AST.Mixin(embeddedCode());
     }
-
     function embeddedCode() {
-        var start = LOC(),
-            segments = [] as (AST.CodeText | AST.HtmlElement)[],
-            text = "",
-            loc = LOC();
-
+        var start = LOC(), segments = [], text = "", loc = LOC();
         // consume source text up to the first top-level terminating character
-        while(!EOF && !MATCH(rx.codeTerminator)) {
+        while (!EOF && !MATCH(rx.codeTerminator)) {
             if (PARENS()) {
                 text = balancedParens(segments, text, loc);
-            } else if (IS("'") || IS('"')) {
+            }
+            else if (IS("'") || IS('"')) {
                 text += quotedString();
-            } else {
+            }
+            else {
                 text += SPLIT(rx.codeContinuation);
             }
         }
-
-        if (text) segments.push(new AST.CodeText(text, loc));
-
-        if (segments.length === 0) ERR("not in embedded code", start);
-
+        if (text)
+            segments.push(new AST.CodeText(text, loc));
+        if (segments.length === 0)
+            ERR("not in embedded code", start);
         return new AST.EmbeddedCode(segments);
     }
-
     function jsxEmbeddedCode() {
-        if (NOT('{')) ERR("not at start of JSX embedded code");
-
-        var segments = [] as (AST.CodeText | AST.HtmlElement)[],
-            loc = LOC(),
-            last = balancedParens(segments, "", loc);
-        
+        if (NOT('{'))
+            ERR("not at start of JSX embedded code");
+        var segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
         // remove opening and closing '{' and '}'
         last = last.substr(0, last.length - 1);
         segments.push(new AST.CodeText(last, loc));
-
-        var first = segments[0] as AST.CodeText;
+        var first = segments[0];
         first.text = first.text.substr(1);
-
         return new AST.EmbeddedCode(segments);
     }
-
-    function balancedParens(segments : (AST.CodeText | AST.HtmlElement)[], text : string, loc : LOC) {
-        var start = LOC(),
-            end = PARENS();
-
-        if (end === undefined) ERR("not in parentheses");
-
+    function balancedParens(segments, text, loc) {
+        var start = LOC(), end = PARENS();
+        if (end === undefined)
+            ERR("not in parentheses");
         text += TOK, NEXT();
-
         while (!EOF && NOT(end)) {
             if (IS("'") || IS('"')) {
                 text += quotedString();
-            } else if (IS('//')) {
+            }
+            else if (IS('//')) {
                 text += codeSingleLineComment();
-            } else if (IS('/*')) {
+            }
+            else if (IS('/*')) {
                 text += codeMultiLineComment();
-            } else if (IS("<")) {
-                if (text) segments.push(new AST.CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
+            }
+            else if (IS("<")) {
+                if (text)
+                    segments.push(new AST.CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
                 text = "";
                 segments.push(htmlElement());
                 loc.line = LINE;
                 loc.col = COL;
                 loc.pos = POS;
-            } else if (PARENS()) {
+            }
+            else if (PARENS()) {
                 text = balancedParens(segments, text, loc);
-            } else {
+            }
+            else {
                 text += TOK, NEXT();
             }
         }
-
-        if (EOF) ERR("unterminated parentheses", start);
-
+        if (EOF)
+            ERR("unterminated parentheses", start);
         text += TOK, NEXT();
-
         return text;
     }
-
     function quotedString() {
-        if (NOT("'") && NOT('"')) ERR("not in quoted string");
-
-        var start = LOC(),
-            quote,
-            text;
-
+        if (NOT("'") && NOT('"'))
+            ERR("not in quoted string");
+        var start = LOC(), quote, text;
         quote = text = TOK, NEXT();
-
         while (!EOF && (NOT(quote) || rx.stringEscapedEnd.test(text))) {
             text += TOK, NEXT();
         }
-
-        if (EOF) ERR("unterminated string", start);
-
+        if (EOF)
+            ERR("unterminated string", start);
         text += TOK, NEXT();
-
         return text;
     }
-
     function codeSingleLineComment() {
-        if (NOT("//")) ERR("not in code comment");
-
+        if (NOT("//"))
+            ERR("not in code comment");
         var text = "";
-
         while (!EOF && NOT('\n')) {
             text += TOK, NEXT();
         }
-
         // EOF within a code comment is ok, just means that the text ended with a comment
-        if (!EOF) text += TOK, NEXT();
-
+        if (!EOF)
+            text += TOK, NEXT();
         return text;
     }
-
     function codeMultiLineComment() {
-        if (NOT("/*")) ERR("not in code comment");
-
-        var start = LOC(),
-            text = "";
-
+        if (NOT("/*"))
+            ERR("not in code comment");
+        var start = LOC(), text = "";
         while (!EOF && NOT('*/')) {
             text += TOK, NEXT();
         }
-
-        if (EOF) ERR("unterminated multi-line comment", start);
-
+        if (EOF)
+            ERR("unterminated multi-line comment", start);
         text += TOK, NEXT();
-
         return text;
     }
-
     // token stream ops
     function NEXT() {
-        if (TOK === "\n") LINE++, COL = 0, POS++;
-        else if (TOK) COL += TOK.length, POS += TOK.length;
-
-        if (++i >= TOKS.length) EOF = true, TOK = "";
-        else TOK = TOKS[i];
+        if (TOK === "\n")
+            LINE++, COL = 0, POS++;
+        else if (TOK)
+            COL += TOK.length, POS += TOK.length;
+        if (++i >= TOKS.length)
+            EOF = true, TOK = "";
+        else
+            TOK = TOKS[i];
     }
-
-    function ERR(msg : string, loc? : { line : number, col : number, pos : number }) : never {
+    function ERR(msg, loc) {
         loc = loc || LOC();
         var frag = " at line " + loc.line + " col " + loc.col + ": ``" + TOKS.join('').substr(loc.pos, 30).replace("\n", "").replace("\r", "") + "''";
         throw new Error(msg + frag);
     }
-
-    function IS(t : string) {
+    function IS(t) {
         return TOK === t;
     }
-
-    function NOT(t : string) {
+    function NOT(t) {
         return TOK !== t;
     }
-
-    function MATCH(rx : RegExp) {
+    function MATCH(rx) {
         return rx.test(TOK);
     }
-
-    function MATCHES(rx : RegExp) {
+    function MATCHES(rx) {
         return rx.exec(TOK);
     }
-
     function PARENS() {
         return parens[TOK];
     }
-
-    function SPLIT(rx : RegExp) {
-        var ms = MATCHES(rx),
-            m : string;
+    function SPLIT(rx) {
+        var ms = MATCHES(rx), m;
         if (ms && (m = ms[0])) {
             COL += m.length;
             POS += m.length;
             TOK = TOK.substring(m.length);
-            if (TOK === "") NEXT();
+            if (TOK === "")
+                NEXT();
             return m;
-        } else {
+        }
+        else {
             return "";
         }
     }
-
     function LOC() {
         return { line: LINE, col: COL, pos: POS };
     }
-};
+}
+;

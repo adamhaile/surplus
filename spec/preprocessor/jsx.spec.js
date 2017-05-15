@@ -1,6 +1,6 @@
 describe("JSX syntax", function () {
     it("sets a property to the value of a JSX expression", function () {
-        eval(window['surplus-preprocessor'].preprocess('                      \
+        eval(window.SurplusPreprocessor.preprocess('        \
             var val = "foo",                                \
                 input = <input value = {val} />;            \
                                                             \
@@ -9,7 +9,7 @@ describe("JSX syntax", function () {
     });
 
     it("inserts the value of a JSX expression into a node's children", function () {
-        eval(window['surplus-preprocessor'].preprocess('                      \
+        eval(window.SurplusPreprocessor.preprocess('        \
             var val = "foo",                                \
                 span = <span>{val}</span>;                  \
                                                             \
@@ -18,7 +18,7 @@ describe("JSX syntax", function () {
     });
 
     it("calls upper-cased sub-components", function () {
-        var code = window['surplus-preprocessor'].preprocess('          \
+        var code = window.SurplusPreprocessor.preprocess('              \
             var props = null,                                           \
                 SubComponent = p => props = p,                          \
                 sub = <SubComponent foo="2" bar={3}/>;                  \
@@ -30,7 +30,7 @@ describe("JSX syntax", function () {
     });
 
     it("can have sub-components with children", function () {
-        var code = window['surplus-preprocessor'].preprocess('              \
+        var code = window.SurplusPreprocessor.preprocess('                  \
             var props = null,                                               \
                 SubComponent = p => props = p,                              \
                 sub =                                                       \
@@ -54,7 +54,7 @@ describe("JSX syntax", function () {
     });
 
     it("can have sub-components as children", function () {
-        var code = window['surplus-preprocessor'].preprocess('              \
+        var code = window.SurplusPreprocessor.preprocess('                  \
             var SubComponent = p => <span>{p.text}</span>,                  \
                 div =                                                       \
                     <div>                                                   \

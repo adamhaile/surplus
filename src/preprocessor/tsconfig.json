@@ -1,0 +1,12 @@
+{
+    "compilerOptions": {
+        "target": "ES5",
+        "module": "es2015",
+        "strict": true,
+        "outDir": "../../packages/surplus-preprocessor/es",
+        "declaration": true
+    },
+    "include": [
+        "*.ts"
+    ]
+}

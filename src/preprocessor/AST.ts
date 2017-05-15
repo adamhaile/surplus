@@ -1,6 +1,7 @@
 import { Params } from './preprocess';
 import { IShimmable, Context } from './shims';
 import { ICodeGenerator, IStatementGenerator, CodeBlock } from './genCode';
+import { LOC } from './parse';
 
 export abstract class ASTCodeNode implements ICodeGenerator, IShimmable {
     shim(ctx? : Context) { }
@@ -9,7 +10,7 @@ export abstract class ASTCodeNode implements ICodeGenerator, IShimmable {
 
 export abstract class ASTStatementNode implements IStatementGenerator, IShimmable {
     shim(ctx? : Context) { }    
-    genDOMStatements(opts : Params, code : CodeBlock, parent : string, n : number) { }
+    genDOMStatements(opts : Params, code : CodeBlock, parent : string | null, n : number) : string | void { }
 }
 
 export class CodeTopLevel extends ASTCodeNode {
@@ -21,7 +22,7 @@ export class CodeTopLevel extends ASTCodeNode {
 export class CodeText extends ASTCodeNode {
     constructor(
         public text : string, 
-        public loc : { line: number, col : number }
+        public loc : LOC
     ) { super(); }
 }
 
@@ -37,7 +38,7 @@ export class HtmlElement extends ASTCodeNode implements IStatementGenerator {
         public properties : (StaticProperty | DynamicProperty | Mixin)[], 
         public content : (HtmlElement | HtmlComment | HtmlText | HtmlInsert)[]
     ) { super(); }    
-    genDOMStatements(opts : Params, code : CodeBlock, parent : string, n : number) { }
+    genDOMStatements(opts : Params, code : CodeBlock, parent : string | null, n : number) : string | void { }
 }
 
 export class HtmlText extends ASTStatementNode {
