@@ -1,6 +1,6 @@
 {
   "name": "surplus",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "module": "es/Surplus.js",
   "description": "Javascript pre-processor that converts JSX syntax into inline DOM instructions",
   "keywords": [
