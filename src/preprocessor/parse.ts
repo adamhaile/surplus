@@ -11,9 +11,10 @@ const rx = {
 };
 
 const parens : { [p : string] : string } = {
-    "(": ")",
-    "[": "]",
-    "{": "}"
+    "("   : ")",
+    "["   : "]",
+    "{"   : "}",
+    "{...": "}"
 };
 
 export type LOC = { line: number, col: number, pos: number };
@@ -79,7 +80,7 @@ export function parse(TOKS : string[], opts : Params) {
             } else if (!opts.jsx && IS('@')) {
                 properties.push(mixin());
             } else if (opts.jsx && IS('{...')) {
-                ERR("JSX spread operator not supported");
+                properties.push(jsxMixin());
             } else {
                 ERR("unrecognized content in begin tag");
             }
@@ -195,6 +196,12 @@ export function parse(TOKS : string[], opts : Params) {
         return new AST.Mixin(embeddedCode());
     }
 
+    function jsxMixin() {
+        if (NOT('{...')) ERR("not at start of JSX mixin");
+
+        return new AST.Mixin(jsxEmbeddedCode());
+    }
+
     function embeddedCode() {
         var start = LOC(),
             segments = [] as (AST.CodeText | AST.HtmlElement)[],
@@ -220,18 +227,19 @@ export function parse(TOKS : string[], opts : Params) {
     }
 
     function jsxEmbeddedCode() {
-        if (NOT('{')) ERR("not at start of JSX embedded code");
+        if (NOT('{') && NOT('{...')) ERR("not at start of JSX embedded code");
 
-        var segments = [] as (AST.CodeText | AST.HtmlElement)[],
+        var prefix = TOK.length,
+            segments = [] as (AST.CodeText | AST.HtmlElement)[],
             loc = LOC(),
             last = balancedParens(segments, "", loc);
         
-        // remove opening and closing '{' and '}'
+        // remove opening and closing '{|{...' and '}'
         last = last.substr(0, last.length - 1);
         segments.push(new AST.CodeText(last, loc));
 
         var first = segments[0] as AST.CodeText;
-        first.text = first.text.substr(1);
+        first.text = first.text.substr(prefix);
 
         return new AST.EmbeddedCode(segments);
     }

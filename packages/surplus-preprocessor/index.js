@@ -169,7 +169,8 @@ var rx$1 = {
 var parens = {
     "(": ")",
     "[": "]",
-    "{": "}"
+    "{": "}",
+    "{...": "}"
 };
 function parse(TOKS, opts) {
     var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
@@ -219,7 +220,7 @@ function parse(TOKS, opts) {
                 properties.push(mixin());
             }
             else if (opts.jsx && IS('{...')) {
-                ERR("JSX spread operator not supported");
+                properties.push(jsxMixin());
             }
             else {
                 ERR("unrecognized content in begin tag");
@@ -316,6 +317,11 @@ function parse(TOKS, opts) {
         NEXT(); // pass '@'
         return new Mixin(embeddedCode());
     }
+    function jsxMixin() {
+        if (NOT('{...'))
+            ERR("not at start of JSX mixin");
+        return new Mixin(jsxEmbeddedCode());
+    }
     function embeddedCode() {
         var start = LOC(), segments = [], text = "", loc = LOC();
         // consume source text up to the first top-level terminating character
@@ -337,14 +343,14 @@ function parse(TOKS, opts) {
         return new EmbeddedCode(segments);
     }
     function jsxEmbeddedCode() {
-        if (NOT('{'))
+        if (NOT('{') && NOT('{...'))
             ERR("not at start of JSX embedded code");
-        var segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
-        // remove opening and closing '{' and '}'
+        var prefix = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
+        // remove opening and closing '{|{...' and '}'
         last = last.substr(0, last.length - 1);
         segments.push(new CodeText(last, loc));
         var first = segments[0];
-        first.text = first.text.substr(1);
+        first.text = first.text.substr(prefix);
         return new EmbeddedCode(segments);
     }
     function balancedParens(segments, text, loc) {
@@ -721,12 +727,7 @@ HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) {
     if (rx$3.upperStart.test(this.tag)) {
         var expr = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
         code.init(assign(id, createText('')));
-        if (!opts.exec) {
-            code.exe("Surplus.insert(" + range + ", " + expr + ");");
-        }
-        else {
-            code.exe(exe(opts, "Surplus.insert(range, " + expr + ", " + opts.exec + ");", "range", range));
-        }
+        code.exe(exe("Surplus.insert(range, " + expr + ");", "range", range));
     }
     else {
         var exelen = code.exes.length;
@@ -758,11 +759,11 @@ HtmlText.prototype.genDOMStatements = function (opts, code, parent, n) {
 HtmlInsert.prototype.genDOMStatements = function (opts, code, parent, n) {
     var id = code.id(genIdentifier(parent, 'insert', n)), ins = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
     code.init(assign(id, createText('')));
-    if (!opts.exec || noApparentSignals(ins)) {
-        code.exe("Surplus.insert(" + range + ", " + ins + ", " + (opts.exec || "null") + ");");
+    if (noApparentSignals(ins)) {
+        code.exe("Surplus.insert(" + range + ", " + ins + ");");
     }
     else {
-        code.exe(exe(opts, "Surplus.insert(range, " + ins + ", " + (opts.exec || "null") + ");", "range", range));
+        code.exe(exe("Surplus.insert(range, " + ins + ");", "range", range));
     }
     return id;
 };
@@ -780,13 +781,13 @@ DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
             code.exe(setter);
         }
         else {
-            code.exe(exe(opts, setter, "", ""));
+            code.exe(exe(setter, "", ""));
         }
     }
 };
 Mixin.prototype.genDOMStatements = function (opts, code, id, n) {
     var expr = this.code.genCode(opts);
-    code.exe(exe(opts, "(" + expr + ")(" + id + ", __state);", "__state", ""));
+    code.exe(exe("(" + expr + ")(" + id + ", __state);", "__state", ""));
 };
 var genIdentifier = function (parent, tag, n) {
     return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -806,15 +807,12 @@ var createComment = function (text) {
 var createText = function (text) {
     return "Surplus.createTextNode(" + codeStr(text) + ")";
 };
-var exe = function (opts, code, varname, seed) {
-    return opts.exec ?
-        (varname ? opts.exec + "(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
-            : opts.exec + "(function () { " + code + " });") :
-        varname ? "(function (" + varname + ") { return " + code + " })(" + seed + ");" :
-            code;
+var exe = function (code, varname, seed) {
+    return varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
+        : "Surplus.S(function () { " + code + " });";
 };
 function propName(opts, name) {
-    return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
+    return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
 }
 function noApparentSignals(code) {
     return !rx$3.hasParen.test(code) || rx$3.loneFunction.test(code);
@@ -842,9 +840,8 @@ function codeStr(str) {
 function preprocess(str, opts) {
     opts = opts || {};
     var params = {
-        exec: opts.exec || '',
         sourcemap: opts.sourcemap || null,
-        jsx: opts.jsx || false
+        jsx: 'jsx' in opts ? opts.jsx : true
     };
     var toks = tokenize(str, params), ast = parse(toks, params);
     if (shimmed)
