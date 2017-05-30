@@ -1,5 +1,6 @@
+import { S } from './Surplus';
 var DOCUMENT_FRAGMENT_NODE = 11, TEXT_NODE = 3;
-export function insert(range, value, exec) {
+export function insert(range, value) {
     var parent = range.start.parentNode, test = range.start, good = null, t = typeof value;
     //if (parent === null) {
     //    throw new Error("Surplus.insert() can only be used on a node that has a parent node. \n"
@@ -37,14 +38,9 @@ export function insert(range, value, exec) {
         insertArray(value);
     }
     else if (value instanceof Function) {
-        if (exec) {
-            exec(function () {
-                insert(range, value(), exec);
-            });
-        }
-        else {
+        S(function () {
             insert(range, value());
-        }
+        });
         good = range.end;
     }
     else if (value !== null && value !== undefined) {
@@ -107,6 +103,8 @@ export function insert(range, value, exec) {
                 if (value instanceof Node) {
                     if (test !== value) {
                         if (good === null) {
+                            if (range.end === value)
+                                range.end = value.previousSibling;
                             parent.replaceChild(value, test);
                             range.start = value;
                             if (range.end === test)
@@ -119,6 +117,8 @@ export function insert(range, value, exec) {
                                 test = value.nextSibling;
                             }
                             else {
+                                if (range.end === value)
+                                    range.end = value.previousSibling;
                                 parent.insertBefore(value, test);
                             }
                         }

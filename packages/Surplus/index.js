@@ -1,11 +1,13 @@
 (function (global, factory) {
-	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(factory((global.Surplus = global.Surplus || {})));
-}(this, (function (exports) { 'use strict';
+	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('s-js')) :
+	typeof define === 'function' && define.amd ? define(['exports', 's-js'], factory) :
+	(factory((global.Surplus = global.Surplus || {}),global.S));
+}(this, (function (exports,S) { 'use strict';
+
+S = 'default' in S ? S['default'] : S;
 
 var TEXT_NODE = 3;
-function insert(range, value, exec) {
+function insert$$1(range, value) {
     var parent = range.start.parentNode, test = range.start, good = null, t = typeof value;
     //if (parent === null) {
     //    throw new Error("Surplus.insert() can only be used on a node that has a parent node. \n"
@@ -43,14 +45,9 @@ function insert(range, value, exec) {
         insertArray(value);
     }
     else if (value instanceof Function) {
-        if (exec) {
-            exec(function () {
-                insert(range, value(), exec);
-            });
-        }
-        else {
-            insert(range, value());
-        }
+        S(function () {
+            insert$$1(range, value());
+        });
         good = range.end;
     }
     else if (value !== null && value !== undefined) {
@@ -113,6 +110,8 @@ function insert(range, value, exec) {
                 if (value instanceof Node) {
                     if (test !== value) {
                         if (good === null) {
+                            if (range.end === value)
+                                range.end = value.previousSibling;
                             parent.replaceChild(value, test);
                             range.start = value;
                             if (range.end === test)
@@ -125,6 +124,8 @@ function insert(range, value, exec) {
                                 test = value.nextSibling;
                             }
                             else {
+                                if (range.end === value)
+                                    range.end = value.previousSibling;
                                 parent.insertBefore(value, test);
                             }
                         }
@@ -171,7 +172,8 @@ function appendChild(parent, child) {
     parent.appendChild(child);
 }
 
-exports.insert = insert;
+exports.insert = insert$$1;
+exports.S = S;
 exports.createElement = createElement;
 exports.createComment = createComment;
 exports.createTextNode = createTextNode;

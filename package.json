@@ -4,10 +4,13 @@
   "description": "Javascript pre-processor that converts JSX syntax into inline DOM instructions",
   "scripts": {
     "test": "karma start",
-    "build": "tsc -p src/runtime/tsconfig.json && tsc -p src/preprocessor/tsconfig.json && rollup packages\\Surplus\\es\\Surplus.js -f \"umd\" -n \"Surplus\" -o .\\packages\\Surplus\\index.js && rollup packages\\surplus-preprocessor\\es\\preprocessor.js -f \"umd\" -n \"SurplusPreprocessor\" -o .\\packages\\surplus-preprocessor\\index.js"
+    "build": "tsc -p src/runtime/tsconfig.json && tsc -p src/preprocessor/tsconfig.json && rollup -c src/runtime/rollup.config.js && rollup -c src/preprocessor/rollup.config.js"
   },
   "author": "Adam Haile",
   "license": "MIT",
+  "dependencies": {
+    "s-js": "^0.4.3"
+  },
   "devDependencies": {
     "jasmine": "^2.6.0",
     "karma": "^1.7.0",

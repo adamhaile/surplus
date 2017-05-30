@@ -1,3 +1,5 @@
+import { S } from './Surplus';
+
 const DOCUMENT_FRAGMENT_NODE = 11,
     TEXT_NODE = 3;
 
@@ -11,7 +13,7 @@ export type InsertScalar = string | number | boolean | null | undefined | Node;
 export type InsertScalarOrArray = InsertScalar | InsertScalar[] | (InsertScalar | InsertScalar[])[] | (InsertScalar | (InsertScalar | InsertScalar[])[])[]
 export type InsertValue = InsertScalarOrArray | (() => InsertValue);
 
-export function insert(range : Range, value : InsertValue, exec? : (fn : () => void) => void) {
+export function insert(range : Range, value : InsertValue) {
     var parent = range.start.parentNode!, 
         test = range.start,
         good = null as Node | null,
@@ -49,13 +51,9 @@ export function insert(range : Range, value : InsertValue, exec? : (fn : () => v
     } else if (value instanceof Array) {
         insertArray(value);
     } else if (value instanceof Function) {
-        if (exec) {
-            exec(function () {
-                insert(range, (value as () => InsertValue)(), exec);
-            });
-        } else {
+        S(function () {
             insert(range, (value as () => InsertValue)());
-        }
+        });
         good = range.end;
     } else if (value !== null && value !== undefined) {
         value = value.toString();
@@ -114,6 +112,7 @@ export function insert(range : Range, value : InsertValue, exec? : (fn : () => v
                 if (value instanceof Node) {
                     if (test !== value) {
                         if (good === null) {
+                            if (range.end === value) range.end = value.previousSibling!;
                             parent.replaceChild(value, test);
                             range.start = value;
                             if (range.end === test) range.end = value;
@@ -123,6 +122,7 @@ export function insert(range : Range, value : InsertValue, exec? : (fn : () => v
                                 parent.removeChild(test);
                                 test = value.nextSibling!;
                             } else {
+                                if (range.end === value) range.end = value.previousSibling!;
                                 parent.insertBefore(value, test);
                             }
                         }

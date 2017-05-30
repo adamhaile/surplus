@@ -11,6 +11,9 @@
     "template",
     "templating"
   ],
+  "dependencies": {
+    "s-js": "^0.4.3"
+  },
   "author": "Adam Haile",
   "license": "MIT"
 }
