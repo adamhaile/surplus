@@ -1,9 +1,9 @@
 describe("upper-case subcomponent", function () {
     it("is called with a property object", function () {
-        var code = window.SurplusPreprocessor.preprocess('          \
+        var code = window.SurplusPreprocessor.preprocess('              \
             var props = null,                                           \
                 SubComponent = p => props = p,                          \
-                sub = <SubComponent foo="2" bar=3/>;                    \
+                sub = <SubComponent foo="2" bar={3}/>;                  \
                                                                         \
             expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \
         ');
@@ -12,7 +12,7 @@ describe("upper-case subcomponent", function () {
     });
 
     it("can have children", function () {
-        var code = window.SurplusPreprocessor.preprocess('              \
+        var code = window.SurplusPreprocessor.preprocess('                  \
             var props = null,                                               \
                 SubComponent = p => props = p,                              \
                 sub =                                                       \
@@ -36,8 +36,8 @@ describe("upper-case subcomponent", function () {
     });
 
     it("can be children", function () {
-        var code = window.SurplusPreprocessor.preprocess('              \
-            var SubComponent = p => <span>@p.text</span>,                   \
+        var code = window.SurplusPreprocessor.preprocess('                  \
+            var SubComponent = p => <span>{p.text}</span>,                  \
                 div =                                                       \
                     <div>                                                   \
                         <SubComponent text="foo" />                         \

@@ -7,7 +7,7 @@ describe("HTML mixin", function () {
         eval(window.SurplusPreprocessor.preprocess('            \
             argsSpy.calls.reset(), nodeSpy.calls.reset();       \
                                                                 \
-            var a = <a @test("foo", 2) />;                      \
+            var a = <a {...test("foo", 2)} />;                  \
                                                                 \
             expect(argsSpy).toHaveBeenCalledWith("foo", 2);     \
             expect(nodeSpy).toHaveBeenCalledWith(a, undefined); \

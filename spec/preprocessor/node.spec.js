@@ -37,7 +37,7 @@ describe("HTML node literal", function () {
     });
 
     it("preserves static attributes", function () {
-        var code = window.SurplusPreprocessor.preprocess('                          \
+        var code = window.SurplusPreprocessor.preprocess('      \
             var a = <a href="#" target="top"></a>;              \
                                                                 \
             expect(a.getAttribute("href")).toBe("#");           \
