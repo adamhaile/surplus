@@ -6,9 +6,8 @@ import * as sourcemap from './sourcemap';
 export function preprocess(str, opts) {
     opts = opts || {};
     var params = {
-        exec: opts.exec || '',
         sourcemap: opts.sourcemap || null,
-        jsx: opts.jsx || false
+        jsx: 'jsx' in opts ? opts.jsx : true
     };
     var toks = tokenize(str, params), ast = parse(toks, params);
     if (shimmed)

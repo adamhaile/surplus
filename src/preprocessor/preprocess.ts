@@ -5,13 +5,11 @@ import './genCode';
 import * as sourcemap from './sourcemap';
 
 export interface Options {
-    exec?      : string,
     sourcemap? : 'extract' | 'append' | null,
     jsx?       : boolean
 }
 
 export interface Params {
-    exec : string;
     sourcemap: 'extract' | 'append' | null,
     jsx: boolean;
 }
@@ -19,9 +17,8 @@ export interface Params {
 export function preprocess(str : string, opts : Options) {
     opts = opts || {};
     var params = {
-        exec:      opts.exec    || '',
         sourcemap: opts.sourcemap || null,
-        jsx:       opts.jsx       || false
+        jsx:       'jsx' in opts ? opts.jsx : true
     } as Params;
 
     var toks = tokenize(str, params),

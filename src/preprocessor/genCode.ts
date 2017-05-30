@@ -93,11 +93,7 @@ AST.HtmlElement.prototype.genDOMStatements     = function (opts, code, parent, n
         var expr = genSubComponent(this, opts, ""),
             range = `{ start: ${id}, end: ${id} }`;
         code.init(assign(id, createText('')));
-        if (!opts.exec) {
-            code.exe(`Surplus.insert(${range}, ${expr});`);   
-        } else { 
-            code.exe(exe(opts, `Surplus.insert(range, ${expr}, ${opts.exec});`, "range", range));
-        }
+        code.exe(exe(`Surplus.insert(range, ${expr});`, "range", range));
     } else {
         var exelen = code.exes.length;
         code.init(assign(id, createElement(this.tag)));
@@ -128,10 +124,10 @@ AST.HtmlInsert.prototype.genDOMStatements      = function (opts, code, parent, n
         ins = this.code.genCode(opts),
         range = `{ start: ${id}, end: ${id} }`;
     code.init(assign(id, createText('')));
-    if (!opts.exec || noApparentSignals(ins)) {
-        code.exe(`Surplus.insert(${range}, ${ins}, ${opts.exec || "null"});`);
+    if (noApparentSignals(ins)) {
+        code.exe(`Surplus.insert(${range}, ${ins});`);
     } else { 
-        code.exe(exe(opts, `Surplus.insert(range, ${ins}, ${opts.exec || "null"});`, "range", range));
+        code.exe(exe(`Surplus.insert(range, ${ins});`, "range", range));
     }
     return id;
 };
@@ -148,13 +144,13 @@ AST.DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
         if (noApparentSignals(expr)) {
             code.exe(setter);
         } else {
-            code.exe(exe(opts, setter, "", ""));
+            code.exe(exe(setter, "", ""));
         }
     }
 };
 AST.Mixin.prototype.genDOMStatements           = function (opts, code, id, n) {
     var expr = this.code.genCode(opts);
-    code.exe(exe(opts, `(${expr})(${id}, __state);`, "__state", ""));
+    code.exe(exe(`(${expr})(${id}, __state);`, "__state", ""));
 };
 
 let genIdentifier = (parent : string | null, tag : string, n : number) =>
@@ -169,15 +165,12 @@ let genIdentifier = (parent : string | null, tag : string, n : number) =>
         `Surplus.createComment(${codeStr(text)})`,
     createText    = (text : string) => 
         `Surplus.createTextNode(${codeStr(text)})`,
-    exe = (opts : Params, code : string, varname : string , seed : string) =>
-        opts.exec ?
-            (varname ? `${opts.exec}(function (${varname}) { return ${code} }${seed ? `, ${seed}` : ''});`
-                        : `${opts.exec}(function () { ${code} });`) :
-        varname ? `(function (${varname}) { return ${code} })(${seed});` :
-        code;
+    exe = (code : string, varname : string , seed : string) =>
+        varname ? `Surplus.S(function (${varname}) { return ${code} }${seed ? `, ${seed}` : ''});`
+                : `Surplus.S(function () { ${code} });`;
 
 function propName(opts : Params, name : string) {
-    return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
+    return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
 }
 
 function noApparentSignals(code : string) {

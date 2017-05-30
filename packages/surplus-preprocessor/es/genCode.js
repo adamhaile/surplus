@@ -75,12 +75,7 @@ AST.HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) {
     if (rx.upperStart.test(this.tag)) {
         var expr = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
         code.init(assign(id, createText('')));
-        if (!opts.exec) {
-            code.exe("Surplus.insert(" + range + ", " + expr + ");");
-        }
-        else {
-            code.exe(exe(opts, "Surplus.insert(range, " + expr + ", " + opts.exec + ");", "range", range));
-        }
+        code.exe(exe("Surplus.insert(range, " + expr + ");", "range", range));
     }
     else {
         var exelen = code.exes.length;
@@ -112,11 +107,11 @@ AST.HtmlText.prototype.genDOMStatements = function (opts, code, parent, n) {
 AST.HtmlInsert.prototype.genDOMStatements = function (opts, code, parent, n) {
     var id = code.id(genIdentifier(parent, 'insert', n)), ins = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
     code.init(assign(id, createText('')));
-    if (!opts.exec || noApparentSignals(ins)) {
-        code.exe("Surplus.insert(" + range + ", " + ins + ", " + (opts.exec || "null") + ");");
+    if (noApparentSignals(ins)) {
+        code.exe("Surplus.insert(" + range + ", " + ins + ");");
     }
     else {
-        code.exe(exe(opts, "Surplus.insert(range, " + ins + ", " + (opts.exec || "null") + ");", "range", range));
+        code.exe(exe("Surplus.insert(range, " + ins + ");", "range", range));
     }
     return id;
 };
@@ -134,13 +129,13 @@ AST.DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
             code.exe(setter);
         }
         else {
-            code.exe(exe(opts, setter, "", ""));
+            code.exe(exe(setter, "", ""));
         }
     }
 };
 AST.Mixin.prototype.genDOMStatements = function (opts, code, id, n) {
     var expr = this.code.genCode(opts);
-    code.exe(exe(opts, "(" + expr + ")(" + id + ", __state);", "__state", ""));
+    code.exe(exe("(" + expr + ")(" + id + ", __state);", "__state", ""));
 };
 var genIdentifier = function (parent, tag, n) {
     return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -154,15 +149,12 @@ var genIdentifier = function (parent, tag, n) {
     return "Surplus.createComment(" + codeStr(text) + ")";
 }, createText = function (text) {
     return "Surplus.createTextNode(" + codeStr(text) + ")";
-}, exe = function (opts, code, varname, seed) {
-    return opts.exec ?
-        (varname ? opts.exec + "(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
-            : opts.exec + "(function () { " + code + " });") :
-        varname ? "(function (" + varname + ") { return " + code + " })(" + seed + ");" :
-            code;
+}, exe = function (code, varname, seed) {
+    return varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
+        : "Surplus.S(function () { " + code + " });";
 };
 function propName(opts, name) {
-    return opts.jsx && name.substr(0, 2) === 'on' ? name.toLowerCase() : name;
+    return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
 }
 function noApparentSignals(code) {
     return !rx.hasParen.test(code) || rx.loneFunction.test(code);

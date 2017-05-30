@@ -1,11 +1,9 @@
 import './genCode';
 export interface Options {
-    exec?: string;
     sourcemap?: 'extract' | 'append' | null;
     jsx?: boolean;
 }
 export interface Params {
-    exec: string;
     sourcemap: 'extract' | 'append' | null;
     jsx: boolean;
 }
