@@ -51,7 +51,7 @@ export function parse(TOKS, opts) {
         tag = SPLIT(rx.identifier);
         if (!tag)
             ERR("bad element name", start);
-        SPLIT(rx.leadingWs);
+        SKIPWS();
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
@@ -66,7 +66,7 @@ export function parse(TOKS, opts) {
             else {
                 ERR("unrecognized content in begin tag");
             }
-            SPLIT(rx.leadingWs);
+            SKIPWS();
         }
         if (EOF)
             ERR("unterminated start node", start);
@@ -134,11 +134,11 @@ export function parse(TOKS, opts) {
         if (!MATCH(rx.identifier))
             ERR("not at start of property declaration");
         var name = SPLIT(rx.identifier);
-        SPLIT(rx.leadingWs); // pass name
+        SKIPWS(); // pass name
         if (NOT('='))
             ERR("expected equals sign after property name");
         NEXT(); // pass '='
-        SPLIT(rx.leadingWs);
+        SKIPWS();
         if (IS('"') || IS("'")) {
             return new AST.StaticProperty(name, quotedString());
         }
@@ -186,12 +186,14 @@ export function parse(TOKS, opts) {
     function jsxEmbeddedCode() {
         if (NOT('{') && NOT('{...'))
             ERR("not at start of JSX embedded code");
-        var prefix = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
-        // remove opening and closing '{|{...' and '}'
+        var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
+        // remove closing '}'
         last = last.substr(0, last.length - 1);
         segments.push(new AST.CodeText(last, loc));
+        // remove opening '{' or '{...', adjusting code loc accordingly
         var first = segments[0];
-        first.text = first.text.substr(prefix);
+        first.loc.col += prefixLength;
+        first.text = first.text.substr(prefixLength);
         return new AST.EmbeddedCode(segments);
     }
     function balancedParens(segments, text, loc) {
@@ -297,6 +299,16 @@ export function parse(TOKS, opts) {
     }
     function PARENS() {
         return parens[TOK];
+    }
+    function SKIPWS() {
+        while (true) {
+            if (IS('\n'))
+                NEXT();
+            else if (MATCHES(rx.leadingWs))
+                SPLIT(rx.leadingWs);
+            else
+                break;
+        }
     }
     function SPLIT(rx) {
         var ms = MATCHES(rx), m;

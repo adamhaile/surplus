@@ -71,7 +71,7 @@ export function parse(TOKS : string[], opts : Params) {
 
         if (!tag) ERR("bad element name", start);
 
-        SPLIT(rx.leadingWs);
+        SKIPWS();
 
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
@@ -85,7 +85,7 @@ export function parse(TOKS : string[], opts : Params) {
                 ERR("unrecognized content in begin tag");
             }
 
-            SPLIT(rx.leadingWs);
+            SKIPWS();
         }
 
         if (EOF) ERR("unterminated start node", start);
@@ -169,13 +169,13 @@ export function parse(TOKS : string[], opts : Params) {
 
         var name = SPLIT(rx.identifier);
 
-        SPLIT(rx.leadingWs); // pass name
+        SKIPWS(); // pass name
 
         if (NOT('=')) ERR("expected equals sign after property name");
 
         NEXT(); // pass '='
 
-        SPLIT(rx.leadingWs);
+        SKIPWS();
 
         if (IS('"') || IS("'")) {
             return new AST.StaticProperty(name, quotedString());
@@ -229,17 +229,19 @@ export function parse(TOKS : string[], opts : Params) {
     function jsxEmbeddedCode() {
         if (NOT('{') && NOT('{...')) ERR("not at start of JSX embedded code");
 
-        var prefix = TOK.length,
+        var prefixLength = TOK.length,
             segments = [] as (AST.CodeText | AST.HtmlElement)[],
             loc = LOC(),
             last = balancedParens(segments, "", loc);
         
-        // remove opening and closing '{|{...' and '}'
+        // remove closing '}'
         last = last.substr(0, last.length - 1);
         segments.push(new AST.CodeText(last, loc));
 
+        // remove opening '{' or '{...', adjusting code loc accordingly
         var first = segments[0] as AST.CodeText;
-        first.text = first.text.substr(prefix);
+        first.loc.col += prefixLength;
+        first.text = first.text.substr(prefixLength);
 
         return new AST.EmbeddedCode(segments);
     }
@@ -365,6 +367,14 @@ export function parse(TOKS : string[], opts : Params) {
 
     function PARENS() {
         return parens[TOK];
+    }
+
+    function SKIPWS() {
+        while (true) {
+            if (IS('\n')) NEXT();
+            else if (MATCHES(rx.leadingWs)) SPLIT(rx.leadingWs);
+            else break;
+        }
     }
 
     function SPLIT(rx : RegExp) {
