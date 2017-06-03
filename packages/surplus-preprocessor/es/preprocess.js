@@ -7,6 +7,8 @@ export function preprocess(str, opts) {
     opts = opts || {};
     var params = {
         sourcemap: opts.sourcemap || null,
+        sourcefile: opts.sourcefile || 'in.js',
+        targetfile: opts.targetfile || 'out.js',
         jsx: 'jsx' in opts ? opts.jsx : true
     };
     var toks = tokenize(str, params), ast = parse(toks, params);

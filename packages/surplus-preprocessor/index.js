@@ -210,7 +210,7 @@ function parse(TOKS, opts) {
         tag = SPLIT(rx$1.identifier);
         if (!tag)
             ERR("bad element name", start);
-        SPLIT(rx$1.leadingWs);
+        SKIPWS();
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx$1.identifier)) {
@@ -225,7 +225,7 @@ function parse(TOKS, opts) {
             else {
                 ERR("unrecognized content in begin tag");
             }
-            SPLIT(rx$1.leadingWs);
+            SKIPWS();
         }
         if (EOF)
             ERR("unterminated start node", start);
@@ -293,11 +293,11 @@ function parse(TOKS, opts) {
         if (!MATCH(rx$1.identifier))
             ERR("not at start of property declaration");
         var name = SPLIT(rx$1.identifier);
-        SPLIT(rx$1.leadingWs); // pass name
+        SKIPWS(); // pass name
         if (NOT('='))
             ERR("expected equals sign after property name");
         NEXT(); // pass '='
-        SPLIT(rx$1.leadingWs);
+        SKIPWS();
         if (IS('"') || IS("'")) {
             return new StaticProperty(name, quotedString());
         }
@@ -345,12 +345,14 @@ function parse(TOKS, opts) {
     function jsxEmbeddedCode() {
         if (NOT('{') && NOT('{...'))
             ERR("not at start of JSX embedded code");
-        var prefix = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
-        // remove opening and closing '{|{...' and '}'
+        var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
+        // remove closing '}'
         last = last.substr(0, last.length - 1);
         segments.push(new CodeText(last, loc));
+        // remove opening '{' or '{...', adjusting code loc accordingly
         var first = segments[0];
-        first.text = first.text.substr(prefix);
+        first.loc.col += prefixLength;
+        first.text = first.text.substr(prefixLength);
         return new EmbeddedCode(segments);
     }
     function balancedParens(segments, text, loc) {
@@ -457,6 +459,16 @@ function parse(TOKS, opts) {
     function PARENS() {
         return parens[TOK];
     }
+    function SKIPWS() {
+        while (true) {
+            if (IS('\n'))
+                NEXT();
+            else if (MATCHES(rx$1.leadingWs))
+                SPLIT(rx$1.leadingWs);
+            else
+                break;
+        }
+    }
     function SPLIT(rx) {
         var ms = MATCHES(rx), m;
         if (ms && (m = ms[0])) {
@@ -562,10 +574,10 @@ function insertBefore(node, ctx) {
 }
 
 var rx$4 = {
-    locs: /(\n)|(\u0000(\d+),(\d+)\u0000)|(\u0000\u0000)/g
+    locs: /(\r?\n)|(\u0000(\d+),(\d+)\u0000)|(\u0000\u0000)/g
 };
-var vlqlast = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
-var vlqcont = "ghijklmnopqrstuvwxyz0123456789+/";
+var vlqFinalDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
+var vlqContinuationDigits = "ghijklmnopqrstuvwxyz0123456789+/";
 function segmentStart(loc) {
     return "\u0000" + loc.line + "," + loc.col + "\u0000";
 }
@@ -573,41 +585,44 @@ function segmentEnd() {
     return "\u0000\u0000";
 }
 function extractMappings(embedded) {
-    var mappings = "", pgcol = 0, psline = 0, pscol = 0, insegment = false, linestart = 0, linecont = false;
-    var src = embedded.replace(rx$4.locs, function (_, nl, start, line, col, end, offset) {
+    var mappings = "", lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, isInSegment = false, lineStartPos = 0, lineTagLength = 0, isLineContinuation = false;
+    var src = embedded.replace(rx$4.locs, function (_, nl, start, sourceLine, sourceCol, end, offset) {
         if (nl) {
             mappings += ";";
-            if (insegment) {
-                mappings += "AA" + vlq(1) + vlq(0 - pscol);
-                psline++;
-                pscol = 0;
-                linecont = true;
+            if (isInSegment) {
+                mappings += "AA" + vlq(1) + vlq(0 - lastSourceCol);
+                lastSourceLine++;
+                lastSourceCol = 0;
+                isLineContinuation = true;
             }
             else {
-                linecont = false;
+                isLineContinuation = false;
             }
-            linestart = offset + nl.length;
-            pgcol = 0;
+            lineStartPos = offset + nl.length;
+            lineTagLength = 0;
+            lastGeneratedCol = 0;
             return nl;
         }
         else if (start) {
-            var gcol = offset - linestart;
-            line = parseInt(line);
-            col = parseInt(col);
-            mappings += (linecont ? "," : "")
-                + vlq(gcol - pgcol)
+            var generatedCol = offset - lineStartPos - lineTagLength;
+            sourceLine = parseInt(sourceLine);
+            sourceCol = parseInt(sourceCol);
+            mappings += (isLineContinuation ? "," : "")
+                + vlq(generatedCol - lastGeneratedCol)
                 + "A" // only one file
-                + vlq(line - psline)
-                + vlq(col - pscol);
-            insegment = true;
-            linecont = true;
-            pgcol = gcol;
-            psline = line;
-            pscol = col;
+                + vlq(sourceLine - lastSourceLine)
+                + vlq(sourceCol - lastSourceCol);
+            isInSegment = true;
+            isLineContinuation = true;
+            lineTagLength += start.length;
+            lastGeneratedCol = generatedCol;
+            lastSourceLine = sourceLine;
+            lastSourceCol = sourceCol;
             return "";
         }
         else if (end) {
-            insegment = false;
+            isInSegment = false;
+            lineTagLength += end.length;
             return "";
         }
     });
@@ -617,17 +632,17 @@ function extractMappings(embedded) {
     };
 }
 function extractMap(src, original, opts) {
-    var extract = extractMappings(src), map = createMap(extract.mappings, original);
+    var extract = extractMappings(src), map = createMap(extract.mappings, original, opts);
     return {
         src: extract.src,
         map: map
     };
 }
-function createMap(mappings, original) {
+function createMap(mappings, original, opts) {
     return {
         version: 3,
-        file: 'out.js',
-        sources: ['in.js'],
+        file: opts.targetfile,
+        sources: [opts.sourcefile],
         sourcesContent: [original],
         names: [],
         mappings: mappings
@@ -635,7 +650,7 @@ function createMap(mappings, original) {
 }
 function appendMap(src, original, opts) {
     var extract = extractMap(src, original, opts), appended = extract.src
-        + "\n//# sourceMappingURL=data:"
+        + "\n//# sourceMappingURL=data:application/json,"
         + encodeURIComponent(JSON.stringify(extract.map));
     return appended;
 }
@@ -647,9 +662,9 @@ function vlq(num) {
     var numstr = num.toString(32);
     // convert base32 digits of num to vlq continuation digits in reverse order
     for (i = numstr.length - 1; i > 0; i--)
-        str += vlqcont[parseInt(numstr[i], 32)];
-    // add final vlqlast digit
-    str += vlqlast[parseInt(numstr[0], 32)];
+        str += vlqContinuationDigits[parseInt(numstr[i], 32)];
+    // add final vlq digit
+    str += vlqFinalDigits[parseInt(numstr[0], 32)];
     return str;
 }
 
@@ -841,6 +856,8 @@ function preprocess(str, opts) {
     opts = opts || {};
     var params = {
         sourcemap: opts.sourcemap || null,
+        sourcefile: opts.sourcefile || 'in.js',
+        targetfile: opts.targetfile || 'out.js',
         jsx: 'jsx' in opts ? opts.jsx : true
     };
     var toks = tokenize(str, params), ast = parse(toks, params);
