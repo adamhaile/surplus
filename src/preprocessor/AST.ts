@@ -36,7 +36,8 @@ export class HtmlElement extends ASTCodeNode implements IStatementGenerator {
     constructor(
         public tag : string, 
         public properties : (StaticProperty | DynamicProperty | Mixin)[], 
-        public content : (HtmlElement | HtmlComment | HtmlText | HtmlInsert)[]
+        public content : (HtmlElement | HtmlComment | HtmlText | HtmlInsert)[],
+        public loc : LOC
     ) { super(); }    
     genDOMStatements(opts : Params, code : CodeBlock, parent : string | null, n : number) : string | void { }
 }
@@ -55,7 +56,8 @@ export class HtmlComment extends ASTStatementNode {
 
 export class HtmlInsert extends ASTStatementNode {
     constructor(
-        public code : EmbeddedCode
+        public code : EmbeddedCode,
+        public loc : LOC
     ) { super(); }
 }
 
@@ -69,12 +71,14 @@ export class StaticProperty extends ASTStatementNode {
 export class DynamicProperty extends ASTStatementNode {
     constructor(
         public name : string, 
-        public code : EmbeddedCode
+        public code : EmbeddedCode,
+        public loc : LOC
     ) { super(); }
 }
 
 export class Mixin extends ASTStatementNode {
     constructor(
-        public code : EmbeddedCode
+        public code : EmbeddedCode,
+        public loc : LOC
     ) { super(); }
 }

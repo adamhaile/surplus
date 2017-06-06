@@ -1,7 +1,6 @@
 import { Params } from './preprocess';
 import { LOC } from './parse';
-export declare function segmentStart(loc: LOC): string;
-export declare function segmentEnd(): string;
+export declare function locationMark(loc: LOC): string;
 export declare function extractMap(src: string, original: string, opts: Params): {
     src: string;
     map: {

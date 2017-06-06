@@ -27,7 +27,8 @@ export declare class HtmlElement extends ASTCodeNode implements IStatementGenera
     tag: string;
     properties: (StaticProperty | DynamicProperty | Mixin)[];
     content: (HtmlElement | HtmlComment | HtmlText | HtmlInsert)[];
-    constructor(tag: string, properties: (StaticProperty | DynamicProperty | Mixin)[], content: (HtmlElement | HtmlComment | HtmlText | HtmlInsert)[]);
+    loc: LOC;
+    constructor(tag: string, properties: (StaticProperty | DynamicProperty | Mixin)[], content: (HtmlElement | HtmlComment | HtmlText | HtmlInsert)[], loc: LOC);
     genDOMStatements(opts: Params, code: CodeBlock, parent: string | null, n: number): string | void;
 }
 export declare class HtmlText extends ASTStatementNode {
@@ -40,7 +41,8 @@ export declare class HtmlComment extends ASTStatementNode {
 }
 export declare class HtmlInsert extends ASTStatementNode {
     code: EmbeddedCode;
-    constructor(code: EmbeddedCode);
+    loc: LOC;
+    constructor(code: EmbeddedCode, loc: LOC);
 }
 export declare class StaticProperty extends ASTStatementNode {
     name: string;
@@ -50,9 +52,11 @@ export declare class StaticProperty extends ASTStatementNode {
 export declare class DynamicProperty extends ASTStatementNode {
     name: string;
     code: EmbeddedCode;
-    constructor(name: string, code: EmbeddedCode);
+    loc: LOC;
+    constructor(name: string, code: EmbeddedCode, loc: LOC);
 }
 export declare class Mixin extends ASTStatementNode {
     code: EmbeddedCode;
-    constructor(code: EmbeddedCode);
+    loc: LOC;
+    constructor(code: EmbeddedCode, loc: LOC);
 }

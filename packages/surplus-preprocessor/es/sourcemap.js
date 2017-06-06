@@ -1,54 +1,39 @@
 var rx = {
-    locs: /(\r?\n)|(\u0000(\d+),(\d+)\u0000)|(\u0000\u0000)/g
+    locs: /(\n)|(\u0000(\d+),(\d+)\u0000)/g
 }, vlqFinalDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef", vlqContinuationDigits = "ghijklmnopqrstuvwxyz0123456789+/";
-export function segmentStart(loc) {
+export function locationMark(loc) {
     return "\u0000" + loc.line + "," + loc.col + "\u0000";
 }
-export function segmentEnd() {
-    return "\u0000\u0000";
-}
 function extractMappings(embedded) {
-    var mappings = "", lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, isInSegment = false, lineStartPos = 0, lineTagLength = 0, isLineContinuation = false;
-    var src = embedded.replace(rx.locs, function (_, nl, start, sourceLine, sourceCol, end, offset) {
+    var line = [], lines = [], lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, lineStartPos = 0, lineMarksLength = 0;
+    var src = embedded.replace(rx.locs, function (_, nl, mark, sourceLine, sourceCol, offset) {
         if (nl) {
-            mappings += ";";
-            if (isInSegment) {
-                mappings += "AA" + vlq(1) + vlq(0 - lastSourceCol);
-                lastSourceLine++;
-                lastSourceCol = 0;
-                isLineContinuation = true;
-            }
-            else {
-                isLineContinuation = false;
-            }
-            lineStartPos = offset + nl.length;
-            lineTagLength = 0;
+            lines.push(line);
+            line = [];
+            lineStartPos = offset + 1;
+            lineMarksLength = 0;
             lastGeneratedCol = 0;
             return nl;
         }
-        else if (start) {
-            var generatedCol = offset - lineStartPos - lineTagLength;
+        else {
+            var generatedCol = offset - lineStartPos - lineMarksLength;
             sourceLine = parseInt(sourceLine);
             sourceCol = parseInt(sourceCol);
-            mappings += (isLineContinuation ? "," : "")
-                + vlq(generatedCol - lastGeneratedCol)
+            line.push(vlq(generatedCol - lastGeneratedCol)
                 + "A" // only one file
                 + vlq(sourceLine - lastSourceLine)
-                + vlq(sourceCol - lastSourceCol);
-            isInSegment = true;
-            isLineContinuation = true;
-            lineTagLength += start.length;
+                + vlq(sourceCol - lastSourceCol));
+            //lineMarksLength += mark.length;
+            lineMarksLength -= 2;
             lastGeneratedCol = generatedCol;
             lastSourceLine = sourceLine;
             lastSourceCol = sourceCol;
-            return "";
-        }
-        else if (end) {
-            isInSegment = false;
-            lineTagLength += end.length;
-            return "";
+            //return "";
+            return "/*" + sourceLine + "," + sourceCol + "*/";
         }
     });
+    lines.push(line);
+    var mappings = lines.map(function (l) { return l.join(','); }).join(';');
     return {
         src: src,
         mappings: mappings

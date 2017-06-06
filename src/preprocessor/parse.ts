@@ -120,7 +120,7 @@ export function parse(TOKS : string[], opts : Params) {
             NEXT(); // pass '>'
         }
 
-        return new AST.HtmlElement(tag, properties, content);
+        return new AST.HtmlElement(tag, properties, content, start);
     }
 
     function htmlText() {
@@ -155,19 +155,23 @@ export function parse(TOKS : string[], opts : Params) {
     function htmlInsert() {
         if (NOT('@')) ERR("not at start of code insert");
 
+        var loc = LOC();
+
         NEXT(); // pass '@'
 
-        return new AST.HtmlInsert(embeddedCode());
+        return new AST.HtmlInsert(embeddedCode(), loc);
     }
 
     function jsxHtmlInsert() {
-        return new AST.HtmlInsert(jsxEmbeddedCode());
+        var loc = LOC();
+        return new AST.HtmlInsert(jsxEmbeddedCode(), loc);
     }
 
     function property() {
         if (!MATCH(rx.identifier)) ERR("not at start of property declaration");
 
-        var name = SPLIT(rx.identifier);
+        var loc = LOC(),
+            name = SPLIT(rx.identifier);
 
         SKIPWS(); // pass name
 
@@ -180,9 +184,9 @@ export function parse(TOKS : string[], opts : Params) {
         if (IS('"') || IS("'")) {
             return new AST.StaticProperty(name, quotedString());
         } else if (opts.jsx && IS('{')) {
-            return new AST.DynamicProperty(name, jsxEmbeddedCode());
+            return new AST.DynamicProperty(name, jsxEmbeddedCode(), loc);
         } else if (!opts.jsx) {
-            return new AST.DynamicProperty(name, embeddedCode());
+            return new AST.DynamicProperty(name, embeddedCode(), loc);
         } else {
             return ERR("unexepected value for JSX property");
         }
@@ -191,15 +195,19 @@ export function parse(TOKS : string[], opts : Params) {
     function mixin() {
         if (NOT('@')) ERR("not at start of mixin");
 
+        var loc = LOC();
+
         NEXT(); // pass '@'
 
-        return new AST.Mixin(embeddedCode());
+        return new AST.Mixin(embeddedCode(), loc);
     }
 
     function jsxMixin() {
         if (NOT('{...')) ERR("not at start of JSX mixin");
 
-        return new AST.Mixin(jsxEmbeddedCode());
+        var loc = LOC();
+
+        return new AST.Mixin(jsxEmbeddedCode(), loc);
     }
 
     function embeddedCode() {

@@ -14,22 +14,22 @@ var rx = {
 AST.CodeTopLevel.prototype.genCode =
     AST.EmbeddedCode.prototype.genCode = function (opts) { return concatResults(opts, this.segments, 'genCode'); };
 AST.CodeText.prototype.genCode = function (opts) {
-    return (opts.sourcemap ? sourcemap.segmentStart(this.loc) : "")
-        + this.text
-        + (opts.sourcemap ? sourcemap.segmentEnd() : "");
+    return markBlock(this.text, this.loc, opts);
 };
 AST.HtmlElement.prototype.genCode = function (opts, prior) {
+    var code;
     if (rx.upperStart.test(this.tag)) {
-        return genSubComponent(this, opts, prior);
+        code = genSubComponent(this, opts, prior);
     }
     else if (this.properties.length === 0 && this.content.length === 0) {
         // optimization: don't need IIFE for simple single nodes
-        return "document.createElement(\"" + this.tag + "\")";
+        code = "document.createElement(\"" + this.tag + "\")";
     }
     else {
-        var code = new CodeBlock(), expr = this.genDOMStatements(opts, code, null, 0);
-        return code.toCode(expr, indent(prior));
+        var block = new CodeBlock(), expr = this.genDOMStatements(opts, block, null, 0);
+        code = block.toCode(expr, indent(prior));
     }
+    return markLoc(code, this.loc, opts);
 };
 function genSubComponent(cmp, opts, prior) {
     var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = cmp.properties.map(function (p) {
@@ -75,7 +75,7 @@ AST.HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) {
     if (rx.upperStart.test(this.tag)) {
         var expr = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
         code.init(assign(id, createText('')));
-        code.exe(exe("Surplus.insert(range, " + expr + ");", "range", range));
+        code.exe(exe("Surplus.insert(range, " + expr + ");", "range", range, this.loc, opts));
     }
     else {
         var exelen = code.exes.length;
@@ -107,12 +107,9 @@ AST.HtmlText.prototype.genDOMStatements = function (opts, code, parent, n) {
 AST.HtmlInsert.prototype.genDOMStatements = function (opts, code, parent, n) {
     var id = code.id(genIdentifier(parent, 'insert', n)), ins = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
     code.init(assign(id, createText('')));
-    if (noApparentSignals(ins)) {
-        code.exe("Surplus.insert(" + range + ", " + ins + ");");
-    }
-    else {
-        code.exe(exe("Surplus.insert(range, " + ins + ");", "range", range));
-    }
+    code.exe(noApparentSignals(ins)
+        ? "Surplus.insert(" + range + ", " + ins + ");"
+        : exe("Surplus.insert(range, " + ins + ");", "range", range, this.loc, opts));
     return id;
 };
 AST.StaticProperty.prototype.genDOMStatements = function (opts, code, id, n) {
@@ -125,17 +122,14 @@ AST.DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
     }
     else {
         var prop = propName(opts, this.name), setter = id + "." + prop + " = " + expr + ";";
-        if (noApparentSignals(expr)) {
-            code.exe(setter);
-        }
-        else {
-            code.exe(exe(setter, "", ""));
-        }
+        code.exe(noApparentSignals(expr)
+            ? setter
+            : exe(setter, "", "", this.loc, opts));
     }
 };
 AST.Mixin.prototype.genDOMStatements = function (opts, code, id, n) {
     var expr = this.code.genCode(opts);
-    code.exe(exe("(" + expr + ")(" + id + ", __state);", "__state", ""));
+    code.exe(exe("(" + expr + ")(" + id + ", __state);", "__state", "", this.loc, opts));
 };
 var genIdentifier = function (parent, tag, n) {
     return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -149,9 +143,9 @@ var genIdentifier = function (parent, tag, n) {
     return "Surplus.createComment(" + codeStr(text) + ")";
 }, createText = function (text) {
     return "Surplus.createTextNode(" + codeStr(text) + ")";
-}, exe = function (code, varname, seed) {
-    return varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
-        : "Surplus.S(function () { " + code + " });";
+}, exe = function (code, varname, seed, loc, opts) {
+    return markLoc(varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
+        : "Surplus.S(function () { " + code + " });", loc, opts);
 };
 function propName(opts, name) {
     return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
@@ -177,4 +171,19 @@ function codeStr(str) {
         .replace(rx.singleQuotes, "\\'")
         .replace(rx.newlines, "\\\n")
         + "'";
+}
+function markLoc(str, loc, opts) {
+    return opts.sourcemap ? sourcemap.locationMark(loc) + str : str;
+}
+function markBlock(str, loc, opts) {
+    if (!opts.sourcemap)
+        return str;
+    var lines = str.split('\n'), offset = 0;
+    for (var i = 1; i < lines.length; i++) {
+        var line = lines[i];
+        offset += line.length;
+        var lineloc = { line: loc.line + i, col: 0, pos: loc.pos + offset + i };
+        lines[i] = sourcemap.locationMark(lineloc) + line;
+    }
+    return sourcemap.locationMark(loc) + lines.join('\n');
 }

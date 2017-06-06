@@ -91,11 +91,12 @@ var EmbeddedCode = (function (_super) {
 }(ASTCodeNode));
 var HtmlElement = (function (_super) {
     __extends(HtmlElement, _super);
-    function HtmlElement(tag, properties, content) {
+    function HtmlElement(tag, properties, content, loc) {
         var _this = _super.call(this) || this;
         _this.tag = tag;
         _this.properties = properties;
         _this.content = content;
+        _this.loc = loc;
         return _this;
     }
     HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) { };
@@ -121,9 +122,10 @@ var HtmlComment = (function (_super) {
 }(ASTStatementNode));
 var HtmlInsert = (function (_super) {
     __extends(HtmlInsert, _super);
-    function HtmlInsert(code) {
+    function HtmlInsert(code, loc) {
         var _this = _super.call(this) || this;
         _this.code = code;
+        _this.loc = loc;
         return _this;
     }
     return HtmlInsert;
@@ -140,19 +142,21 @@ var StaticProperty = (function (_super) {
 }(ASTStatementNode));
 var DynamicProperty = (function (_super) {
     __extends(DynamicProperty, _super);
-    function DynamicProperty(name, code) {
+    function DynamicProperty(name, code, loc) {
         var _this = _super.call(this) || this;
         _this.name = name;
         _this.code = code;
+        _this.loc = loc;
         return _this;
     }
     return DynamicProperty;
 }(ASTStatementNode));
 var Mixin = (function (_super) {
     __extends(Mixin, _super);
-    function Mixin(code) {
+    function Mixin(code, loc) {
         var _this = _super.call(this) || this;
         _this.code = code;
+        _this.loc = loc;
         return _this;
     }
     return Mixin;
@@ -258,7 +262,7 @@ function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return new HtmlElement(tag, properties, content);
+        return new HtmlElement(tag, properties, content, start);
     }
     function htmlText() {
         var text = "";
@@ -283,16 +287,18 @@ function parse(TOKS, opts) {
     function htmlInsert() {
         if (NOT('@'))
             ERR("not at start of code insert");
+        var loc = LOC();
         NEXT(); // pass '@'
-        return new HtmlInsert(embeddedCode());
+        return new HtmlInsert(embeddedCode(), loc);
     }
     function jsxHtmlInsert() {
-        return new HtmlInsert(jsxEmbeddedCode());
+        var loc = LOC();
+        return new HtmlInsert(jsxEmbeddedCode(), loc);
     }
     function property() {
         if (!MATCH(rx$1.identifier))
             ERR("not at start of property declaration");
-        var name = SPLIT(rx$1.identifier);
+        var loc = LOC(), name = SPLIT(rx$1.identifier);
         SKIPWS(); // pass name
         if (NOT('='))
             ERR("expected equals sign after property name");
@@ -302,10 +308,10 @@ function parse(TOKS, opts) {
             return new StaticProperty(name, quotedString());
         }
         else if (opts.jsx && IS('{')) {
-            return new DynamicProperty(name, jsxEmbeddedCode());
+            return new DynamicProperty(name, jsxEmbeddedCode(), loc);
         }
         else if (!opts.jsx) {
-            return new DynamicProperty(name, embeddedCode());
+            return new DynamicProperty(name, embeddedCode(), loc);
         }
         else {
             return ERR("unexepected value for JSX property");
@@ -314,13 +320,15 @@ function parse(TOKS, opts) {
     function mixin() {
         if (NOT('@'))
             ERR("not at start of mixin");
+        var loc = LOC();
         NEXT(); // pass '@'
-        return new Mixin(embeddedCode());
+        return new Mixin(embeddedCode(), loc);
     }
     function jsxMixin() {
         if (NOT('{...'))
             ERR("not at start of JSX mixin");
-        return new Mixin(jsxEmbeddedCode());
+        var loc = LOC();
+        return new Mixin(jsxEmbeddedCode(), loc);
     }
     function embeddedCode() {
         var start = LOC(), segments = [], text = "", loc = LOC();
@@ -574,58 +582,43 @@ function insertBefore(node, ctx) {
 }
 
 var rx$4 = {
-    locs: /(\r?\n)|(\u0000(\d+),(\d+)\u0000)|(\u0000\u0000)/g
+    locs: /(\n)|(\u0000(\d+),(\d+)\u0000)/g
 };
 var vlqFinalDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
 var vlqContinuationDigits = "ghijklmnopqrstuvwxyz0123456789+/";
-function segmentStart(loc) {
+function locationMark(loc) {
     return "\u0000" + loc.line + "," + loc.col + "\u0000";
 }
-function segmentEnd() {
-    return "\u0000\u0000";
-}
 function extractMappings(embedded) {
-    var mappings = "", lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, isInSegment = false, lineStartPos = 0, lineTagLength = 0, isLineContinuation = false;
-    var src = embedded.replace(rx$4.locs, function (_, nl, start, sourceLine, sourceCol, end, offset) {
+    var line = [], lines = [], lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, lineStartPos = 0, lineMarksLength = 0;
+    var src = embedded.replace(rx$4.locs, function (_, nl, mark, sourceLine, sourceCol, offset) {
         if (nl) {
-            mappings += ";";
-            if (isInSegment) {
-                mappings += "AA" + vlq(1) + vlq(0 - lastSourceCol);
-                lastSourceLine++;
-                lastSourceCol = 0;
-                isLineContinuation = true;
-            }
-            else {
-                isLineContinuation = false;
-            }
-            lineStartPos = offset + nl.length;
-            lineTagLength = 0;
+            lines.push(line);
+            line = [];
+            lineStartPos = offset + 1;
+            lineMarksLength = 0;
             lastGeneratedCol = 0;
             return nl;
         }
-        else if (start) {
-            var generatedCol = offset - lineStartPos - lineTagLength;
+        else {
+            var generatedCol = offset - lineStartPos - lineMarksLength;
             sourceLine = parseInt(sourceLine);
             sourceCol = parseInt(sourceCol);
-            mappings += (isLineContinuation ? "," : "")
-                + vlq(generatedCol - lastGeneratedCol)
+            line.push(vlq(generatedCol - lastGeneratedCol)
                 + "A" // only one file
                 + vlq(sourceLine - lastSourceLine)
-                + vlq(sourceCol - lastSourceCol);
-            isInSegment = true;
-            isLineContinuation = true;
-            lineTagLength += start.length;
+                + vlq(sourceCol - lastSourceCol));
+            //lineMarksLength += mark.length;
+            lineMarksLength -= 2;
             lastGeneratedCol = generatedCol;
             lastSourceLine = sourceLine;
             lastSourceCol = sourceCol;
-            return "";
-        }
-        else if (end) {
-            isInSegment = false;
-            lineTagLength += end.length;
-            return "";
+            //return "";
+            return "/*" + sourceLine + "," + sourceCol + "*/";
         }
     });
+    lines.push(line);
+    var mappings = lines.map(function (l) { return l.join(','); }).join(';');
     return {
         src: src,
         mappings: mappings
@@ -682,22 +675,22 @@ var rx$3 = {
 CodeTopLevel.prototype.genCode =
     EmbeddedCode.prototype.genCode = function (opts) { return concatResults(opts, this.segments, 'genCode'); };
 CodeText.prototype.genCode = function (opts) {
-    return (opts.sourcemap ? segmentStart(this.loc) : "")
-        + this.text
-        + (opts.sourcemap ? segmentEnd() : "");
+    return markBlock(this.text, this.loc, opts);
 };
 HtmlElement.prototype.genCode = function (opts, prior) {
+    var code;
     if (rx$3.upperStart.test(this.tag)) {
-        return genSubComponent(this, opts, prior);
+        code = genSubComponent(this, opts, prior);
     }
     else if (this.properties.length === 0 && this.content.length === 0) {
         // optimization: don't need IIFE for simple single nodes
-        return "document.createElement(\"" + this.tag + "\")";
+        code = "document.createElement(\"" + this.tag + "\")";
     }
     else {
-        var code = new CodeBlock(), expr = this.genDOMStatements(opts, code, null, 0);
-        return code.toCode(expr, indent(prior));
+        var block = new CodeBlock(), expr = this.genDOMStatements(opts, block, null, 0);
+        code = block.toCode(expr, indent(prior));
     }
+    return markLoc(code, this.loc, opts);
 };
 function genSubComponent(cmp, opts, prior) {
     var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = cmp.properties.map(function (p) {
@@ -742,7 +735,7 @@ HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) {
     if (rx$3.upperStart.test(this.tag)) {
         var expr = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
         code.init(assign(id, createText('')));
-        code.exe(exe("Surplus.insert(range, " + expr + ");", "range", range));
+        code.exe(exe("Surplus.insert(range, " + expr + ");", "range", range, this.loc, opts));
     }
     else {
         var exelen = code.exes.length;
@@ -774,12 +767,9 @@ HtmlText.prototype.genDOMStatements = function (opts, code, parent, n) {
 HtmlInsert.prototype.genDOMStatements = function (opts, code, parent, n) {
     var id = code.id(genIdentifier(parent, 'insert', n)), ins = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
     code.init(assign(id, createText('')));
-    if (noApparentSignals(ins)) {
-        code.exe("Surplus.insert(" + range + ", " + ins + ");");
-    }
-    else {
-        code.exe(exe("Surplus.insert(range, " + ins + ");", "range", range));
-    }
+    code.exe(noApparentSignals(ins)
+        ? "Surplus.insert(" + range + ", " + ins + ");"
+        : exe("Surplus.insert(range, " + ins + ");", "range", range, this.loc, opts));
     return id;
 };
 StaticProperty.prototype.genDOMStatements = function (opts, code, id, n) {
@@ -792,17 +782,14 @@ DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
     }
     else {
         var prop = propName(opts, this.name), setter = id + "." + prop + " = " + expr + ";";
-        if (noApparentSignals(expr)) {
-            code.exe(setter);
-        }
-        else {
-            code.exe(exe(setter, "", ""));
-        }
+        code.exe(noApparentSignals(expr)
+            ? setter
+            : exe(setter, "", "", this.loc, opts));
     }
 };
 Mixin.prototype.genDOMStatements = function (opts, code, id, n) {
     var expr = this.code.genCode(opts);
-    code.exe(exe("(" + expr + ")(" + id + ", __state);", "__state", ""));
+    code.exe(exe("(" + expr + ")(" + id + ", __state);", "__state", "", this.loc, opts));
 };
 var genIdentifier = function (parent, tag, n) {
     return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -822,9 +809,9 @@ var createComment = function (text) {
 var createText = function (text) {
     return "Surplus.createTextNode(" + codeStr(text) + ")";
 };
-var exe = function (code, varname, seed) {
-    return varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
-        : "Surplus.S(function () { " + code + " });";
+var exe = function (code, varname, seed, loc, opts) {
+    return markLoc(varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
+        : "Surplus.S(function () { " + code + " });", loc, opts);
 };
 function propName(opts, name) {
     return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
@@ -850,6 +837,21 @@ function codeStr(str) {
         .replace(rx$3.singleQuotes, "\\'")
         .replace(rx$3.newlines, "\\\n")
         + "'";
+}
+function markLoc(str, loc, opts) {
+    return opts.sourcemap ? locationMark(loc) + str : str;
+}
+function markBlock(str, loc, opts) {
+    if (!opts.sourcemap)
+        return str;
+    var lines = str.split('\n'), offset = 0;
+    for (var i = 1; i < lines.length; i++) {
+        var line = lines[i];
+        offset += line.length;
+        var lineloc = { line: loc.line + i, col: 0, pos: loc.pos + offset + i };
+        lines[i] = locationMark(lineloc) + line;
+    }
+    return locationMark(loc) + lines.join('\n');
 }
 
 function preprocess(str, opts) {

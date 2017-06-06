@@ -58,11 +58,12 @@ var EmbeddedCode = (function (_super) {
 export { EmbeddedCode };
 var HtmlElement = (function (_super) {
     __extends(HtmlElement, _super);
-    function HtmlElement(tag, properties, content) {
+    function HtmlElement(tag, properties, content, loc) {
         var _this = _super.call(this) || this;
         _this.tag = tag;
         _this.properties = properties;
         _this.content = content;
+        _this.loc = loc;
         return _this;
     }
     HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) { };
@@ -91,9 +92,10 @@ var HtmlComment = (function (_super) {
 export { HtmlComment };
 var HtmlInsert = (function (_super) {
     __extends(HtmlInsert, _super);
-    function HtmlInsert(code) {
+    function HtmlInsert(code, loc) {
         var _this = _super.call(this) || this;
         _this.code = code;
+        _this.loc = loc;
         return _this;
     }
     return HtmlInsert;
@@ -112,10 +114,11 @@ var StaticProperty = (function (_super) {
 export { StaticProperty };
 var DynamicProperty = (function (_super) {
     __extends(DynamicProperty, _super);
-    function DynamicProperty(name, code) {
+    function DynamicProperty(name, code, loc) {
         var _this = _super.call(this) || this;
         _this.name = name;
         _this.code = code;
+        _this.loc = loc;
         return _this;
     }
     return DynamicProperty;
@@ -123,9 +126,10 @@ var DynamicProperty = (function (_super) {
 export { DynamicProperty };
 var Mixin = (function (_super) {
     __extends(Mixin, _super);
-    function Mixin(code) {
+    function Mixin(code, loc) {
         var _this = _super.call(this) || this;
         _this.code = code;
+        _this.loc = loc;
         return _this;
     }
     return Mixin;

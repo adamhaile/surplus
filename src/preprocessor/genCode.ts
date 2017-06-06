@@ -1,4 +1,5 @@
 import * as AST from './AST';
+import { LOC } from './parse';
 import * as sourcemap from './sourcemap';
 import { Params } from './preprocess';
 
@@ -25,21 +26,21 @@ export interface IStatementGenerator {
 AST.CodeTopLevel.prototype.genCode   =
 AST.EmbeddedCode.prototype.genCode   = function (opts) { return concatResults(opts, this.segments, 'genCode'); };
 AST.CodeText.prototype.genCode       = function (opts) {
-    return (opts.sourcemap ? sourcemap.segmentStart(this.loc) : "")
-        + this.text
-        + (opts.sourcemap ? sourcemap.segmentEnd() : "");
+    return markBlock(this.text, this.loc, opts);
 };
 AST.HtmlElement.prototype.genCode = function (opts, prior?) {
+    var code : string;
     if (rx.upperStart.test(this.tag)) {
-        return genSubComponent(this, opts, prior);
+        code = genSubComponent(this, opts, prior);
     } else if (this.properties.length === 0 && this.content.length === 0) {
         // optimization: don't need IIFE for simple single nodes
-        return `document.createElement("${this.tag}")`;
+        code = `document.createElement("${this.tag}")`;
     } else {
-        var code = new CodeBlock(),
-            expr = this.genDOMStatements(opts, code, null, 0);
-        return code.toCode(expr!, indent(prior));
+        var block = new CodeBlock(),
+            expr = this.genDOMStatements(opts, block, null, 0);
+        code = block.toCode(expr!, indent(prior));
     }
+    return markLoc(code, this.loc, opts);
 };
 
 function genSubComponent(cmp : AST.HtmlElement, opts : Params, prior? : string) {
@@ -93,7 +94,7 @@ AST.HtmlElement.prototype.genDOMStatements     = function (opts, code, parent, n
         var expr = genSubComponent(this, opts, ""),
             range = `{ start: ${id}, end: ${id} }`;
         code.init(assign(id, createText('')));
-        code.exe(exe(`Surplus.insert(range, ${expr});`, "range", range));
+        code.exe(exe(`Surplus.insert(range, ${expr});`, "range", range, this.loc, opts));
     } else {
         var exelen = code.exes.length;
         code.init(assign(id, createElement(this.tag)));
@@ -123,17 +124,20 @@ AST.HtmlInsert.prototype.genDOMStatements      = function (opts, code, parent, n
     var id = code.id(genIdentifier(parent, 'insert', n)),
         ins = this.code.genCode(opts),
         range = `{ start: ${id}, end: ${id} }`;
+
     code.init(assign(id, createText('')));
-    if (noApparentSignals(ins)) {
-        code.exe(`Surplus.insert(${range}, ${ins});`);
-    } else { 
-        code.exe(exe(`Surplus.insert(range, ${ins});`, "range", range));
-    }
+
+    code.exe(noApparentSignals(ins)
+        ? `Surplus.insert(${range}, ${ins});`
+        : exe(`Surplus.insert(range, ${ins});`, "range", range, this.loc, opts));
+
     return id;
 };
+
 AST.StaticProperty.prototype.genDOMStatements  = function (opts, code, id, n) {
     code.init(id + "." + propName(opts, this.name) + " = " + this.value + ";");
 };
+
 AST.DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
     var expr = this.code.genCode(opts);
     if (this.name === "ref") {
@@ -141,16 +145,15 @@ AST.DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
     } else {
         var prop = propName(opts, this.name),
             setter = `${id}.${prop} = ${expr};`;
-        if (noApparentSignals(expr)) {
-            code.exe(setter);
-        } else {
-            code.exe(exe(setter, "", ""));
-        }
+
+        code.exe(noApparentSignals(expr)
+            ? setter
+            : exe(setter, "", "", this.loc, opts));
     }
 };
 AST.Mixin.prototype.genDOMStatements           = function (opts, code, id, n) {
     var expr = this.code.genCode(opts);
-    code.exe(exe(`(${expr})(${id}, __state);`, "__state", ""));
+    code.exe(exe(`(${expr})(${id}, __state);`, "__state", "", this.loc, opts));
 };
 
 let genIdentifier = (parent : string | null, tag : string, n : number) =>
@@ -165,9 +168,9 @@ let genIdentifier = (parent : string | null, tag : string, n : number) =>
         `Surplus.createComment(${codeStr(text)})`,
     createText    = (text : string) => 
         `Surplus.createTextNode(${codeStr(text)})`,
-    exe = (code : string, varname : string , seed : string) =>
-        varname ? `Surplus.S(function (${varname}) { return ${code} }${seed ? `, ${seed}` : ''});`
-                : `Surplus.S(function () { ${code} });`;
+    exe = (code : string, varname : string , seed : string, loc : LOC, opts : Params) =>
+        markLoc(varname ? `Surplus.S(function (${varname}) { return ${code} }${seed ? `, ${seed}` : ''});`
+                        : `Surplus.S(function () { ${code} });`, loc, opts);
 
 function propName(opts : Params, name : string) {
     return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
@@ -198,4 +201,24 @@ function codeStr(str : string) {
                     .replace(rx.singleQuotes, "\\'")
                     .replace(rx.newlines, "\\\n")
                 + "'";
+}
+
+function markLoc(str : string, loc : LOC, opts : Params) {
+    return opts.sourcemap ? sourcemap.locationMark(loc) + str : str;
+}
+
+function markBlock(str : string, loc : LOC, opts : Params) {
+    if (!opts.sourcemap) return str;
+
+    var lines = str.split('\n'),
+        offset = 0;
+
+    for (var i = 1; i < lines.length; i++) {
+        var line = lines[i];
+        offset += line.length;
+        var lineloc = { line: loc.line + i, col: 0, pos: loc.pos + offset + i };
+        lines[i] = sourcemap.locationMark(lineloc) + line;
+    }
+
+    return sourcemap.locationMark(loc) + lines.join('\n');
 }
