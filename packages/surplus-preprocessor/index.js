@@ -36,131 +36,75 @@ function tokenize(str, opts) {
     return toks || [];
 }
 
-var __extends = (undefined && undefined.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var ASTCodeNode = (function () {
-    function ASTCodeNode() {
-    }
-    ASTCodeNode.prototype.shim = function (ctx) { };
-    ASTCodeNode.prototype.genCode = function (params, prior) { return ""; };
-    
-    return ASTCodeNode;
-}());
-var ASTStatementNode = (function () {
-    function ASTStatementNode() {
-    }
-    ASTStatementNode.prototype.shim = function (ctx) { };
-    ASTStatementNode.prototype.genDOMStatements = function (opts, code, parent, n) { };
-    return ASTStatementNode;
-}());
-var CodeTopLevel = (function (_super) {
-    __extends(CodeTopLevel, _super);
+var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
-        var _this = _super.call(this) || this;
-        _this.segments = segments;
-        return _this;
+        this.segments = segments;
     }
     return CodeTopLevel;
-}(ASTCodeNode));
-var CodeText = (function (_super) {
-    __extends(CodeText, _super);
+}());
+var CodeText = (function () {
     function CodeText(text, loc) {
-        var _this = _super.call(this) || this;
-        _this.text = text;
-        _this.loc = loc;
-        return _this;
+        this.text = text;
+        this.loc = loc;
     }
     return CodeText;
-}(ASTCodeNode));
-var EmbeddedCode = (function (_super) {
-    __extends(EmbeddedCode, _super);
+}());
+var EmbeddedCode = (function () {
     function EmbeddedCode(segments) {
-        var _this = _super.call(this) || this;
-        _this.segments = segments;
-        return _this;
+        this.segments = segments;
     }
     return EmbeddedCode;
-}(ASTCodeNode));
-var HtmlElement = (function (_super) {
-    __extends(HtmlElement, _super);
+}());
+var HtmlElement = (function () {
     function HtmlElement(tag, properties, content, loc) {
-        var _this = _super.call(this) || this;
-        _this.tag = tag;
-        _this.properties = properties;
-        _this.content = content;
-        _this.loc = loc;
-        return _this;
+        this.tag = tag;
+        this.properties = properties;
+        this.content = content;
+        this.loc = loc;
     }
-    HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) { };
     return HtmlElement;
-}(ASTCodeNode));
-var HtmlText = (function (_super) {
-    __extends(HtmlText, _super);
+}());
+var HtmlText = (function () {
     function HtmlText(text) {
-        var _this = _super.call(this) || this;
-        _this.text = text;
-        return _this;
+        this.text = text;
     }
     return HtmlText;
-}(ASTStatementNode));
-var HtmlComment = (function (_super) {
-    __extends(HtmlComment, _super);
+}());
+var HtmlComment = (function () {
     function HtmlComment(text) {
-        var _this = _super.call(this) || this;
-        _this.text = text;
-        return _this;
+        this.text = text;
     }
     return HtmlComment;
-}(ASTStatementNode));
-var HtmlInsert = (function (_super) {
-    __extends(HtmlInsert, _super);
+}());
+var HtmlInsert = (function () {
     function HtmlInsert(code, loc) {
-        var _this = _super.call(this) || this;
-        _this.code = code;
-        _this.loc = loc;
-        return _this;
+        this.code = code;
+        this.loc = loc;
     }
     return HtmlInsert;
-}(ASTStatementNode));
-var StaticProperty = (function (_super) {
-    __extends(StaticProperty, _super);
+}());
+var StaticProperty = (function () {
     function StaticProperty(name, value) {
-        var _this = _super.call(this) || this;
-        _this.name = name;
-        _this.value = value;
-        return _this;
+        this.name = name;
+        this.value = value;
     }
     return StaticProperty;
-}(ASTStatementNode));
-var DynamicProperty = (function (_super) {
-    __extends(DynamicProperty, _super);
+}());
+var DynamicProperty = (function () {
     function DynamicProperty(name, code, loc) {
-        var _this = _super.call(this) || this;
-        _this.name = name;
-        _this.code = code;
-        _this.loc = loc;
-        return _this;
+        this.name = name;
+        this.code = code;
+        this.loc = loc;
     }
     return DynamicProperty;
-}(ASTStatementNode));
-var Mixin = (function (_super) {
-    __extends(Mixin, _super);
+}());
+var Mixin = (function () {
     function Mixin(code, loc) {
-        var _this = _super.call(this) || this;
-        _this.code = code;
-        _this.loc = loc;
-        return _this;
+        this.code = code;
+        this.loc = loc;
     }
     return Mixin;
-}(ASTStatementNode));
+}());
 
 // pre-compiled regular expressions
 var rx$1 = {
@@ -500,15 +444,70 @@ function parse(TOKS, opts) {
 var rx$2 = {
     ws: /^\s*$/
 };
-var shimmed = false;
+var transform = function (node, opt) {
+    transformCodeTopLevel(node, { index: 0, parent: null, siblings: [], prune: false });
+    return node;
+};
 // add base shim methods that visit AST
-CodeTopLevel.prototype.shim = function (ctx) { shimSiblings(this, this.segments); };
-HtmlElement.prototype.shim = function (ctx) { shimSiblings(this, this.content); };
-HtmlInsert.prototype.shim = function (ctx) { this.code.shim(ctx); };
-EmbeddedCode.prototype.shim = function (ctx) { shimSiblings(this, this.segments); };
-CodeText.prototype.shim =
-    HtmlText.prototype.shim =
-        HtmlComment.prototype.shim = function (ctx) { };
+var transformNode = function (node, ctx) {
+    return node instanceof CodeTopLevel ? transformCodeTopLevel(node, ctx) :
+        node instanceof EmbeddedCode ? transformEmbeddedCode(node, ctx) :
+            node instanceof CodeText ? transformCodeText(node, ctx) :
+                node instanceof HtmlElement ? transformHtmlElement(node, ctx) :
+                    node instanceof HtmlText ? transformHtmlText(node, ctx) :
+                        node instanceof HtmlComment ? transformHtmlComment(node, ctx) :
+                            node instanceof StaticProperty ? transformStaticProperty(node, ctx) :
+                                node instanceof DynamicProperty ? transformDynamicProperty(node, ctx) :
+                                    node instanceof Mixin ? transformMixin(node, ctx) :
+                                        transformHtmlInsert(node, ctx);
+};
+var transformCodeTopLevel = function (node, ctx) {
+    return transformSiblings(node, node.segments);
+};
+var transformEmbeddedCode = function (node, ctx) {
+    return transformSiblings(node, node.segments);
+};
+var transformHtmlElement = function (node, ctx) {
+    transformSiblings(node, node.properties);
+    transformSiblings(node, node.content);
+};
+var transformHtmlInsert = function (node, ctx) {
+    return transformEmbeddedCode(node.code, ctx);
+};
+var transformCodeText = function (node, ctx) { };
+var transformHtmlText = function (node, ctx) { };
+var transformHtmlComment = function (node, ctx) { };
+var transformStaticProperty = function (node, ctx) { };
+var transformDynamicProperty = function (node, ctx) {
+    return transformEmbeddedCode(node.code, ctx);
+};
+var transformMixin = function (node, ctx) {
+    return transformEmbeddedCode(node.code, ctx);
+};
+var transformSiblings = function (parent, siblings) {
+    var ctx = { index: 0, parent: parent, siblings: siblings, prune: false };
+    for (; ctx.index < siblings.length; ctx.index++) {
+        transformNode(siblings[ctx.index], ctx);
+        if (ctx.prune) {
+            siblings.splice(ctx.index, 1);
+            ctx.index--;
+            ctx.prune = false;
+        }
+    }
+};
+var composeTransforms = function (orig, tx) { return function (node, ctx) {
+    tx(node, ctx);
+    if (!ctx.prune)
+        orig(node, ctx);
+}; };
+var prune = function (ctx) {
+    ctx.prune = true;
+};
+var insertBefore = function (node, ctx) {
+    ctx.siblings.splice(ctx.index, 0, node);
+    transformNode(node, ctx);
+    ctx.index++;
+};
 removeWhitespaceTextNodes();
 if (typeof window !== 'undefined' && window.document && window.document.createElement) {
     // browser-based shims
@@ -518,8 +517,8 @@ if (typeof window !== 'undefined' && window.document && window.document.createEl
         insertTextNodeBeforeInitialComments();
 }
 function removeWhitespaceTextNodes() {
-    shim(HtmlText, function (ctx) {
-        if (rx$2.ws.test(this.text)) {
+    transformHtmlText = composeTransforms(transformHtmlText, function (node, ctx) {
+        if (rx$2.ws.test(node.text)) {
             prune(ctx);
         }
     });
@@ -532,9 +531,9 @@ function browserPreservesWhitespaceTextNodes() {
     return ul.childNodes.length === 2;
 }
 function addFEFFtoWhitespaceTextNodes() {
-    shim(HtmlText, function (ctx) {
-        if (rx$2.ws.test(this.text) && !(ctx.parent instanceof StaticProperty)) {
-            this.text = '&#xfeff;' + this.text;
+    transformHtmlText = composeTransforms(transformHtmlText, function (node, ctx) {
+        if (rx$2.ws.test(node.text) && !(ctx.parent instanceof StaticProperty)) {
+            node.text = '&#xfeff;' + node.text;
         }
     });
 }
@@ -546,39 +545,11 @@ function browserPreservesInitialComments() {
     return ul.childNodes.length === 2;
 }
 function insertTextNodeBeforeInitialComments() {
-    shim(HtmlComment, function (ctx) {
+    transformHtmlComment = composeTransforms(transformHtmlComment, function (node, ctx) {
         if (ctx.index === 0) {
             insertBefore(new HtmlText('&#xfeff;'), ctx);
         }
     });
-}
-function shimSiblings(parent, siblings) {
-    var ctx = { index: 0, parent: parent, siblings: siblings, prune: false };
-    for (; ctx.index < siblings.length; ctx.index++) {
-        siblings[ctx.index].shim(ctx);
-        if (ctx.prune) {
-            siblings.splice(ctx.index, 1);
-            ctx.index--;
-            ctx.prune = false;
-        }
-    }
-}
-function shim(node, fn) {
-    shimmed = true;
-    var oldShim = node.prototype.shim;
-    node.prototype.shim = function (ctx) {
-        fn.call(this, ctx);
-        if (!ctx || !ctx.prune)
-            oldShim.call(this, ctx);
-    };
-}
-function prune(ctx) {
-    ctx.prune = true;
-}
-function insertBefore(node, ctx) {
-    ctx.siblings.splice(ctx.index, 0, node);
-    node.shim(ctx);
-    ctx.index++;
 }
 
 var rx$4 = {
@@ -671,128 +642,150 @@ var rx$3 = {
     singleQuotes: /'/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
-// genCode
-CodeTopLevel.prototype.genCode =
-    EmbeddedCode.prototype.genCode = function (opts) { return concatResults(opts, this.segments, 'genCode'); };
-CodeText.prototype.genCode = function (opts) {
-    return markBlock(this.text, this.loc, opts);
-};
-HtmlElement.prototype.genCode = function (opts, prior) {
-    var code;
-    if (rx$3.upperStart.test(this.tag)) {
-        code = genSubComponent(this, opts, prior);
+var CodeBlock = (function () {
+    function CodeBlock() {
+        this.ids = [];
+        this.staticStmts = [];
+        this.dynamicStmts = [];
     }
-    else if (this.properties.length === 0 && this.content.length === 0) {
+    CodeBlock.prototype.id = function (id) { this.ids.push(id); return id; };
+    CodeBlock.prototype.staticStmt = function (stmt) { this.staticStmts.push(stmt); return stmt; };
+    CodeBlock.prototype.dynamicStmt = function (stmt) { this.dynamicStmts.push(stmt); return stmt; };
+    return CodeBlock;
+}());
+var compile = function (node, opts) { return compileSegments(node, opts); };
+var compileSegments = function (node, opts) {
+    var result = "", i;
+    for (i = 0; i < node.segments.length; i++) {
+        result += compileSegment(node.segments[i], result, opts);
+    }
+    return result;
+};
+var compileSegment = function (node, previousCode, opts) {
+    return node instanceof CodeText ? compileCodeText(node, opts) : compileHtmlElement(node, previousCode, opts);
+};
+var compileCodeText = function (node, opts) {
+    return markBlockLocs(node.text, node.loc, opts);
+};
+var compileHtmlElement = function (node, previousCode, opts) {
+    var code;
+    if (rx$3.upperStart.test(node.tag)) {
+        code = compileSubComponent(node, previousCode, opts);
+    }
+    else if (node.properties.length === 0 && node.content.length === 0) {
         // optimization: don't need IIFE for simple single nodes
-        code = "document.createElement(\"" + this.tag + "\")";
+        code = "document.createElement(\"" + node.tag + "\")";
     }
     else {
-        var block = new CodeBlock(), expr = this.genDOMStatements(opts, block, null, 0);
-        code = block.toCode(expr, indent(prior));
+        var block = new CodeBlock(), expr = stmtsHtmlElement(node, block, null, 0, opts);
+        code = compileCodeBlock(block, expr, indent(previousCode));
     }
-    return markLoc(code, this.loc, opts);
+    return markLoc(code, node.loc, opts);
 };
-function genSubComponent(cmp, opts, prior) {
-    var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = cmp.properties.map(function (p) {
+var compileSubComponent = function (node, prior, opts) {
+    var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = node.properties.map(function (p) {
         return p instanceof StaticProperty ? propName(opts, p.name) + ": " + p.value + "," :
-            p instanceof DynamicProperty ? propName(opts, p.name) + ": " + p.code.genCode(opts, prior) + "," :
+            p instanceof DynamicProperty ? propName(opts, p.name) + ": " + compileSegments(p.code, opts) + "," :
                 '';
-    }), children = cmp.content.map(function (c) {
-        return c instanceof HtmlElement ? c.genCode(opts, prior) :
+    }), children = node.content.map(function (c) {
+        return c instanceof HtmlElement ? compileHtmlElement(c, prior, opts) :
             c instanceof HtmlText ? codeStr(c.text.trim()) :
-                c instanceof HtmlInsert ? c.code.genCode(opts, prior) :
+                c instanceof HtmlInsert ? compileSegments(c.code, opts) :
                     createComment(c.text);
     });
-    return cmp.tag + "({" + inl
+    return node.tag + "({" + inl
         + props.join(inl) + inl
         + 'children: [' + iinl
         + children.join(',' + iinl) + inl
         + ']})';
-}
-var CodeBlock = (function () {
-    function CodeBlock() {
-        this.ids = [];
-        this.inits = [];
-        this.exes = [];
-    }
-    CodeBlock.prototype.id = function (id) { this.ids.push(id); return id; };
-    CodeBlock.prototype.init = function (stmt) { this.inits.push(stmt); return stmt; };
-    CodeBlock.prototype.exe = function (stmt) { this.exes.push(stmt); return stmt; };
-    CodeBlock.prototype.toCode = function (expr, indent) {
-        var nl = "\r\n" + indent, inl = nl + '    ', iinl = inl + '    ';
-        return '(function () {' + iinl
-            + 'var ' + this.ids.join(', ') + ';' + iinl
-            + this.inits.join(iinl) + iinl
-            + this.exes.join(iinl) + iinl
-            + 'return ' + expr + ';' + inl
-            + '})()';
-    };
-    return CodeBlock;
-}());
-// genDOMStatements
-HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) {
-    var id = code.id(genIdentifier(parent, this.tag, n));
-    if (rx$3.upperStart.test(this.tag)) {
-        var expr = genSubComponent(this, opts, ""), range = "{ start: " + id + ", end: " + id + " }";
-        code.init(assign(id, createText('')));
-        code.exe(exe("Surplus.insert(range, " + expr + ");", "range", range, this.loc, opts));
+};
+var compileCodeBlock = function (code, expr, indent) {
+    var nl = "\r\n" + indent, inl = nl + '    ', iinl = inl + '    ';
+    return '(function () {' + iinl
+        + 'var ' + code.ids.join(', ') + ';' + iinl
+        + code.staticStmts.join(iinl) + iinl
+        + code.dynamicStmts.join(iinl) + iinl
+        + 'return ' + expr + ';' + inl
+        + '})()';
+};
+var stmtsHtmlElement = function (node, code, parent, n, opts) {
+    var id = code.id(genIdentifier(parent, node.tag, n));
+    if (rx$3.upperStart.test(node.tag)) {
+        var expr = compileSubComponent(node, "", opts), range = "{ start: " + id + ", end: " + id + " }";
+        code.staticStmt(assign(id, createText('')));
+        code.dynamicStmt(computation("Surplus.insert(range, " + expr + ");", "range", range, node.loc, opts));
     }
     else {
-        var exelen = code.exes.length;
-        code.init(assign(id, createElement(this.tag)));
-        for (var i = 0; i < this.properties.length; i++) {
-            this.properties[i].genDOMStatements(opts, code, id, i);
+        var exelen = code.dynamicStmts.length;
+        code.staticStmt(assign(id, createElement(node.tag)));
+        for (var i = 0; i < node.properties.length; i++) {
+            stmtsProperty(node.properties[i], code, id, i, opts);
         }
-        var myexes = code.exes.splice(exelen);
-        for (i = 0; i < this.content.length; i++) {
-            var child = this.content[i].genDOMStatements(opts, code, id, i);
+        var myexes = code.dynamicStmts.splice(exelen);
+        for (i = 0; i < node.content.length; i++) {
+            var child = stmtsChild(node.content[i], code, id, i, opts);
             if (child)
-                code.init(appendNode(id, child));
+                code.staticStmt(appendNode(id, child));
         }
-        code.exes = code.exes.concat(myexes);
+        code.dynamicStmts = code.dynamicStmts.concat(myexes);
     }
     return id;
 };
-HtmlComment.prototype.genDOMStatements = function (opts, code, parent, n) {
-    return createComment(this.text);
+var stmtsProperty = function (node, code, id, n, opts) {
+    return node instanceof StaticProperty ? stmtsStaticProperty(node, code, id, n, opts) :
+        node instanceof DynamicProperty ? stmtsDynamicProperty(node, code, id, n, opts) :
+            stmtsMixin(node, code, id, n, opts);
 };
-HtmlText.prototype.genDOMStatements = function (opts, code, parent, n) {
-    if (n === 0) {
-        code.init(parent + ".innerText = " + codeStr(this.text));
+var stmtsStaticProperty = function (node, code, id, n, opts) {
+    code.staticStmt(id + "." + propName(opts, node.name) + " = " + node.value + ";");
+};
+var stmtsDynamicProperty = function (node, code, id, n, opts) {
+    var expr = compileSegments(node.code, opts);
+    if (node.name === "ref") {
+        code.staticStmt(expr + " = " + id + ";");
     }
     else {
-        return createText(this.text);
-    }
-};
-HtmlInsert.prototype.genDOMStatements = function (opts, code, parent, n) {
-    var id = code.id(genIdentifier(parent, 'insert', n)), ins = this.code.genCode(opts), range = "{ start: " + id + ", end: " + id + " }";
-    code.init(assign(id, createText('')));
-    code.exe(noApparentSignals(ins)
-        ? "Surplus.insert(" + range + ", " + ins + ");"
-        : exe("Surplus.insert(range, " + ins + ");", "range", range, this.loc, opts));
-    return id;
-};
-StaticProperty.prototype.genDOMStatements = function (opts, code, id, n) {
-    code.init(id + "." + propName(opts, this.name) + " = " + this.value + ";");
-};
-DynamicProperty.prototype.genDOMStatements = function (opts, code, id, n) {
-    var expr = this.code.genCode(opts);
-    if (this.name === "ref") {
-        code.init(expr + " = " + id + ";");
-    }
-    else {
-        var prop = propName(opts, this.name), setter = id + "." + prop + " = " + expr + ";";
-        code.exe(noApparentSignals(expr)
+        var prop = propName(opts, node.name), setter = id + "." + prop + " = " + expr + ";";
+        code.dynamicStmt(noApparentSignals(expr)
             ? setter
-            : exe(setter, "", "", this.loc, opts));
+            : computation(setter, "", "", node.loc, opts));
     }
 };
-Mixin.prototype.genDOMStatements = function (opts, code, id, n) {
-    var expr = this.code.genCode(opts);
-    code.exe(exe("(" + expr + ")(" + id + ", __state);", "__state", "", this.loc, opts));
+var stmtsMixin = function (node, code, id, n, opts) {
+    var expr = compileSegments(node.code, opts);
+    code.dynamicStmt(computation("(" + expr + ")(" + id + ", __state);", "__state", "", node.loc, opts));
+};
+var stmtsChild = function (node, code, parent, n, opts) {
+    return node instanceof HtmlElement ? stmtsHtmlElement(node, code, parent, n, opts) :
+        node instanceof HtmlComment ? stmtsHtmlComment(node) :
+            node instanceof HtmlText ? stmtsHtmlText(node, code, parent, n) :
+                stmtsHtmlInsert(node, code, parent, n, opts);
+};
+var stmtsHtmlComment = function (node) {
+    return createComment(node.text);
+};
+var stmtsHtmlText = function (node, code, parent, n) {
+    // if we're the first child, we can just set innerText
+    if (n === 0) {
+        code.staticStmt(parent + ".innerText = " + codeStr(node.text));
+    }
+    else {
+        return createText(node.text);
+    }
+};
+var stmtsHtmlInsert = function (node, code, parent, n, opts) {
+    var id = code.id(genIdentifier(parent, 'insert', n)), ins = compileSegments(node.code, opts), range = "{ start: " + id + ", end: " + id + " }";
+    code.staticStmt(assign(id, createText('')));
+    code.dynamicStmt(noApparentSignals(ins)
+        ? "Surplus.insert(" + range + ", " + ins + ");"
+        : computation("Surplus.insert(range, " + ins + ");", "range", range, node.loc, opts));
+    return id;
 };
 var genIdentifier = function (parent, tag, n) {
     return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
+};
+var propName = function (opts, name) {
+    return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
 };
 var assign = function (id, expr) {
     return id + " = " + expr + ";";
@@ -809,39 +802,28 @@ var createComment = function (text) {
 var createText = function (text) {
     return "Surplus.createTextNode(" + codeStr(text) + ")";
 };
-var exe = function (code, varname, seed, loc, opts) {
+var computation = function (code, varname, seed, loc, opts) {
     return markLoc(varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
         : "Surplus.S(function () { " + code + " });", loc, opts);
 };
-function propName(opts, name) {
-    return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
-}
-function noApparentSignals(code) {
+var noApparentSignals = function (code) {
     return !rx$3.hasParen.test(code) || rx$3.loneFunction.test(code);
-}
-function concatResults(opts, children, method, sep) {
-    var result = "", i;
-    for (i = 0; i < children.length; i++) {
-        if (i && sep)
-            result += sep;
-        result += children[i][method](opts, result);
-    }
-    return result;
-}
-function indent(prior) {
-    var m = rx$3.indent.exec(prior || '');
+};
+var indent = function (previousCode) {
+    var m = rx$3.indent.exec(previousCode);
     return m ? m[1] : '';
-}
-function codeStr(str) {
-    return "'" + str.replace(rx$3.backslashes, "\\\\")
-        .replace(rx$3.singleQuotes, "\\'")
-        .replace(rx$3.newlines, "\\\n")
-        + "'";
-}
-function markLoc(str, loc, opts) {
+};
+var codeStr = function (str) {
+    return "'" +
+        str.replace(rx$3.backslashes, "\\\\")
+            .replace(rx$3.singleQuotes, "\\'")
+            .replace(rx$3.newlines, "\\\n") +
+        "'";
+};
+var markLoc = function (str, loc, opts) {
     return opts.sourcemap ? locationMark(loc) + str : str;
-}
-function markBlock(str, loc, opts) {
+};
+var markBlockLocs = function (str, loc, opts) {
     if (!opts.sourcemap)
         return str;
     var lines = str.split('\n'), offset = 0;
@@ -852,7 +834,7 @@ function markBlock(str, loc, opts) {
         lines[i] = locationMark(lineloc) + line;
     }
     return locationMark(loc) + lines.join('\n');
-}
+};
 
 function preprocess(str, opts) {
     opts = opts || {};
@@ -862,16 +844,9 @@ function preprocess(str, opts) {
         targetfile: opts.targetfile || 'out.js',
         jsx: 'jsx' in opts ? opts.jsx : true
     };
-    var toks = tokenize(str, params), ast = parse(toks, params);
-    if (shimmed)
-        ast.shim();
-    var code = ast.genCode(params), out;
-    if (params.sourcemap === 'extract')
-        out = extractMap(code, str, params);
-    else if (params.sourcemap === 'append')
-        out = appendMap(code, str, params);
-    else
-        out = code;
+    var toks = tokenize(str, params), ast = parse(toks, params), ast2 = transform(ast, params), code = compile(ast2, params), out = params.sourcemap === 'extract' ? extractMap(code, str, params) :
+        params.sourcemap === 'append' ? appendMap(code, str, params) :
+            code;
     return out;
 }
 

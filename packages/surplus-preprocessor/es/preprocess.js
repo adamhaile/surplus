@@ -1,7 +1,7 @@
 import { tokenize } from './tokenize';
 import { parse } from './parse';
-import { shimmed } from './shims';
-import './genCode';
+import { transform } from './transform';
+import { compile } from './compile';
 import * as sourcemap from './sourcemap';
 export function preprocess(str, opts) {
     opts = opts || {};
@@ -11,15 +11,8 @@ export function preprocess(str, opts) {
         targetfile: opts.targetfile || 'out.js',
         jsx: 'jsx' in opts ? opts.jsx : true
     };
-    var toks = tokenize(str, params), ast = parse(toks, params);
-    if (shimmed)
-        ast.shim();
-    var code = ast.genCode(params), out;
-    if (params.sourcemap === 'extract')
-        out = sourcemap.extractMap(code, str, params);
-    else if (params.sourcemap === 'append')
-        out = sourcemap.appendMap(code, str, params);
-    else
-        out = code;
+    var toks = tokenize(str, params), ast = parse(toks, params), ast2 = transform(ast, params), code = compile(ast2, params), out = params.sourcemap === 'extract' ? sourcemap.extractMap(code, str, params) :
+        params.sourcemap === 'append' ? sourcemap.appendMap(code, str, params) :
+            code;
     return out;
 }

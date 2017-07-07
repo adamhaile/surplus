@@ -1,4 +1,3 @@
-import './genCode';
 export interface Options {
     sourcemap?: 'extract' | 'append' | null;
     sourcefile?: string;

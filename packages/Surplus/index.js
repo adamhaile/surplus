@@ -4,7 +4,7 @@
 	(factory((global.Surplus = global.Surplus || {}),global.S));
 }(this, (function (exports,S) { 'use strict';
 
-S = 'default' in S ? S['default'] : S;
+S = S && 'default' in S ? S['default'] : S;
 
 var TEXT_NODE = 3;
 function insert$$1(range, value) {

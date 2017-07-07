@@ -1,137 +1,79 @@
-var __extends = (this && this.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var ASTCodeNode = (function () {
-    function ASTCodeNode() {
-    }
-    ASTCodeNode.prototype.shim = function (ctx) { };
-    ASTCodeNode.prototype.genCode = function (params, prior) { return ""; };
-    ;
-    return ASTCodeNode;
-}());
-export { ASTCodeNode };
-var ASTStatementNode = (function () {
-    function ASTStatementNode() {
-    }
-    ASTStatementNode.prototype.shim = function (ctx) { };
-    ASTStatementNode.prototype.genDOMStatements = function (opts, code, parent, n) { };
-    return ASTStatementNode;
-}());
-export { ASTStatementNode };
-var CodeTopLevel = (function (_super) {
-    __extends(CodeTopLevel, _super);
+var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
-        var _this = _super.call(this) || this;
-        _this.segments = segments;
-        return _this;
+        this.segments = segments;
     }
     return CodeTopLevel;
-}(ASTCodeNode));
+}());
 export { CodeTopLevel };
-var CodeText = (function (_super) {
-    __extends(CodeText, _super);
+var CodeText = (function () {
     function CodeText(text, loc) {
-        var _this = _super.call(this) || this;
-        _this.text = text;
-        _this.loc = loc;
-        return _this;
+        this.text = text;
+        this.loc = loc;
     }
     return CodeText;
-}(ASTCodeNode));
+}());
 export { CodeText };
-var EmbeddedCode = (function (_super) {
-    __extends(EmbeddedCode, _super);
+var EmbeddedCode = (function () {
     function EmbeddedCode(segments) {
-        var _this = _super.call(this) || this;
-        _this.segments = segments;
-        return _this;
+        this.segments = segments;
     }
     return EmbeddedCode;
-}(ASTCodeNode));
+}());
 export { EmbeddedCode };
-var HtmlElement = (function (_super) {
-    __extends(HtmlElement, _super);
+var HtmlElement = (function () {
     function HtmlElement(tag, properties, content, loc) {
-        var _this = _super.call(this) || this;
-        _this.tag = tag;
-        _this.properties = properties;
-        _this.content = content;
-        _this.loc = loc;
-        return _this;
+        this.tag = tag;
+        this.properties = properties;
+        this.content = content;
+        this.loc = loc;
     }
-    HtmlElement.prototype.genDOMStatements = function (opts, code, parent, n) { };
     return HtmlElement;
-}(ASTCodeNode));
+}());
 export { HtmlElement };
-var HtmlText = (function (_super) {
-    __extends(HtmlText, _super);
+var HtmlText = (function () {
     function HtmlText(text) {
-        var _this = _super.call(this) || this;
-        _this.text = text;
-        return _this;
+        this.text = text;
     }
     return HtmlText;
-}(ASTStatementNode));
+}());
 export { HtmlText };
-var HtmlComment = (function (_super) {
-    __extends(HtmlComment, _super);
+var HtmlComment = (function () {
     function HtmlComment(text) {
-        var _this = _super.call(this) || this;
-        _this.text = text;
-        return _this;
+        this.text = text;
     }
     return HtmlComment;
-}(ASTStatementNode));
+}());
 export { HtmlComment };
-var HtmlInsert = (function (_super) {
-    __extends(HtmlInsert, _super);
+var HtmlInsert = (function () {
     function HtmlInsert(code, loc) {
-        var _this = _super.call(this) || this;
-        _this.code = code;
-        _this.loc = loc;
-        return _this;
+        this.code = code;
+        this.loc = loc;
     }
     return HtmlInsert;
-}(ASTStatementNode));
+}());
 export { HtmlInsert };
-var StaticProperty = (function (_super) {
-    __extends(StaticProperty, _super);
+var StaticProperty = (function () {
     function StaticProperty(name, value) {
-        var _this = _super.call(this) || this;
-        _this.name = name;
-        _this.value = value;
-        return _this;
+        this.name = name;
+        this.value = value;
     }
     return StaticProperty;
-}(ASTStatementNode));
+}());
 export { StaticProperty };
-var DynamicProperty = (function (_super) {
-    __extends(DynamicProperty, _super);
+var DynamicProperty = (function () {
     function DynamicProperty(name, code, loc) {
-        var _this = _super.call(this) || this;
-        _this.name = name;
-        _this.code = code;
-        _this.loc = loc;
-        return _this;
+        this.name = name;
+        this.code = code;
+        this.loc = loc;
     }
     return DynamicProperty;
-}(ASTStatementNode));
+}());
 export { DynamicProperty };
-var Mixin = (function (_super) {
-    __extends(Mixin, _super);
+var Mixin = (function () {
     function Mixin(code, loc) {
-        var _this = _super.call(this) || this;
-        _this.code = code;
-        _this.loc = loc;
-        return _this;
+        this.code = code;
+        this.loc = loc;
     }
     return Mixin;
-}(ASTStatementNode));
+}());
 export { Mixin };

@@ -1,84 +1,73 @@
 import { Params } from './preprocess';
-import { IShimmable, Context } from './shims';
-import { ICodeGenerator, IStatementGenerator, CodeBlock } from './genCode';
 import { LOC } from './parse';
 
-export abstract class ASTCodeNode implements ICodeGenerator, IShimmable {
-    shim(ctx? : Context) { }
-    genCode(params : Params, prior? : string) { return ""; };
-}
-
-export abstract class ASTStatementNode implements IStatementGenerator, IShimmable {
-    shim(ctx? : Context) { }    
-    genDOMStatements(opts : Params, code : CodeBlock, parent : string | null, n : number) : string | void { }
-}
-
-export class CodeTopLevel extends ASTCodeNode {
+export class CodeTopLevel {
     constructor(
         public segments : (CodeText | HtmlElement)[]
-    ) { super(); }
+    ) { }
 }
 
-export class CodeText extends ASTCodeNode {
+export class CodeText { 
     constructor(
         public text : string, 
         public loc : LOC
-    ) { super(); }
+    ) { }
 }
 
-export class EmbeddedCode extends ASTCodeNode {
+export class EmbeddedCode {
     constructor(
         public segments : (CodeText | HtmlElement)[]
-    ) { super(); }
+    ) { }
 }
 
-export class HtmlElement extends ASTCodeNode implements IStatementGenerator {
+export class HtmlElement {
     constructor(
         public tag : string, 
         public properties : (StaticProperty | DynamicProperty | Mixin)[], 
         public content : (HtmlElement | HtmlComment | HtmlText | HtmlInsert)[],
         public loc : LOC
-    ) { super(); }    
-    genDOMStatements(opts : Params, code : CodeBlock, parent : string | null, n : number) : string | void { }
+    ) { }    
 }
 
-export class HtmlText extends ASTStatementNode {
+export class HtmlText {
     constructor(
         public text : string
-    ) { super(); }
+    ) { }
 }
 
-export class HtmlComment extends ASTStatementNode {
+export class HtmlComment {
     constructor(
         public text : string
-    ) { super(); }
+    ) { }
 }
 
-export class HtmlInsert extends ASTStatementNode {
+export class HtmlInsert {
     constructor(
         public code : EmbeddedCode,
         public loc : LOC
-    ) { super(); }
+    ) { }
 }
 
-export class StaticProperty extends ASTStatementNode {
+export class StaticProperty {
     constructor(
         public name : string, 
         public value : string
-    ) { super(); }
+    ) { }
 }
 
-export class DynamicProperty extends ASTStatementNode {
+export class DynamicProperty {
     constructor(
         public name : string, 
         public code : EmbeddedCode,
         public loc : LOC
-    ) { super(); }
+    ) { }
 }
 
-export class Mixin extends ASTStatementNode {
+export class Mixin {
     constructor(
         public code : EmbeddedCode,
         public loc : LOC
-    ) { super(); }
+    ) { }
 }
+
+export type  Node = CodeTopLevel | CodeText | EmbeddedCode | HtmlElement | HtmlText | HtmlComment | HtmlInsert | StaticProperty | DynamicProperty | Mixin;
