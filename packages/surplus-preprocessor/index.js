@@ -36,6 +36,54 @@ function tokenize(str, opts) {
     return toks || [];
 }
 
+var __extends = (undefined && undefined.__extends) || (function () {
+    var extendStatics = Object.setPrototypeOf ||
+        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
+    return function (d, b) {
+        extendStatics(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    };
+})();
+var Context = (function () {
+    function Context(node) {
+        this.node = node;
+    }
+    Context.prototype.child = function (node) { return new Child(node, this); };
+    Context.prototype.sibling = function (node, i, siblings) { return new Sibling(node, i, siblings, this); };
+    return Context;
+}());
+var Root = (function (_super) {
+    __extends(Root, _super);
+    function Root() {
+        return _super !== null && _super.apply(this, arguments) || this;
+    }
+    return Root;
+}(Context));
+var Child = (function (_super) {
+    __extends(Child, _super);
+    function Child(node, parent) {
+        var _this = _super.call(this, node) || this;
+        _this.parent = parent;
+        return _this;
+    }
+    Child.prototype.swap = function (node) { return new Child(node, this.parent); };
+    return Child;
+}(Context));
+var Sibling = (function (_super) {
+    __extends(Sibling, _super);
+    function Sibling(node, index, siblings, parent) {
+        var _this = _super.call(this, node) || this;
+        _this.index = index;
+        _this.siblings = siblings;
+        _this.parent = parent;
+        return _this;
+    }
+    Sibling.prototype.swap = function (node) { return new Sibling(node, this.index, this.siblings, this.parent); };
+    return Sibling;
+}(Context));
+
 var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
         this.segments = segments;
@@ -105,6 +153,55 @@ var Mixin = (function () {
     }
     return Mixin;
 }());
+var Copy = {
+    CodeTopLevel: function (node) {
+        return new CodeTopLevel(flatten(node.segments.map(this.CodeSegment(new Root(node)))));
+    },
+    CodeSegment: function (ctx) {
+        var _this = this;
+        return function (n, i, a) {
+            return n instanceof CodeText ? _this.CodeText(ctx.sibling(n, i, a)) :
+                _this.HtmlElement(ctx.sibling(n, i, a));
+        };
+    },
+    EmbeddedCode: function (ctx) {
+        return new EmbeddedCode(flatten(ctx.node.segments.map(this.CodeSegment(ctx))));
+    },
+    HtmlElement: function (ctx) {
+        return [new HtmlElement(ctx.node.tag, flatten(ctx.node.properties.map(this.HtmlProperty(ctx))), flatten(ctx.node.content.map(this.HtmlContent(ctx))), ctx.node.loc)];
+    },
+    HtmlProperty: function (ctx) {
+        var _this = this;
+        return function (n, i, a) {
+            return n instanceof StaticProperty ? _this.StaticProperty(ctx.sibling(n, i, a)) :
+                n instanceof DynamicProperty ? _this.DynamicProperty(ctx.sibling(n, i, a)) :
+                    _this.Mixin(ctx.sibling(n, i, a));
+        };
+    },
+    HtmlContent: function (ctx) {
+        var _this = this;
+        return function (n, i, a) {
+            return n instanceof HtmlComment ? _this.HtmlComment(ctx.sibling(n, i, a)) :
+                n instanceof HtmlText ? _this.HtmlText(ctx.sibling(n, i, a)) :
+                    n instanceof HtmlInsert ? _this.HtmlInsert(ctx.sibling(n, i, a)) :
+                        _this.HtmlElement(ctx.sibling(n, i, a));
+        };
+    },
+    HtmlInsert: function (ctx) {
+        return [new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    },
+    CodeText: function (ctx) { return [ctx.node]; },
+    HtmlText: function (ctx) { return [ctx.node]; },
+    HtmlComment: function (ctx) { return [ctx.node]; },
+    StaticProperty: function (ctx) { return [ctx.node]; },
+    DynamicProperty: function (ctx) {
+        return [new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    },
+    Mixin: function (ctx) {
+        return [new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    }
+};
+var flatten = function (aas) { return aas.reduce(function (as, a) { return as.concat(a); }, []); };
 
 // pre-compiled regular expressions
 var rx$1 = {
@@ -304,7 +401,7 @@ function parse(TOKS, opts) {
         // remove opening '{' or '{...', adjusting code loc accordingly
         var first = segments[0];
         first.loc.col += prefixLength;
-        first.text = first.text.substr(prefixLength);
+        segments[0] = new CodeText(first.text.substr(prefixLength), first.loc);
         return new EmbeddedCode(segments);
     }
     function balancedParens(segments, text, loc) {
@@ -440,88 +537,32 @@ function parse(TOKS, opts) {
     }
 }
 
+var __assign = (undefined && undefined.__assign) || Object.assign || function(t) {
+    for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+            t[p] = s[p];
+    }
+    return t;
+};
 // Cross-browser compatibility shims
 var rx$2 = {
     ws: /^\s*$/
 };
 var transform = function (node, opt) {
-    transformCodeTopLevel(node, { index: 0, parent: null, siblings: [], prune: false });
-    return node;
-};
-// add base shim methods that visit AST
-var transformNode = function (node, ctx) {
-    return node instanceof CodeTopLevel ? transformCodeTopLevel(node, ctx) :
-        node instanceof EmbeddedCode ? transformEmbeddedCode(node, ctx) :
-            node instanceof CodeText ? transformCodeText(node, ctx) :
-                node instanceof HtmlElement ? transformHtmlElement(node, ctx) :
-                    node instanceof HtmlText ? transformHtmlText(node, ctx) :
-                        node instanceof HtmlComment ? transformHtmlComment(node, ctx) :
-                            node instanceof StaticProperty ? transformStaticProperty(node, ctx) :
-                                node instanceof DynamicProperty ? transformDynamicProperty(node, ctx) :
-                                    node instanceof Mixin ? transformMixin(node, ctx) :
-                                        transformHtmlInsert(node, ctx);
-};
-var transformCodeTopLevel = function (node, ctx) {
-    return transformSiblings(node, node.segments);
-};
-var transformEmbeddedCode = function (node, ctx) {
-    return transformSiblings(node, node.segments);
-};
-var transformHtmlElement = function (node, ctx) {
-    transformSiblings(node, node.properties);
-    transformSiblings(node, node.content);
-};
-var transformHtmlInsert = function (node, ctx) {
-    return transformEmbeddedCode(node.code, ctx);
-};
-var transformCodeText = function (node, ctx) { };
-var transformHtmlText = function (node, ctx) { };
-var transformHtmlComment = function (node, ctx) { };
-var transformStaticProperty = function (node, ctx) { };
-var transformDynamicProperty = function (node, ctx) {
-    return transformEmbeddedCode(node.code, ctx);
-};
-var transformMixin = function (node, ctx) {
-    return transformEmbeddedCode(node.code, ctx);
-};
-var transformSiblings = function (parent, siblings) {
-    var ctx = { index: 0, parent: parent, siblings: siblings, prune: false };
-    for (; ctx.index < siblings.length; ctx.index++) {
-        transformNode(siblings[ctx.index], ctx);
-        if (ctx.prune) {
-            siblings.splice(ctx.index, 1);
-            ctx.index--;
-            ctx.prune = false;
-        }
+    var tx = Copy;
+    tx = removeWhitespaceTextNodes(tx);
+    if (typeof window !== 'undefined' && window.document && window.document.createElement) {
+        // browser-based shims
+        if (!browserPreservesWhitespaceTextNodes())
+            tx = addFEFFtoWhitespaceTextNodes(tx);
+        if (!browserPreservesInitialComments())
+            tx = insertTextNodeBeforeInitialComments(tx);
     }
+    return tx.CodeTopLevel(node);
 };
-var composeTransforms = function (orig, tx) { return function (node, ctx) {
-    tx(node, ctx);
-    if (!ctx.prune)
-        orig(node, ctx);
-}; };
-var prune = function (ctx) {
-    ctx.prune = true;
-};
-var insertBefore = function (node, ctx) {
-    ctx.siblings.splice(ctx.index, 0, node);
-    transformNode(node, ctx);
-    ctx.index++;
-};
-removeWhitespaceTextNodes();
-if (typeof window !== 'undefined' && window.document && window.document.createElement) {
-    // browser-based shims
-    if (!browserPreservesWhitespaceTextNodes())
-        addFEFFtoWhitespaceTextNodes();
-    if (!browserPreservesInitialComments())
-        insertTextNodeBeforeInitialComments();
-}
-function removeWhitespaceTextNodes() {
-    transformHtmlText = composeTransforms(transformHtmlText, function (node, ctx) {
-        if (rx$2.ws.test(node.text)) {
-            prune(ctx);
-        }
-    });
+function removeWhitespaceTextNodes(tx) {
+    return __assign({}, tx, { HtmlText: function (ctx) { return rx$2.ws.test(ctx.node.text) ? [] : tx.HtmlText(ctx); } });
 }
 // IE <9 will removes text nodes that just contain whitespace in certain situations.
 // Solution is to add a zero-width non-breaking space (entity &#xfeff) to the nodes.
@@ -530,12 +571,12 @@ function browserPreservesWhitespaceTextNodes() {
     ul.innerHTML = "    <li></li>";
     return ul.childNodes.length === 2;
 }
-function addFEFFtoWhitespaceTextNodes() {
-    transformHtmlText = composeTransforms(transformHtmlText, function (node, ctx) {
-        if (rx$2.ws.test(node.text) && !(ctx.parent instanceof StaticProperty)) {
-            node.text = '&#xfeff;' + node.text;
-        }
-    });
+function addFEFFtoWhitespaceTextNodes(tx) {
+    return __assign({}, tx, { HtmlText: function (ctx) {
+            return tx.HtmlText(rx$2.ws.test(ctx.node.text) && !(ctx.parent.node instanceof StaticProperty)
+                ? ctx.swap(new HtmlText('&#xfeff;' + ctx.node.text))
+                : ctx);
+        } });
 }
 // IE <9 will remove comments when they're the first child of certain elements
 // Solution is to prepend a non-whitespace text node, using the &#xfeff trick.
@@ -544,12 +585,10 @@ function browserPreservesInitialComments() {
     ul.innerHTML = "<!-- --><li></li>";
     return ul.childNodes.length === 2;
 }
-function insertTextNodeBeforeInitialComments() {
-    transformHtmlComment = composeTransforms(transformHtmlComment, function (node, ctx) {
-        if (ctx.index === 0) {
-            insertBefore(new HtmlText('&#xfeff;'), ctx);
-        }
-    });
+function insertTextNodeBeforeInitialComments(tx) {
+    return __assign({}, tx, { HtmlComment: function (ctx) {
+            return (ctx.index === 0 ? tx.HtmlText(ctx.swap(new HtmlText('&#xfeff;'))) : []).concat(tx.HtmlComment(ctx));
+        } });
 }
 
 var rx$4 = {

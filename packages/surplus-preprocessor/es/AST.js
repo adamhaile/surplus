@@ -1,3 +1,4 @@
+import { Root } from './treeContext';
 var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
         this.segments = segments;
@@ -77,3 +78,52 @@ var Mixin = (function () {
     return Mixin;
 }());
 export { Mixin };
+export var Copy = {
+    CodeTopLevel: function (node) {
+        return new CodeTopLevel(flatten(node.segments.map(this.CodeSegment(new Root(node)))));
+    },
+    CodeSegment: function (ctx) {
+        var _this = this;
+        return function (n, i, a) {
+            return n instanceof CodeText ? _this.CodeText(ctx.sibling(n, i, a)) :
+                _this.HtmlElement(ctx.sibling(n, i, a));
+        };
+    },
+    EmbeddedCode: function (ctx) {
+        return new EmbeddedCode(flatten(ctx.node.segments.map(this.CodeSegment(ctx))));
+    },
+    HtmlElement: function (ctx) {
+        return [new HtmlElement(ctx.node.tag, flatten(ctx.node.properties.map(this.HtmlProperty(ctx))), flatten(ctx.node.content.map(this.HtmlContent(ctx))), ctx.node.loc)];
+    },
+    HtmlProperty: function (ctx) {
+        var _this = this;
+        return function (n, i, a) {
+            return n instanceof StaticProperty ? _this.StaticProperty(ctx.sibling(n, i, a)) :
+                n instanceof DynamicProperty ? _this.DynamicProperty(ctx.sibling(n, i, a)) :
+                    _this.Mixin(ctx.sibling(n, i, a));
+        };
+    },
+    HtmlContent: function (ctx) {
+        var _this = this;
+        return function (n, i, a) {
+            return n instanceof HtmlComment ? _this.HtmlComment(ctx.sibling(n, i, a)) :
+                n instanceof HtmlText ? _this.HtmlText(ctx.sibling(n, i, a)) :
+                    n instanceof HtmlInsert ? _this.HtmlInsert(ctx.sibling(n, i, a)) :
+                        _this.HtmlElement(ctx.sibling(n, i, a));
+        };
+    },
+    HtmlInsert: function (ctx) {
+        return [new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    },
+    CodeText: function (ctx) { return [ctx.node]; },
+    HtmlText: function (ctx) { return [ctx.node]; },
+    HtmlComment: function (ctx) { return [ctx.node]; },
+    StaticProperty: function (ctx) { return [ctx.node]; },
+    DynamicProperty: function (ctx) {
+        return [new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    },
+    Mixin: function (ctx) {
+        return [new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    }
+};
+var flatten = function (aas) { return aas.reduce(function (as, a) { return as.concat(a); }, []); };

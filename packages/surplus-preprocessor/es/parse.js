@@ -197,7 +197,7 @@ export function parse(TOKS, opts) {
         // remove opening '{' or '{...', adjusting code loc accordingly
         var first = segments[0];
         first.loc.col += prefixLength;
-        first.text = first.text.substr(prefixLength);
+        segments[0] = new AST.CodeText(first.text.substr(prefixLength), first.loc);
         return new AST.EmbeddedCode(segments);
     }
     function balancedParens(segments, text, loc) {
