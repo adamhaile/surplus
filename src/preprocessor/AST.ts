@@ -1,6 +1,4 @@
-import { Params } from './preprocess';
 import { LOC } from './parse';
-import { Path, SiblingPath } from './path';
 
 export class CodeTopLevel {
     constructor(
@@ -80,61 +78,42 @@ export type Node = CodeTopLevel | CodeText | EmbeddedCode | HtmlElement | HtmlTe
 
 // treeContext type declarations and a Copy transform, for building non-identity transforms on top of
 
-export interface CodeTopLevelPath    extends Path<CodeTopLevel, null> {};
-export interface EmbeddedCodePath    extends Path<EmbeddedCode, DynamicPropertyPath | MixinPath | HtmlInsertPath> {};
-export interface HtmlElementPath     extends SiblingPath<HtmlElement, CodeText | HtmlContent, CodeTopLevelPath | EmbeddedCodePath | HtmlElementPath> {};
-export interface HtmlInsertPath      extends SiblingPath<HtmlInsert, HtmlContent, HtmlElementPath> {};
-export interface CodeTextPath        extends SiblingPath<CodeText, CodeSegment, CodeTopLevelPath | EmbeddedCodePath> {};
-export interface HtmlTextPath        extends SiblingPath<HtmlText, HtmlContent, HtmlElementPath> {};
-export interface HtmlCommentPath     extends SiblingPath<HtmlComment, HtmlContent, HtmlElementPath> {};
-export interface StaticPropertyPath  extends SiblingPath<StaticProperty, HtmlProperty, HtmlElementPath> {};
-export interface DynamicPropertyPath extends SiblingPath<DynamicProperty, HtmlProperty, HtmlElementPath> {};
-export interface MixinPath           extends SiblingPath<Mixin, HtmlProperty, HtmlElementPath> {};
-
 export const Copy = {
     CodeTopLevel(node : CodeTopLevel) {
-        return new CodeTopLevel(node.segments.map(this.CodeSegment(new Path(node, null))));
+        return new CodeTopLevel(this.CodeSegments(node.segments));
     },
-    CodeSegment(ctx : Path<CodeTopLevel | EmbeddedCode, any>) {
-        return (n : CodeSegment, i : number, a : CodeSegment[]) : CodeSegment => 
-            n instanceof CodeText ? this.CodeText(ctx.sibling(n, i, a)) : 
-            this.HtmlElement(ctx.sibling(n, i, a));
+    CodeSegments(segments : CodeSegment[]) {
+        return segments.map(node => node instanceof CodeText ? this.CodeText(node) : this.HtmlElement(node));
     },
-    EmbeddedCode(ctx : EmbeddedCodePath) {
-        return new EmbeddedCode(ctx.node.segments.map(this.CodeSegment(ctx)));
+    EmbeddedCode(node : EmbeddedCode) {
+        return new EmbeddedCode(this.CodeSegments(node.segments));
     },
-    HtmlElement(ctx : HtmlElementPath) : HtmlElement {
-        return new HtmlElement(ctx.node.tag, 
-            ctx.node.properties.map(this.HtmlProperty(ctx)), 
-            ctx.node.content.map(this.HtmlContent(ctx)), 
-            ctx.node.loc
+    HtmlElement(node : HtmlElement) : HtmlElement {
+        return new HtmlElement(node.tag, 
+            node.properties.map(p => 
+                p instanceof StaticProperty  ? this.StaticProperty(p) :
+                p instanceof DynamicProperty ? this.DynamicProperty(p) :
+                this.Mixin(p)), 
+            node.content.map(c => 
+                c instanceof HtmlComment ? this.HtmlComment(c) :
+                c instanceof HtmlText    ? this.HtmlText(c) :
+                c instanceof HtmlInsert  ? this.HtmlInsert(c) :
+                this.HtmlElement(c)), 
+            node.loc
         );
     },
-    HtmlProperty(ctx : HtmlElementPath) {
-        return (n : HtmlProperty, i : number, a : HtmlProperty[]) : HtmlProperty =>
-            n instanceof StaticProperty ? this.StaticProperty(ctx.sibling(n, i, a)) :
-            n instanceof DynamicProperty ? this.DynamicProperty(ctx.sibling(n, i, a)) :
-            this.Mixin(ctx.sibling(n, i, a));
+    HtmlInsert(node : HtmlInsert) {
+        return new HtmlInsert(this.EmbeddedCode(node.code), node.loc);
     },
-    HtmlContent(ctx : HtmlElementPath) {
-        return (n : HtmlContent, i : number, a : HtmlContent[]) : HtmlContent =>
-            n instanceof HtmlComment ? this.HtmlComment(ctx.sibling(n, i, a)) :
-            n instanceof HtmlText ? this.HtmlText(ctx.sibling(n, i, a)) :
-            n instanceof HtmlInsert ? this.HtmlInsert(ctx.sibling(n, i, a)) :
-            this.HtmlElement(ctx.sibling(n, i, a));
+    CodeText(node : CodeText) { return node; },
+    HtmlText(node : HtmlText) { return node; },
+    HtmlComment(node : HtmlComment) { return node; },
+    StaticProperty(node : StaticProperty) { return node; },
+    DynamicProperty(node : DynamicProperty) {
+        return new DynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
-    HtmlInsert(ctx : HtmlInsertPath) {
-        return new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
-    },
-    CodeText(ctx : CodeTextPath) { return ctx.node; },
-    HtmlText(ctx : HtmlTextPath) { return ctx.node; },
-    HtmlComment(ctx : HtmlCommentPath) { return ctx.node; },
-    StaticProperty(ctx : StaticPropertyPath) { return ctx.node; },
-    DynamicProperty(ctx : DynamicPropertyPath) {
-        return new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
-    },
-    Mixin(ctx : MixinPath) {
-        return new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
+    Mixin(node : Mixin) {
+        return new Mixin(this.EmbeddedCode(node.code), node.loc);
     }
 };
 

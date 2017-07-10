@@ -1,4 +1,3 @@
-import { Path } from './path';
 var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
         this.segments = segments;
@@ -78,61 +77,42 @@ var Mixin = (function () {
     return Mixin;
 }());
 export { Mixin };
-;
-;
-;
-;
-;
-;
-;
-;
-;
-;
+// treeContext type declarations and a Copy transform, for building non-identity transforms on top of
 export var Copy = {
     CodeTopLevel: function (node) {
-        return new CodeTopLevel(node.segments.map(this.CodeSegment(new Path(node, null))));
+        return new CodeTopLevel(this.CodeSegments(node.segments));
     },
-    CodeSegment: function (ctx) {
+    CodeSegments: function (segments) {
         var _this = this;
-        return function (n, i, a) {
-            return n instanceof CodeText ? _this.CodeText(ctx.sibling(n, i, a)) :
-                _this.HtmlElement(ctx.sibling(n, i, a));
-        };
+        return segments.map(function (node) { return node instanceof CodeText ? _this.CodeText(node) : _this.HtmlElement(node); });
     },
-    EmbeddedCode: function (ctx) {
-        return new EmbeddedCode(ctx.node.segments.map(this.CodeSegment(ctx)));
+    EmbeddedCode: function (node) {
+        return new EmbeddedCode(this.CodeSegments(node.segments));
     },
-    HtmlElement: function (ctx) {
-        return new HtmlElement(ctx.node.tag, ctx.node.properties.map(this.HtmlProperty(ctx)), ctx.node.content.map(this.HtmlContent(ctx)), ctx.node.loc);
-    },
-    HtmlProperty: function (ctx) {
+    HtmlElement: function (node) {
         var _this = this;
-        return function (n, i, a) {
-            return n instanceof StaticProperty ? _this.StaticProperty(ctx.sibling(n, i, a)) :
-                n instanceof DynamicProperty ? _this.DynamicProperty(ctx.sibling(n, i, a)) :
-                    _this.Mixin(ctx.sibling(n, i, a));
-        };
+        return new HtmlElement(node.tag, node.properties.map(function (p) {
+            return p instanceof StaticProperty ? _this.StaticProperty(p) :
+                p instanceof DynamicProperty ? _this.DynamicProperty(p) :
+                    _this.Mixin(p);
+        }), node.content.map(function (c) {
+            return c instanceof HtmlComment ? _this.HtmlComment(c) :
+                c instanceof HtmlText ? _this.HtmlText(c) :
+                    c instanceof HtmlInsert ? _this.HtmlInsert(c) :
+                        _this.HtmlElement(c);
+        }), node.loc);
     },
-    HtmlContent: function (ctx) {
-        var _this = this;
-        return function (n, i, a) {
-            return n instanceof HtmlComment ? _this.HtmlComment(ctx.sibling(n, i, a)) :
-                n instanceof HtmlText ? _this.HtmlText(ctx.sibling(n, i, a)) :
-                    n instanceof HtmlInsert ? _this.HtmlInsert(ctx.sibling(n, i, a)) :
-                        _this.HtmlElement(ctx.sibling(n, i, a));
-        };
+    HtmlInsert: function (node) {
+        return new HtmlInsert(this.EmbeddedCode(node.code), node.loc);
     },
-    HtmlInsert: function (ctx) {
-        return new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
+    CodeText: function (node) { return node; },
+    HtmlText: function (node) { return node; },
+    HtmlComment: function (node) { return node; },
+    StaticProperty: function (node) { return node; },
+    DynamicProperty: function (node) {
+        return new DynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
-    CodeText: function (ctx) { return ctx.node; },
-    HtmlText: function (ctx) { return ctx.node; },
-    HtmlComment: function (ctx) { return ctx.node; },
-    StaticProperty: function (ctx) { return ctx.node; },
-    DynamicProperty: function (ctx) {
-        return new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
-    },
-    Mixin: function (ctx) {
-        return new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
+    Mixin: function (node) {
+        return new Mixin(this.EmbeddedCode(node.code), node.loc);
     }
 };

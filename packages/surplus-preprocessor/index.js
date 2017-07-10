@@ -36,38 +36,6 @@ function tokenize(str, opts) {
     return toks || [];
 }
 
-var __extends = (undefined && undefined.__extends) || (function () {
-    var extendStatics = Object.setPrototypeOf ||
-        ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
-        function (d, b) { for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p]; };
-    return function (d, b) {
-        extendStatics(d, b);
-        function __() { this.constructor = d; }
-        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-    };
-})();
-var Path = (function () {
-    function Path(node, parent) {
-        this.node = node;
-        this.parent = parent;
-    }
-    Path.prototype.child = function (node) { return new Path(node, this); };
-    Path.prototype.sibling = function (node, i, siblings) { return new SiblingPath(node, i, siblings, this); };
-    Path.prototype.swap = function (node) { return new Path(node, this.parent); };
-    return Path;
-}());
-var SiblingPath = (function (_super) {
-    __extends(SiblingPath, _super);
-    function SiblingPath(node, index, siblings, parent) {
-        var _this = _super.call(this, node, parent) || this;
-        _this.index = index;
-        _this.siblings = siblings;
-        return _this;
-    }
-    SiblingPath.prototype.swap = function (node) { return new SiblingPath(node, this.index, this.siblings, this.parent); };
-    return SiblingPath;
-}(Path));
-
 var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
         this.segments = segments;
@@ -137,62 +105,43 @@ var Mixin = (function () {
     }
     return Mixin;
 }());
-
-
-
-
-
-
-
-
-
-
+// treeContext type declarations and a Copy transform, for building non-identity transforms on top of
 var Copy = {
     CodeTopLevel: function (node) {
-        return new CodeTopLevel(node.segments.map(this.CodeSegment(new Path(node, null))));
+        return new CodeTopLevel(this.CodeSegments(node.segments));
     },
-    CodeSegment: function (ctx) {
+    CodeSegments: function (segments) {
         var _this = this;
-        return function (n, i, a) {
-            return n instanceof CodeText ? _this.CodeText(ctx.sibling(n, i, a)) :
-                _this.HtmlElement(ctx.sibling(n, i, a));
-        };
+        return segments.map(function (node) { return node instanceof CodeText ? _this.CodeText(node) : _this.HtmlElement(node); });
     },
-    EmbeddedCode: function (ctx) {
-        return new EmbeddedCode(ctx.node.segments.map(this.CodeSegment(ctx)));
+    EmbeddedCode: function (node) {
+        return new EmbeddedCode(this.CodeSegments(node.segments));
     },
-    HtmlElement: function (ctx) {
-        return new HtmlElement(ctx.node.tag, ctx.node.properties.map(this.HtmlProperty(ctx)), ctx.node.content.map(this.HtmlContent(ctx)), ctx.node.loc);
-    },
-    HtmlProperty: function (ctx) {
+    HtmlElement: function (node) {
         var _this = this;
-        return function (n, i, a) {
-            return n instanceof StaticProperty ? _this.StaticProperty(ctx.sibling(n, i, a)) :
-                n instanceof DynamicProperty ? _this.DynamicProperty(ctx.sibling(n, i, a)) :
-                    _this.Mixin(ctx.sibling(n, i, a));
-        };
+        return new HtmlElement(node.tag, node.properties.map(function (p) {
+            return p instanceof StaticProperty ? _this.StaticProperty(p) :
+                p instanceof DynamicProperty ? _this.DynamicProperty(p) :
+                    _this.Mixin(p);
+        }), node.content.map(function (c) {
+            return c instanceof HtmlComment ? _this.HtmlComment(c) :
+                c instanceof HtmlText ? _this.HtmlText(c) :
+                    c instanceof HtmlInsert ? _this.HtmlInsert(c) :
+                        _this.HtmlElement(c);
+        }), node.loc);
     },
-    HtmlContent: function (ctx) {
-        var _this = this;
-        return function (n, i, a) {
-            return n instanceof HtmlComment ? _this.HtmlComment(ctx.sibling(n, i, a)) :
-                n instanceof HtmlText ? _this.HtmlText(ctx.sibling(n, i, a)) :
-                    n instanceof HtmlInsert ? _this.HtmlInsert(ctx.sibling(n, i, a)) :
-                        _this.HtmlElement(ctx.sibling(n, i, a));
-        };
+    HtmlInsert: function (node) {
+        return new HtmlInsert(this.EmbeddedCode(node.code), node.loc);
     },
-    HtmlInsert: function (ctx) {
-        return new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
+    CodeText: function (node) { return node; },
+    HtmlText: function (node) { return node; },
+    HtmlComment: function (node) { return node; },
+    StaticProperty: function (node) { return node; },
+    DynamicProperty: function (node) {
+        return new DynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
-    CodeText: function (ctx) { return ctx.node; },
-    HtmlText: function (ctx) { return ctx.node; },
-    HtmlComment: function (ctx) { return ctx.node; },
-    StaticProperty: function (ctx) { return ctx.node; },
-    DynamicProperty: function (ctx) {
-        return new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
-    },
-    Mixin: function (ctx) {
-        return new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
+    Mixin: function (node) {
+        return new Mixin(this.EmbeddedCode(node.code), node.loc);
     }
 };
 
@@ -790,33 +739,39 @@ var tf = [
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 var transform = function (node, opt) { return tf.CodeTopLevel(node); };
 function removeWhitespaceTextNodes(tx) {
-    return __assign({}, tx, { HtmlElement: function (ctx) {
-            var _a = ctx.node, tag = _a.tag, properties = _a.properties, content = _a.content, loc = _a.loc;
-            content = content.filter(function (c) { return !(c instanceof HtmlText && rx$2.ws.test(c.text)); });
-            if (content.length !== ctx.node.content.length) {
-                ctx = ctx.swap(new HtmlElement(tag, properties, content, loc));
+    return __assign({}, tx, { HtmlElement: function (node) {
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof HtmlText && rx$2.ws.test(c.text)); });
+            if (nonWhitespaceContent.length !== content.length) {
+                node = new HtmlElement(tag, properties, nonWhitespaceContent, loc);
             }
-            return tx.HtmlElement.call(this, ctx);
+            return tx.HtmlElement.call(this, node);
         } });
 }
 function translateJSXPropertyNames(tx) {
-    return __assign({}, tx, { DynamicProperty: function (ctx) {
-            var _a = ctx.node, name = _a.name, code = _a.code, loc = _a.loc;
-            if (rx$2.lowerStart.test(ctx.parent.node.tag) && rx$2.jsxEventProperty.test(name)) {
-                name = name === "onDoubleClick" ? "ondblclick" : name.toLowerCase();
-                ctx = ctx.swap(new DynamicProperty(name, code, loc));
+    return __assign({}, tx, { HtmlElement: function (node) {
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
+            if (rx$2.lowerStart.test(tag)) {
+                var nonJSXProperties = properties.map(function (p) {
+                    return p instanceof DynamicProperty
+                        ? new DynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc)
+                        : p;
+                });
+                node = new HtmlElement(tag, nonJSXProperties, content, loc);
             }
-            return tx.DynamicProperty.call(this, ctx);
+            return tx.HtmlElement.call(this, node);
         } });
 }
+function translateJSXPropertyName(name) {
+    return rx$2.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
+}
 function promoteInitialTextNodesToTextContentProperties(tx) {
-    return __assign({}, tx, { HtmlElement: function (ctx) {
-            var _a = ctx.node, tag = _a.tag, properties = _a.properties, content = _a.content, loc = _a.loc;
+    return __assign({}, tx, { HtmlElement: function (node) {
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
             if (rx$2.lowerStart.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
-                var textContent = new StaticProperty("textContent", codeStr(content[0].text)), node = new HtmlElement(tag, properties.concat([textContent]), content.slice(1), loc);
-                ctx = ctx.swap(node);
+                var textContent = new StaticProperty("textContent", codeStr(content[0].text));
+                node = new HtmlElement(tag, properties.concat([textContent]), content.slice(1), loc);
             }
-            return tx.HtmlElement.call(this, ctx);
+            return tx.HtmlElement.call(this, node);
         } });
 }
 

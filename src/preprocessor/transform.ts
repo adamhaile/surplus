@@ -20,13 +20,13 @@ export const transform = (node : CodeTopLevel, opt : Params) => tf.CodeTopLevel(
 function removeWhitespaceTextNodes(tx : Copy) : Copy {
     return { 
         ...tx, 
-        HtmlElement(ctx) { 
-            var { tag, properties, content, loc } = ctx.node;
-            content = content.filter(c => !(c instanceof HtmlText && rx.ws.test(c.text)));
-            if (content.length !== ctx.node.content.length) {
-                ctx = ctx.swap(new HtmlElement(tag, properties, content, loc));
+        HtmlElement(node) { 
+            const { tag, properties, content, loc } = node,
+                nonWhitespaceContent = content.filter(c => !(c instanceof HtmlText && rx.ws.test(c.text)));
+            if (nonWhitespaceContent.length !== content.length) {
+                node = new HtmlElement(tag, properties, nonWhitespaceContent, loc);
             }
-            return tx.HtmlElement.call(this, ctx);
+            return tx.HtmlElement.call(this, node);
         } 
     };
 }
@@ -34,28 +34,35 @@ function removeWhitespaceTextNodes(tx : Copy) : Copy {
 function translateJSXPropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        DynamicProperty(ctx) {
-            let { name, code, loc } = ctx.node;
-            if (rx.lowerStart.test(ctx.parent.node.tag) && rx.jsxEventProperty.test(name)) {
-                name = name === "onDoubleClick" ? "ondblclick" : name.toLowerCase();
-                ctx = ctx.swap(new DynamicProperty(name, code, loc));
+        HtmlElement(node) {
+            const { tag, properties, content, loc } = node;
+            if (rx.lowerStart.test(tag)) {
+                const nonJSXProperties = properties.map(p =>
+                    p instanceof DynamicProperty 
+                    ? new DynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc) 
+                    : p
+                );
+                node = new HtmlElement(tag, nonJSXProperties, content, loc);
             }
-            return tx.DynamicProperty.call(this, ctx);
+            return tx.HtmlElement.call(this, node);
         } 
     };
+}
+
+function translateJSXPropertyName(name : string) {
+    return rx.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
 
 function promoteInitialTextNodesToTextContentProperties(tx : Copy) : Copy {
     return {
         ...tx,
-        HtmlElement(ctx) {
-            const { tag, properties, content, loc } = ctx.node;
+        HtmlElement(node) {
+            const { tag, properties, content, loc } = node;
             if (rx.lowerStart.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
-                var textContent = new StaticProperty("textContent", codeStr((content[0] as HtmlText).text)),
-                    node = new HtmlElement(tag, [ ...properties, textContent ], content.slice(1), loc);
-                ctx = ctx.swap(node);
+                var textContent = new StaticProperty("textContent", codeStr((content[0] as HtmlText).text));
+                node = new HtmlElement(tag, [ ...properties, textContent ], content.slice(1), loc);
             }
-            return tx.HtmlElement.call(this, ctx);
+            return tx.HtmlElement.call(this, node);
         }
     };
 }
