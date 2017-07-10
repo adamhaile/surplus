@@ -1,12 +1,18 @@
-export function createElement(tag) {
+export function createRootElement(tag) {
     return document.createElement(tag);
 }
-export function createComment(text) {
-    return document.createComment(text);
+export function createElement(tag, parent) {
+    var el = document.createElement(tag);
+    parent.appendChild(el);
+    return el;
 }
-export function createTextNode(text) {
-    return document.createTextNode(text);
+export function createComment(text, parent) {
+    var comment = document.createComment(text);
+    parent.appendChild(comment);
+    return comment;
 }
-export function appendChild(parent, child) {
-    parent.appendChild(child);
+export function createTextNode(text, parent) {
+    var node = document.createTextNode(text);
+    parent.appendChild(node);
+    return node;
 }

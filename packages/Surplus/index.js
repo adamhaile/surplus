@@ -159,25 +159,31 @@ function insert$$1(range, value) {
     }
 }
 
-function createElement(tag) {
+function createRootElement(tag) {
     return document.createElement(tag);
 }
-function createComment(text) {
-    return document.createComment(text);
+function createElement(tag, parent) {
+    var el = document.createElement(tag);
+    parent.appendChild(el);
+    return el;
 }
-function createTextNode(text) {
-    return document.createTextNode(text);
+function createComment(text, parent) {
+    var comment = document.createComment(text);
+    parent.appendChild(comment);
+    return comment;
 }
-function appendChild(parent, child) {
-    parent.appendChild(child);
+function createTextNode(text, parent) {
+    var node = document.createTextNode(text);
+    parent.appendChild(node);
+    return node;
 }
 
 exports.insert = insert$$1;
 exports.S = S;
+exports.createRootElement = createRootElement;
 exports.createElement = createElement;
 exports.createComment = createComment;
 exports.createTextNode = createTextNode;
-exports.appendChild = appendChild;
 
 Object.defineProperty(exports, '__esModule', { value: true });
 

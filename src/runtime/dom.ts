@@ -1,15 +1,21 @@
-export function createElement(tag : string) {
+export function createRootElement(tag : string) {
     return document.createElement(tag);
 }
 
-export function createComment(text : string) {
-    return document.createComment(text);
+export function createElement(tag : string, parent : HTMLElement) {
+    var el = document.createElement(tag);
+    parent.appendChild(el);
+    return el;
 }
 
-export function createTextNode(text : string) {
-    return document.createTextNode(text);
+export function createComment(text : string, parent : HTMLElement) {
+    var comment = document.createComment(text);
+    parent.appendChild(comment);
+    return comment;
 }
 
-export function appendChild(parent : Node, child : Node) {
-    parent.appendChild(child);
+export function createTextNode(text : string, parent : HTMLElement) {
+    var node = document.createTextNode(text);
+    parent.appendChild(node);
+    return node;
 }

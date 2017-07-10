@@ -1,4 +1,4 @@
-import { CodeText, HtmlElement, HtmlText, HtmlComment, HtmlInsert, StaticProperty, DynamicProperty } from './AST';
+import { EmbeddedCode, CodeText, HtmlElement, HtmlText, HtmlComment, HtmlInsert, StaticProperty, DynamicProperty } from './AST';
 import { locationMark } from './sourcemap';
 export { compile, codeStr };
 // pre-compiled regular expressions
@@ -14,22 +14,14 @@ var rx = {
 var DOMExpression = (function () {
     function DOMExpression() {
         this.ids = [];
-        this.staticStmts = [];
-        this.dynamicStmts = [];
-        this.result = "";
+        this.statements = [];
+        this.computations = [];
     }
-    DOMExpression.prototype.id = function (id) { this.ids.push(id); return id; };
-    DOMExpression.prototype.staticStmt = function (stmt) { this.staticStmts.push(stmt); return stmt; };
-    DOMExpression.prototype.dynamicStmt = function (stmt) { this.dynamicStmts.push(stmt); return stmt; };
     return DOMExpression;
 }());
-var compile = function (node, opts) {
+var compile = function (ctl, opts) {
     var compileSegments = function (node) {
-        var result = "", i;
-        for (i = 0; i < node.segments.length; i++) {
-            result += compileSegment(node.segments[i], result);
-        }
-        return result;
+        return node.segments.reduce(function (res, s) { return res + compileSegment(s, res); }, "");
     }, compileSegment = function (node, previousCode) {
         return node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, previousCode);
     }, compileCodeText = function (node) {
@@ -56,8 +48,8 @@ var compile = function (node, opts) {
             return c instanceof HtmlElement ? compileHtmlElement(c, prior) :
                 c instanceof HtmlText ? codeStr(c.text.trim()) :
                     c instanceof HtmlInsert ? compileSegments(c.code) :
-                        createComment(c.text);
-        });
+                        "document.createComment(" + codeStr(c.text) + ")";
+        }); // FIXME: translate to js comment maybe?
         return node.tag + "({" + inl
             + props.join(inl) + inl
             + 'children: [' + iinl
@@ -67,92 +59,76 @@ var compile = function (node, opts) {
         var nl = "\r\n" + indent(previousCode), inl = nl + '    ', iinl = inl + '    ';
         return '(function () {' + iinl
             + 'var ' + code.ids.join(', ') + ';' + iinl
-            + code.staticStmts.join(iinl) + iinl
-            + code.dynamicStmts.join(iinl) + iinl
-            + 'return ' + code.result + ';' + inl
+            + code.statements.join(iinl) + iinl
+            + code.computations.join(iinl) + iinl
+            + 'return __;' + inl
             + '})()';
-    }, buildDOMExpression = function (node) {
+    }, buildDOMExpression = function (top) {
         var code = new DOMExpression();
-        var stmtsHtmlElement = function (node, parent, n) {
-            var id = code.id(genIdentifier(parent, node.tag, n));
+        var buildHtmlElement = function (node, parent, n) {
+            var id = addId(parent, node.tag, n);
             if (rx.upperStart.test(node.tag)) {
-                var expr = compileSubComponent(node, ""), range = "{ start: " + id + ", end: " + id + " }";
-                code.staticStmt(assign(id, createText('')));
-                code.dynamicStmt(computation("Surplus.insert(range, " + expr + ");", "range", range, node.loc, opts));
+                var expr = compileSubComponent(node, "");
+                buildHtmlInsert(new HtmlInsert(new EmbeddedCode([new CodeText(expr, node.loc)]), node.loc), parent, n);
             }
             else {
-                var exelen = code.dynamicStmts.length;
-                code.staticStmt(assign(id, createElement(node.tag)));
-                for (var i = 0; i < node.properties.length; i++) {
-                    stmtsProperty(node.properties[i], id, i);
-                }
-                var myexes = code.dynamicStmts.splice(exelen);
-                for (i = 0; i < node.content.length; i++) {
-                    var child = stmtsChild(node.content[i], id, i);
-                    if (child)
-                        code.staticStmt(appendNode(id, child));
-                }
-                code.dynamicStmts = code.dynamicStmts.concat(myexes);
+                var exelen = code.computations.length;
+                addStatement(parent ? id + " = Surplus.createElement('" + node.tag + "', " + parent + ")"
+                    : id + " = Surplus.createRootElement('" + node.tag + "')");
+                node.properties.forEach(function (p, i) { return buildProperty(p, id, i); });
+                var myexes = code.computations.splice(exelen);
+                node.content.forEach(function (c, i) { return buildChild(c, id, i); });
+                code.computations.push.apply(code.computations, myexes);
             }
-            return id;
-        }, stmtsProperty = function (node, id, n) {
-            return node instanceof StaticProperty ? stmtsStaticProperty(node, id, n) :
-                node instanceof DynamicProperty ? stmtsDynamicProperty(node, id, n) :
-                    stmtsMixin(node, id, n);
-        }, stmtsStaticProperty = function (node, id, n) {
-            code.staticStmt(id + "." + node.name + " = " + node.value + ";");
-        }, stmtsDynamicProperty = function (node, id, n) {
+        }, buildProperty = function (node, id, n) {
+            return node instanceof StaticProperty ? buildStaticProperty(node, id, n) :
+                node instanceof DynamicProperty ? buildDynamicProperty(node, id, n) :
+                    buildMixin(node, id, n);
+        }, buildStaticProperty = function (node, id, n) {
+            addStatement(id + "." + node.name + " = " + node.value + ";");
+        }, buildDynamicProperty = function (node, id, n) {
             var expr = compileSegments(node.code);
             if (node.name === "ref") {
-                code.staticStmt(expr + " = " + id + ";");
+                addStatement(expr + " = " + id + ";");
             }
             else {
                 var setter = id + "." + node.name + " = " + expr + ";";
-                code.dynamicStmt(noApparentSignals(expr)
-                    ? setter
-                    : computation(setter, "", "", node.loc, opts));
+                if (noApparentSignals(expr))
+                    addStatement(setter);
+                else
+                    addComputation(setter, "", "", node.loc);
             }
-        }, stmtsMixin = function (node, id, n) {
+        }, buildMixin = function (node, id, n) {
             var expr = compileSegments(node.code);
-            code.dynamicStmt(computation("(" + expr + ")(" + id + ", __state);", "__state", "", node.loc, opts));
-        }, stmtsChild = function (node, parent, n) {
-            return node instanceof HtmlElement ? stmtsHtmlElement(node, parent, n) :
-                node instanceof HtmlComment ? stmtsHtmlComment(node) :
-                    node instanceof HtmlText ? stmtsHtmlText(node, parent, n) :
-                        stmtsHtmlInsert(node, parent, n);
-        }, stmtsHtmlComment = function (node) {
-            return createComment(node.text);
-        }, stmtsHtmlText = function (node, parent, n) {
-            return createText(node.text);
-        }, stmtsHtmlInsert = function (node, parent, n) {
-            var id = code.id(genIdentifier(parent, 'insert', n)), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
-            code.staticStmt(assign(id, createText('')));
-            code.dynamicStmt(noApparentSignals(ins)
-                ? "Surplus.insert(" + range + ", " + ins + ");"
-                : computation("Surplus.insert(range, " + ins + ");", "range", range, node.loc, opts));
+            addComputation("(" + expr + ")(" + id + ", __state);", "__state", "", node.loc);
+        }, buildChild = function (node, parent, n) {
+            return node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :
+                node instanceof HtmlComment ? buildHtmlComment(node, parent) :
+                    node instanceof HtmlText ? buildHtmlText(node, parent, n) :
+                        buildHtmlInsert(node, parent, n);
+        }, buildHtmlComment = function (node, parent) {
+            return addStatement("Surplus.createComment(" + codeStr(node.text) + ", " + parent + ")");
+        }, buildHtmlText = function (node, parent, n) {
+            return addStatement("Surplus.createTextNode(" + codeStr(node.text) + ", " + parent + ")");
+        }, buildHtmlInsert = function (node, parent, n) {
+            var id = addId(parent, 'insert', n), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
+            addStatement(id + " = Surplus.createTextNode('', " + parent + ")");
+            addComputation("Surplus.insert(range, " + ins + ");", "range", range, node.loc);
+        }, addId = function (parent, tag, n) {
+            var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
+            code.ids.push(id);
             return id;
+        }, addStatement = function (stmt) {
+            return code.statements.push(stmt);
+        }, addComputation = function (body, varname, seed, loc) {
+            body = varname ? "Surplus.S(function (" + varname + ") { return " + body + " }" + (seed ? ", " + seed : '') + ");"
+                : "Surplus.S(function () { " + body + " });";
+            code.computations.push(markLoc(body, loc, opts));
         };
-        code.result = stmtsHtmlElement(node, null, 0);
+        buildHtmlElement(top, '', 0);
         return code;
     };
-    return compileSegments(node);
-};
-var genIdentifier = function (parent, tag, n) {
-    return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
-};
-var assign = function (id, expr) {
-    return id + " = " + expr + ";";
-}, appendNode = function (parent, child) {
-    return "Surplus.appendChild(" + parent + ", " + child + ");";
-}, createElement = function (tag) {
-    return "Surplus.createElement('" + tag + "')";
-}, createComment = function (text) {
-    return "Surplus.createComment(" + codeStr(text) + ")";
-}, createText = function (text) {
-    return "Surplus.createTextNode(" + codeStr(text) + ")";
-}, computation = function (code, varname, seed, loc, opts) {
-    return markLoc(varname ? "Surplus.S(function (" + varname + ") { return " + code + " }" + (seed ? ", " + seed : '') + ");"
-        : "Surplus.S(function () { " + code + " });", loc, opts);
+    return compileSegments(ctl);
 };
 var noApparentSignals = function (code) {
     return !rx.hasParen.test(code) || rx.loneFunction.test(code);

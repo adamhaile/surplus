@@ -8,7 +8,9 @@ import {
     HtmlInsert,     
     StaticProperty, 
     DynamicProperty,
-    Mixin          
+    Mixin,                  
+    CodeSegment, 
+    Node
 } from './AST';
 import { LOC } from './parse';
 import { locationMark } from './sourcemap';
@@ -28,27 +30,16 @@ const rx = {
 };
 
 class DOMExpression {
-    public ids = [] as string[];
-    public staticStmts = [] as string[];
-    public dynamicStmts = [] as string[];
-    public result = "" as string;
-
-    id(id : string)            { this.ids.push(id);            return id; }
-    staticStmt(stmt : string)  { this.staticStmts.push(stmt);  return stmt; }
-    dynamicStmt(stmt : string) { this.dynamicStmts.push(stmt); return stmt; }
+    public readonly ids          = [] as string[];
+    public readonly statements   = [] as string[];
+    public readonly computations = [] as string[];
 }
 
-const compile = (node : CodeTopLevel, opts : Params) => {
+const compile = (ctl : CodeTopLevel, opts : Params) => {
     const compileSegments = (node : CodeTopLevel | EmbeddedCode) => {
-            var result = "", i;
-
-            for (i = 0; i < node.segments.length; i++) {
-                result += compileSegment(node.segments[i], result);
-            }
-
-            return result;
+            return node.segments.reduce((res, s) => res + compileSegment(s, res), "");
         },
-        compileSegment = (node : CodeText | HtmlElement, previousCode : string) => 
+        compileSegment = (node : CodeSegment, previousCode : string) => 
             node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, previousCode),
         compileCodeText = (node : CodeText) =>
             markBlockLocs(node.text, node.loc, opts),
@@ -76,7 +67,7 @@ const compile = (node : CodeTopLevel, opts : Params) => {
                     c instanceof HtmlElement ? compileHtmlElement(c, prior) :
                     c instanceof HtmlText    ? codeStr(c.text.trim()) :
                     c instanceof HtmlInsert  ? compileSegments(c.code) :
-                    createComment(c.text) );
+                    `document.createComment(${codeStr(c.text)})` ); // FIXME: translate to js comment maybe?
 
             return `${node.tag}({` + inl
                 + props.join(inl) + inl
@@ -91,109 +82,87 @@ const compile = (node : CodeTopLevel, opts : Params) => {
 
             return '(function () {' + iinl 
                 + 'var ' + code.ids.join(', ') + ';' + iinl
-                + code.staticStmts.join(iinl) + iinl 
-                + code.dynamicStmts.join(iinl) + iinl
-                + 'return ' + code.result + ';' + inl 
+                + code.statements.join(iinl) + iinl 
+                + code.computations.join(iinl) + iinl
+                + 'return __;' + inl 
                 +  '})()';
         },
-        buildDOMExpression = (node : HtmlElement) => {
+        buildDOMExpression = (top : HtmlElement) => {
             const code = new DOMExpression();
 
-            const stmtsHtmlElement = (node : HtmlElement, parent : string | null, n : number) => {
-                var id = code.id(genIdentifier(parent, node.tag, n));
+            const buildHtmlElement = (node : HtmlElement, parent : string, n : number) => {
+                var id = addId(parent, node.tag, n);
                 if (rx.upperStart.test(node.tag)) {
-                    var expr = compileSubComponent(node, ""),
-                        range = `{ start: ${id}, end: ${id} }`;
-                    code.staticStmt(assign(id, createText('')));
-                    code.dynamicStmt(computation(`Surplus.insert(range, ${expr});`, "range", range, node.loc, opts));
+                    var expr = compileSubComponent(node, "");
+                    buildHtmlInsert(new HtmlInsert(new EmbeddedCode([new CodeText(expr, node.loc)]), node.loc), parent, n);
                 } else {
-                    var exelen = code.dynamicStmts.length;
-                    code.staticStmt(assign(id, createElement(node.tag)));
-                    for (var i = 0; i < node.properties.length; i++) {
-                        stmtsProperty(node.properties[i], id, i);
-                    }
-                    var myexes = code.dynamicStmts.splice(exelen);
-                    for (i = 0; i < node.content.length; i++) {
-                        var child = stmtsChild(node.content[i], id, i);
-                        if (child) code.staticStmt(appendNode(id, child));
-                    }
-                    code.dynamicStmts = code.dynamicStmts.concat(myexes);
+                    const exelen = code.computations.length;
+                    addStatement(parent ? `${id} = Surplus.createElement(\'${node.tag}\', ${parent})`
+                                        : `${id} = Surplus.createRootElement(\'${node.tag}\')`);
+                    node.properties.forEach((p, i) => buildProperty(p, id, i));
+                    const myexes = code.computations.splice(exelen);
+                    node.content.forEach((c, i) => buildChild(c, id, i));
+                    code.computations.push.apply(code.computations, myexes);
                 }
-                return id;
             },
-            stmtsProperty = (node : StaticProperty | DynamicProperty | Mixin, id : string, n : number) =>
-                node instanceof StaticProperty ? stmtsStaticProperty(node, id, n) :
-                node instanceof DynamicProperty ? stmtsDynamicProperty(node, id, n) :
-                stmtsMixin(node, id, n),
-            stmtsStaticProperty = (node : StaticProperty, id : string, n : number) => {
-                code.staticStmt(id + "." + node.name + " = " + node.value + ";");
+            buildProperty = (node : StaticProperty | DynamicProperty | Mixin, id : string, n : number) =>
+                node instanceof StaticProperty  ? buildStaticProperty(node, id, n) :
+                node instanceof DynamicProperty ? buildDynamicProperty(node, id, n) :
+                buildMixin(node, id, n),
+            buildStaticProperty = (node : StaticProperty, id : string, n : number) => {
+                addStatement(id + "." + node.name + " = " + node.value + ";");
             },
-            stmtsDynamicProperty = (node : DynamicProperty, id : string, n : number) => {
+            buildDynamicProperty = (node : DynamicProperty, id : string, n : number) => {
                 var expr = compileSegments(node.code);
                 if (node.name === "ref") {
-                    code.staticStmt(expr + " = " + id + ";");
+                    addStatement(expr + " = " + id + ";");
                 } else {
                     var setter = `${id}.${node.name} = ${expr};`;
 
-                    code.dynamicStmt(noApparentSignals(expr)
-                        ? setter
-                        : computation(setter, "", "", node.loc, opts));
+                    if (noApparentSignals(expr)) addStatement(setter);
+                    else addComputation(setter, "", "", node.loc);
                 }
             },
-            stmtsMixin = (node : Mixin, id : string, n : number) => {
+            buildMixin = (node : Mixin, id : string, n : number) => {
                 var expr = compileSegments(node.code);
-                code.dynamicStmt(computation(`(${expr})(${id}, __state);`, "__state", "", node.loc, opts));
+                addComputation(`(${expr})(${id}, __state);`, "__state", "", node.loc);
             },
-            stmtsChild = (node : HtmlElement | HtmlComment | HtmlText | HtmlInsert, parent : string, n : number) =>
-                node instanceof HtmlElement ? stmtsHtmlElement(node, parent, n) :
-                node instanceof HtmlComment ? stmtsHtmlComment(node) :
-                node instanceof HtmlText ? stmtsHtmlText(node, parent, n) :
-                stmtsHtmlInsert(node, parent, n),
-            stmtsHtmlComment = (node : HtmlComment) =>
-                createComment(node.text),
-            stmtsHtmlText = (node : HtmlText, parent : string, n : number) => { 
-                return createText(node.text);
-            },
-            stmtsHtmlInsert = (node : HtmlInsert, parent : string, n : number) => {
-                var id = code.id(genIdentifier(parent, 'insert', n)),
+            buildChild = (node : HtmlElement | HtmlComment | HtmlText | HtmlInsert, parent : string, n : number) =>
+                node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :
+                node instanceof HtmlComment ? buildHtmlComment(node, parent) :
+                node instanceof HtmlText    ? buildHtmlText(node, parent, n) :
+                buildHtmlInsert(node, parent, n),
+            buildHtmlComment = (node : HtmlComment, parent : string) =>
+                addStatement(`Surplus.createComment(${codeStr(node.text)}, ${parent})`),
+            buildHtmlText = (node : HtmlText, parent : string, n : number) =>
+                addStatement(`Surplus.createTextNode(${codeStr(node.text)}, ${parent})`),
+            buildHtmlInsert = (node : HtmlInsert, parent : string, n : number) => {
+                var id = addId(parent, 'insert', n),
                     ins = compileSegments(node.code),
                     range = `{ start: ${id}, end: ${id} }`;
-
-                code.staticStmt(assign(id, createText('')));
-
-                code.dynamicStmt(noApparentSignals(ins)
-                    ? `Surplus.insert(${range}, ${ins});`
-                    : computation(`Surplus.insert(range, ${ins});`, "range", range, node.loc, opts));
-
+                addStatement(`${id} = Surplus.createTextNode('', ${parent})`);
+                addComputation(`Surplus.insert(range, ${ins});`, "range", range, node.loc);
+            },
+            addId = (parent : string, tag : string, n : number) => {
+                const id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
+                code.ids.push(id);
                 return id;
-            };
+            },
+            addStatement = (stmt : string) =>
+                code.statements.push(stmt),
+            addComputation = (body : string, varname : string , seed : string, loc : LOC) => {
+                body = varname ? `Surplus.S(function (${varname}) { return ${body} }${seed ? `, ${seed}` : ''});`
+                               : `Surplus.S(function () { ${body} });`;
+                code.computations.push(markLoc(body, loc, opts));
+            }
 
-            code.result = stmtsHtmlElement(node, null, 0);
+            buildHtmlElement(top, '', 0);
 
             return code;
         };
 
-        return compileSegments(node);
+        return compileSegments(ctl);
     };
-
-const
-    genIdentifier = (parent : string | null, tag : string, n : number) =>
-        parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
-
-const 
-    assign = (id : string, expr : string) => 
-        `${id} = ${expr};`,
-    appendNode = (parent : string, child : string) =>
-        `Surplus.appendChild(${parent}, ${child});`,
-    createElement = (tag : string)  => 
-        `Surplus.createElement(\'${tag}\')`,
-    createComment = (text : string) => 
-        `Surplus.createComment(${codeStr(text)})`,
-    createText    = (text : string) => 
-        `Surplus.createTextNode(${codeStr(text)})`,
-    computation = (code : string, varname : string , seed : string, loc : LOC, opts : Params) =>
-        markLoc(varname ? `Surplus.S(function (${varname}) { return ${code} }${seed ? `, ${seed}` : ''});`
-                        : `Surplus.S(function () { ${code} });`, loc, opts);
 
 const
     noApparentSignals = (code : string) =>
