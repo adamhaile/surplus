@@ -620,150 +620,134 @@ var rx$3 = {
     singleQuotes: /'/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
-var CodeBlock = (function () {
-    function CodeBlock() {
+var DOMExpression = (function () {
+    function DOMExpression() {
         this.ids = [];
         this.staticStmts = [];
         this.dynamicStmts = [];
+        this.result = "";
     }
-    CodeBlock.prototype.id = function (id) { this.ids.push(id); return id; };
-    CodeBlock.prototype.staticStmt = function (stmt) { this.staticStmts.push(stmt); return stmt; };
-    CodeBlock.prototype.dynamicStmt = function (stmt) { this.dynamicStmts.push(stmt); return stmt; };
-    return CodeBlock;
+    DOMExpression.prototype.id = function (id) { this.ids.push(id); return id; };
+    DOMExpression.prototype.staticStmt = function (stmt) { this.staticStmts.push(stmt); return stmt; };
+    DOMExpression.prototype.dynamicStmt = function (stmt) { this.dynamicStmts.push(stmt); return stmt; };
+    return DOMExpression;
 }());
-var compile = function (node, opts) { return compileSegments(node, opts); };
-var compileSegments = function (node, opts) {
-    var result = "", i;
-    for (i = 0; i < node.segments.length; i++) {
-        result += compileSegment(node.segments[i], result, opts);
-    }
-    return result;
-};
-var compileSegment = function (node, previousCode, opts) {
-    return node instanceof CodeText ? compileCodeText(node, opts) : compileHtmlElement(node, previousCode, opts);
-};
-var compileCodeText = function (node, opts) {
-    return markBlockLocs(node.text, node.loc, opts);
-};
-var compileHtmlElement = function (node, previousCode, opts) {
-    var code;
-    if (rx$3.upperStart.test(node.tag)) {
-        code = compileSubComponent(node, previousCode, opts);
-    }
-    else if (node.properties.length === 0 && node.content.length === 0) {
-        // optimization: don't need IIFE for simple single nodes
-        code = "document.createElement(\"" + node.tag + "\")";
-    }
-    else {
-        var block = new CodeBlock(), expr = stmtsHtmlElement(node, block, null, 0, opts);
-        code = compileCodeBlock(block, expr, indent(previousCode));
-    }
-    return markLoc(code, node.loc, opts);
-};
-var compileSubComponent = function (node, prior, opts) {
-    var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = node.properties.map(function (p) {
-        return p instanceof StaticProperty ? propName(opts, p.name) + ": " + p.value + "," :
-            p instanceof DynamicProperty ? propName(opts, p.name) + ": " + compileSegments(p.code, opts) + "," :
-                '';
-    }), children = node.content.map(function (c) {
-        return c instanceof HtmlElement ? compileHtmlElement(c, prior, opts) :
-            c instanceof HtmlText ? codeStr(c.text.trim()) :
-                c instanceof HtmlInsert ? compileSegments(c.code, opts) :
-                    createComment(c.text);
-    });
-    return node.tag + "({" + inl
-        + props.join(inl) + inl
-        + 'children: [' + iinl
-        + children.join(',' + iinl) + inl
-        + ']})';
-};
-var compileCodeBlock = function (code, expr, indent) {
-    var nl = "\r\n" + indent, inl = nl + '    ', iinl = inl + '    ';
-    return '(function () {' + iinl
-        + 'var ' + code.ids.join(', ') + ';' + iinl
-        + code.staticStmts.join(iinl) + iinl
-        + code.dynamicStmts.join(iinl) + iinl
-        + 'return ' + expr + ';' + inl
-        + '})()';
-};
-var stmtsHtmlElement = function (node, code, parent, n, opts) {
-    var id = code.id(genIdentifier(parent, node.tag, n));
-    if (rx$3.upperStart.test(node.tag)) {
-        var expr = compileSubComponent(node, "", opts), range = "{ start: " + id + ", end: " + id + " }";
-        code.staticStmt(assign(id, createText('')));
-        code.dynamicStmt(computation("Surplus.insert(range, " + expr + ");", "range", range, node.loc, opts));
-    }
-    else {
-        var exelen = code.dynamicStmts.length;
-        code.staticStmt(assign(id, createElement(node.tag)));
-        for (var i = 0; i < node.properties.length; i++) {
-            stmtsProperty(node.properties[i], code, id, i, opts);
+var compile = function (node, opts) {
+    var compileSegments = function (node) {
+        var result = "", i;
+        for (i = 0; i < node.segments.length; i++) {
+            result += compileSegment(node.segments[i], result);
         }
-        var myexes = code.dynamicStmts.splice(exelen);
-        for (i = 0; i < node.content.length; i++) {
-            var child = stmtsChild(node.content[i], code, id, i, opts);
-            if (child)
-                code.staticStmt(appendNode(id, child));
+        return result;
+    }, compileSegment = function (node, previousCode) {
+        return node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, previousCode);
+    }, compileCodeText = function (node) {
+        return markBlockLocs(node.text, node.loc, opts);
+    }, compileHtmlElement = function (node, previousCode) {
+        var code;
+        if (rx$3.upperStart.test(node.tag)) {
+            code = compileSubComponent(node, previousCode);
         }
-        code.dynamicStmts = code.dynamicStmts.concat(myexes);
-    }
-    return id;
-};
-var stmtsProperty = function (node, code, id, n, opts) {
-    return node instanceof StaticProperty ? stmtsStaticProperty(node, code, id, n, opts) :
-        node instanceof DynamicProperty ? stmtsDynamicProperty(node, code, id, n, opts) :
-            stmtsMixin(node, code, id, n, opts);
-};
-var stmtsStaticProperty = function (node, code, id, n, opts) {
-    code.staticStmt(id + "." + propName(opts, node.name) + " = " + node.value + ";");
-};
-var stmtsDynamicProperty = function (node, code, id, n, opts) {
-    var expr = compileSegments(node.code, opts);
-    if (node.name === "ref") {
-        code.staticStmt(expr + " = " + id + ";");
-    }
-    else {
-        var prop = propName(opts, node.name), setter = id + "." + prop + " = " + expr + ";";
-        code.dynamicStmt(noApparentSignals(expr)
-            ? setter
-            : computation(setter, "", "", node.loc, opts));
-    }
-};
-var stmtsMixin = function (node, code, id, n, opts) {
-    var expr = compileSegments(node.code, opts);
-    code.dynamicStmt(computation("(" + expr + ")(" + id + ", __state);", "__state", "", node.loc, opts));
-};
-var stmtsChild = function (node, code, parent, n, opts) {
-    return node instanceof HtmlElement ? stmtsHtmlElement(node, code, parent, n, opts) :
-        node instanceof HtmlComment ? stmtsHtmlComment(node) :
-            node instanceof HtmlText ? stmtsHtmlText(node, code, parent, n) :
-                stmtsHtmlInsert(node, code, parent, n, opts);
-};
-var stmtsHtmlComment = function (node) {
-    return createComment(node.text);
-};
-var stmtsHtmlText = function (node, code, parent, n) {
-    // if we're the first child, we can just set innerText
-    if (n === 0) {
-        code.staticStmt(parent + ".innerText = " + codeStr(node.text));
-    }
-    else {
-        return createText(node.text);
-    }
-};
-var stmtsHtmlInsert = function (node, code, parent, n, opts) {
-    var id = code.id(genIdentifier(parent, 'insert', n)), ins = compileSegments(node.code, opts), range = "{ start: " + id + ", end: " + id + " }";
-    code.staticStmt(assign(id, createText('')));
-    code.dynamicStmt(noApparentSignals(ins)
-        ? "Surplus.insert(" + range + ", " + ins + ");"
-        : computation("Surplus.insert(range, " + ins + ");", "range", range, node.loc, opts));
-    return id;
+        else if (node.properties.length === 0 && node.content.length === 0) {
+            // optimization: don't need IIFE for simple single nodes
+            code = "document.createElement(\"" + node.tag + "\")";
+        }
+        else {
+            code = compileDOMExpression(buildDOMExpression(node), previousCode);
+        }
+        return markLoc(code, node.loc, opts);
+    }, compileSubComponent = function (node, prior) {
+        var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = node.properties.map(function (p) {
+            return p instanceof StaticProperty ? p.name + ": " + p.value + "," :
+                p instanceof DynamicProperty ? p.name + ": " + compileSegments(p.code) + "," :
+                    '';
+        }), children = node.content.map(function (c) {
+            return c instanceof HtmlElement ? compileHtmlElement(c, prior) :
+                c instanceof HtmlText ? codeStr(c.text.trim()) :
+                    c instanceof HtmlInsert ? compileSegments(c.code) :
+                        createComment(c.text);
+        });
+        return node.tag + "({" + inl
+            + props.join(inl) + inl
+            + 'children: [' + iinl
+            + children.join(',' + iinl) + inl
+            + ']})';
+    }, compileDOMExpression = function (code, previousCode) {
+        var nl = "\r\n" + indent(previousCode), inl = nl + '    ', iinl = inl + '    ';
+        return '(function () {' + iinl
+            + 'var ' + code.ids.join(', ') + ';' + iinl
+            + code.staticStmts.join(iinl) + iinl
+            + code.dynamicStmts.join(iinl) + iinl
+            + 'return ' + code.result + ';' + inl
+            + '})()';
+    }, buildDOMExpression = function (node) {
+        var code = new DOMExpression();
+        var stmtsHtmlElement = function (node, parent, n) {
+            var id = code.id(genIdentifier(parent, node.tag, n));
+            if (rx$3.upperStart.test(node.tag)) {
+                var expr = compileSubComponent(node, ""), range = "{ start: " + id + ", end: " + id + " }";
+                code.staticStmt(assign(id, createText('')));
+                code.dynamicStmt(computation("Surplus.insert(range, " + expr + ");", "range", range, node.loc, opts));
+            }
+            else {
+                var exelen = code.dynamicStmts.length;
+                code.staticStmt(assign(id, createElement(node.tag)));
+                for (var i = 0; i < node.properties.length; i++) {
+                    stmtsProperty(node.properties[i], id, i);
+                }
+                var myexes = code.dynamicStmts.splice(exelen);
+                for (i = 0; i < node.content.length; i++) {
+                    var child = stmtsChild(node.content[i], id, i);
+                    if (child)
+                        code.staticStmt(appendNode(id, child));
+                }
+                code.dynamicStmts = code.dynamicStmts.concat(myexes);
+            }
+            return id;
+        }, stmtsProperty = function (node, id, n) {
+            return node instanceof StaticProperty ? stmtsStaticProperty(node, id, n) :
+                node instanceof DynamicProperty ? stmtsDynamicProperty(node, id, n) :
+                    stmtsMixin(node, id, n);
+        }, stmtsStaticProperty = function (node, id, n) {
+            code.staticStmt(id + "." + node.name + " = " + node.value + ";");
+        }, stmtsDynamicProperty = function (node, id, n) {
+            var expr = compileSegments(node.code);
+            if (node.name === "ref") {
+                code.staticStmt(expr + " = " + id + ";");
+            }
+            else {
+                var setter = id + "." + node.name + " = " + expr + ";";
+                code.dynamicStmt(noApparentSignals(expr)
+                    ? setter
+                    : computation(setter, "", "", node.loc, opts));
+            }
+        }, stmtsMixin = function (node, id, n) {
+            var expr = compileSegments(node.code);
+            code.dynamicStmt(computation("(" + expr + ")(" + id + ", __state);", "__state", "", node.loc, opts));
+        }, stmtsChild = function (node, parent, n) {
+            return node instanceof HtmlElement ? stmtsHtmlElement(node, parent, n) :
+                node instanceof HtmlComment ? stmtsHtmlComment(node) :
+                    node instanceof HtmlText ? stmtsHtmlText(node, parent, n) :
+                        stmtsHtmlInsert(node, parent, n);
+        }, stmtsHtmlComment = function (node) {
+            return createComment(node.text);
+        }, stmtsHtmlText = function (node, parent, n) {
+            return createText(node.text);
+        }, stmtsHtmlInsert = function (node, parent, n) {
+            var id = code.id(genIdentifier(parent, 'insert', n)), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
+            code.staticStmt(assign(id, createText('')));
+            code.dynamicStmt(noApparentSignals(ins)
+                ? "Surplus.insert(" + range + ", " + ins + ");"
+                : computation("Surplus.insert(range, " + ins + ");", "range", range, node.loc, opts));
+            return id;
+        };
+        code.result = stmtsHtmlElement(node, null, 0);
+        return code;
+    };
+    return compileSegments(node);
 };
 var genIdentifier = function (parent, tag, n) {
     return parent === null ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
-};
-var propName = function (opts, name) {
-    return opts.jsx && name.substr(0, 2) === 'on' ? (name === 'onDoubleClick' ? 'ondblclick' : name.toLowerCase()) : name;
 };
 var assign = function (id, expr) {
     return id + " = " + expr + ";";
