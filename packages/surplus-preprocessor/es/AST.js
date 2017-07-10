@@ -1,4 +1,4 @@
-import { Root } from './treeContext';
+import { Path } from './path';
 var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
         this.segments = segments;
@@ -78,9 +78,19 @@ var Mixin = (function () {
     return Mixin;
 }());
 export { Mixin };
+;
+;
+;
+;
+;
+;
+;
+;
+;
+;
 export var Copy = {
     CodeTopLevel: function (node) {
-        return new CodeTopLevel(flatten(node.segments.map(this.CodeSegment(new Root(node)))));
+        return new CodeTopLevel(node.segments.map(this.CodeSegment(new Path(node, null))));
     },
     CodeSegment: function (ctx) {
         var _this = this;
@@ -90,10 +100,10 @@ export var Copy = {
         };
     },
     EmbeddedCode: function (ctx) {
-        return new EmbeddedCode(flatten(ctx.node.segments.map(this.CodeSegment(ctx))));
+        return new EmbeddedCode(ctx.node.segments.map(this.CodeSegment(ctx)));
     },
     HtmlElement: function (ctx) {
-        return [new HtmlElement(ctx.node.tag, flatten(ctx.node.properties.map(this.HtmlProperty(ctx))), flatten(ctx.node.content.map(this.HtmlContent(ctx))), ctx.node.loc)];
+        return new HtmlElement(ctx.node.tag, ctx.node.properties.map(this.HtmlProperty(ctx)), ctx.node.content.map(this.HtmlContent(ctx)), ctx.node.loc);
     },
     HtmlProperty: function (ctx) {
         var _this = this;
@@ -113,17 +123,16 @@ export var Copy = {
         };
     },
     HtmlInsert: function (ctx) {
-        return [new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+        return new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     },
-    CodeText: function (ctx) { return [ctx.node]; },
-    HtmlText: function (ctx) { return [ctx.node]; },
-    HtmlComment: function (ctx) { return [ctx.node]; },
-    StaticProperty: function (ctx) { return [ctx.node]; },
+    CodeText: function (ctx) { return ctx.node; },
+    HtmlText: function (ctx) { return ctx.node; },
+    HtmlComment: function (ctx) { return ctx.node; },
+    StaticProperty: function (ctx) { return ctx.node; },
     DynamicProperty: function (ctx) {
-        return [new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+        return new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     },
     Mixin: function (ctx) {
-        return [new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+        return new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     }
 };
-var flatten = function (aas) { return aas.reduce(function (as, a) { return as.concat(a); }, []); };

@@ -1,9 +1,20 @@
-import { CodeTopLevel, EmbeddedCode, CodeText, HtmlElement, HtmlText, HtmlComment, HtmlInsert, StaticProperty, DynamicProperty, Mixin } from './AST';
+import { 
+    CodeTopLevel,
+    EmbeddedCode,    
+    CodeText,        
+    HtmlElement,     
+    HtmlText,        
+    HtmlComment,     
+    HtmlInsert,      
+    StaticProperty,  
+    DynamicProperty, 
+    Mixin            
+} from './AST';
 import { LOC } from './parse';
-import * as sourcemap from './sourcemap';
+import { locationMark } from './sourcemap';
 import { Params } from './preprocess';
 
-export { compile };
+export { compile, codeStr };
 
 // pre-compiled regular expressions
 const rx = {
@@ -197,7 +208,7 @@ const
 
 const 
     markLoc = (str : string, loc : LOC, opts : Params) =>
-        opts.sourcemap ? sourcemap.locationMark(loc) + str : str,
+        opts.sourcemap ? locationMark(loc) + str : str,
     markBlockLocs = (str : string, loc : LOC, opts : Params) => {
         if (!opts.sourcemap) return str;
 
@@ -208,8 +219,8 @@ const
             var line = lines[i];
             offset += line.length;
             var lineloc = { line: loc.line + i, col: 0, pos: loc.pos + offset + i };
-            lines[i] = sourcemap.locationMark(lineloc) + line;
+            lines[i] = locationMark(lineloc) + line;
         }
 
-        return sourcemap.locationMark(loc) + lines.join('\n');
+        return locationMark(loc) + lines.join('\n');
     };

@@ -1,8 +1,8 @@
 import { LOC } from './parse';
-import { Context, Child, Sibling } from './treeContext';
+import { Path, SiblingPath } from './path';
 export declare class CodeTopLevel {
-    segments: (CodeText | HtmlElement)[];
-    constructor(segments: (CodeText | HtmlElement)[]);
+    segments: CodeSegment[];
+    constructor(segments: CodeSegment[]);
 }
 export declare class CodeText {
     readonly text: string;
@@ -53,29 +53,39 @@ export declare class Mixin {
     constructor(code: EmbeddedCode, loc: LOC);
 }
 export declare type Node = CodeTopLevel | CodeText | EmbeddedCode | HtmlElement | HtmlText | HtmlComment | HtmlInsert | StaticProperty | DynamicProperty | Mixin;
-export declare type CodeSegmentContext = Context<CodeTopLevel | EmbeddedCode>;
-export declare type EmbeddedCodeContext = Child<EmbeddedCode, DynamicProperty | Mixin | HtmlInsert>;
-export declare type HtmlElementContext = Sibling<HtmlElement, CodeText | HtmlContent, CodeTopLevel | EmbeddedCode | HtmlElement>;
-export declare type HtmlInsertContext = Sibling<HtmlInsert, HtmlContent, HtmlElement>;
-export declare type CodeTextContext = Sibling<CodeText, CodeSegment, CodeTopLevel | EmbeddedCode>;
-export declare type HtmlTextContext = Sibling<HtmlText, HtmlContent, HtmlElement>;
-export declare type HtmlCommentContext = Sibling<HtmlComment, HtmlContent, HtmlElement>;
-export declare type StaticPropertyContext = Sibling<StaticProperty, HtmlProperty, HtmlElement>;
-export declare type DynamicPropertyContext = Sibling<DynamicProperty, HtmlProperty, HtmlElement>;
-export declare type MixinContext = Sibling<Mixin, HtmlProperty, HtmlElement>;
+export interface CodeTopLevelPath extends Path<CodeTopLevel, null> {
+}
+export interface EmbeddedCodePath extends Path<EmbeddedCode, DynamicPropertyPath | MixinPath | HtmlInsertPath> {
+}
+export interface HtmlElementPath extends SiblingPath<HtmlElement, CodeText | HtmlContent, CodeTopLevelPath | EmbeddedCodePath | HtmlElementPath> {
+}
+export interface HtmlInsertPath extends SiblingPath<HtmlInsert, HtmlContent, HtmlElementPath> {
+}
+export interface CodeTextPath extends SiblingPath<CodeText, CodeSegment, CodeTopLevelPath | EmbeddedCodePath> {
+}
+export interface HtmlTextPath extends SiblingPath<HtmlText, HtmlContent, HtmlElementPath> {
+}
+export interface HtmlCommentPath extends SiblingPath<HtmlComment, HtmlContent, HtmlElementPath> {
+}
+export interface StaticPropertyPath extends SiblingPath<StaticProperty, HtmlProperty, HtmlElementPath> {
+}
+export interface DynamicPropertyPath extends SiblingPath<DynamicProperty, HtmlProperty, HtmlElementPath> {
+}
+export interface MixinPath extends SiblingPath<Mixin, HtmlProperty, HtmlElementPath> {
+}
 export declare const Copy: {
     CodeTopLevel(node: CodeTopLevel): CodeTopLevel;
-    CodeSegment(ctx: Context<CodeTopLevel | EmbeddedCode>): (n: CodeText | HtmlElement, i: number, a: (CodeText | HtmlElement)[]) => (CodeText | HtmlElement)[];
-    EmbeddedCode(ctx: Child<EmbeddedCode, DynamicProperty | Mixin | HtmlInsert>): EmbeddedCode;
-    HtmlElement(ctx: Sibling<HtmlElement, CodeText | HtmlElement | HtmlInsert | HtmlComment | HtmlText, CodeTopLevel | HtmlElement | EmbeddedCode>): HtmlElement[];
-    HtmlProperty(ctx: Sibling<HtmlElement, CodeText | HtmlElement | HtmlInsert | HtmlComment | HtmlText, CodeTopLevel | HtmlElement | EmbeddedCode>): (n: StaticProperty | DynamicProperty | Mixin, i: number, a: (StaticProperty | DynamicProperty | Mixin)[]) => (StaticProperty | DynamicProperty | Mixin)[];
-    HtmlContent(ctx: Sibling<HtmlElement, CodeText | HtmlElement | HtmlInsert | HtmlComment | HtmlText, CodeTopLevel | HtmlElement | EmbeddedCode>): (n: HtmlElement | HtmlInsert | HtmlComment | HtmlText, i: number, a: (HtmlElement | HtmlInsert | HtmlComment | HtmlText)[]) => (HtmlElement | HtmlInsert | HtmlComment | HtmlText)[];
-    HtmlInsert(ctx: Sibling<HtmlInsert, HtmlElement | HtmlInsert | HtmlComment | HtmlText, HtmlElement>): HtmlInsert[];
-    CodeText(ctx: Sibling<CodeText, CodeText | HtmlElement, CodeTopLevel | EmbeddedCode>): CodeText[];
-    HtmlText(ctx: Sibling<HtmlText, HtmlElement | HtmlInsert | HtmlComment | HtmlText, HtmlElement>): HtmlText[];
-    HtmlComment(ctx: Sibling<HtmlComment, HtmlElement | HtmlInsert | HtmlComment | HtmlText, HtmlElement>): HtmlComment[];
-    StaticProperty(ctx: Sibling<StaticProperty, StaticProperty | DynamicProperty | Mixin, HtmlElement>): StaticProperty[];
-    DynamicProperty(ctx: Sibling<DynamicProperty, StaticProperty | DynamicProperty | Mixin, HtmlElement>): DynamicProperty[];
-    Mixin(ctx: Sibling<Mixin, StaticProperty | DynamicProperty | Mixin, HtmlElement>): Mixin[];
+    CodeSegment(ctx: Path<CodeTopLevel | EmbeddedCode, any>): (n: CodeSegment, i: number, a: CodeSegment[]) => CodeSegment;
+    EmbeddedCode(ctx: EmbeddedCodePath): EmbeddedCode;
+    HtmlElement(ctx: HtmlElementPath): HtmlElement;
+    HtmlProperty(ctx: HtmlElementPath): (n: StaticProperty | DynamicProperty | Mixin, i: number, a: (StaticProperty | DynamicProperty | Mixin)[]) => StaticProperty | DynamicProperty | Mixin;
+    HtmlContent(ctx: HtmlElementPath): (n: HtmlElement | HtmlInsert | HtmlComment | HtmlText, i: number, a: (HtmlElement | HtmlInsert | HtmlComment | HtmlText)[]) => HtmlElement | HtmlInsert | HtmlComment | HtmlText;
+    HtmlInsert(ctx: HtmlInsertPath): HtmlInsert;
+    CodeText(ctx: CodeTextPath): CodeText;
+    HtmlText(ctx: HtmlTextPath): HtmlText;
+    HtmlComment(ctx: HtmlCommentPath): HtmlComment;
+    StaticProperty(ctx: StaticPropertyPath): StaticProperty;
+    DynamicProperty(ctx: DynamicPropertyPath): DynamicProperty;
+    Mixin(ctx: MixinPath): Mixin;
 };
 export declare type Copy = typeof Copy;

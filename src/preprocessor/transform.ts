@@ -1,59 +1,62 @@
 // Cross-browser compatibility shims
-import { CodeTopLevel, StaticProperty, HtmlText, Copy } from './AST';
+import { CodeTopLevel, StaticProperty, DynamicProperty, HtmlElement, HtmlText, Copy } from './AST';
 import { Params } from './preprocess';
+import { codeStr } from './compile';
 
 const rx = {
-    ws: /^\s*$/
+    ws              : /^\s*$/,
+    jsxEventProperty: /^on[A-Z]/,
+    lowerStart      : /^[a-z]/,
 };
 
-export const transform = (node : CodeTopLevel, opt : Params) => {
-    let tx = Copy;
+const tf = [
+    removeWhitespaceTextNodes,
+    translateJSXPropertyNames,
+    promoteInitialTextNodesToTextContentProperties
+].reverse().reduce((tf, fn) => fn(tf), Copy);
 
-    tx = removeWhitespaceTextNodes(tx);
-
-    if (typeof window !== 'undefined' && window.document && window.document.createElement) {
-        // browser-based shims
-        if (!browserPreservesWhitespaceTextNodes())
-            tx = addFEFFtoWhitespaceTextNodes(tx);
-
-        if (!browserPreservesInitialComments())
-            tx = insertTextNodeBeforeInitialComments(tx);
-    }
-
-    return tx.CodeTopLevel(node);
-}
+export const transform = (node : CodeTopLevel, opt : Params) => tf.CodeTopLevel(node);
 
 function removeWhitespaceTextNodes(tx : Copy) : Copy {
-    return { ...tx, HtmlText: ctx => rx.ws.test(ctx.node.text) ? [] : tx.HtmlText(ctx) };
-}
-
-// IE <9 will removes text nodes that just contain whitespace in certain situations.
-// Solution is to add a zero-width non-breaking space (entity &#xfeff) to the nodes.
-function browserPreservesWhitespaceTextNodes() {
-    var ul = document.createElement("ul");
-    ul.innerHTML = "    <li></li>";
-    return ul.childNodes.length === 2;
-}
-
-function addFEFFtoWhitespaceTextNodes(tx : Copy) : Copy {
-    return { ...tx, HtmlText: ctx =>
-        tx.HtmlText(rx.ws.test(ctx.node.text) && !(ctx.parent.node instanceof StaticProperty) 
-            ? ctx.swap(new HtmlText('&#xfeff;' + ctx.node.text))
-            : ctx)
+    return { 
+        ...tx, 
+        HtmlElement(ctx) { 
+            var { tag, properties, content, loc } = ctx.node;
+            content = content.filter(c => !(c instanceof HtmlText && rx.ws.test(c.text)));
+            if (content.length !== ctx.node.content.length) {
+                ctx = ctx.swap(new HtmlElement(tag, properties, content, loc));
+            }
+            return tx.HtmlElement.call(this, ctx);
+        } 
     };
 }
 
-// IE <9 will remove comments when they're the first child of certain elements
-// Solution is to prepend a non-whitespace text node, using the &#xfeff trick.
-function browserPreservesInitialComments() {
-    var ul = document.createElement("ul");
-    ul.innerHTML = "<!-- --><li></li>";
-    return ul.childNodes.length === 2;
+function translateJSXPropertyNames(tx : Copy) : Copy {
+    return { 
+        ...tx, 
+        DynamicProperty(ctx) {
+            let { name, code, loc } = ctx.node;
+            if (rx.lowerStart.test(ctx.parent.node.tag) && rx.jsxEventProperty.test(name)) {
+                name = name === "onDoubleClick" ? "ondblclick" : name.toLowerCase();
+                ctx = ctx.swap(new DynamicProperty(name, code, loc));
+            }
+            return tx.DynamicProperty.call(this, ctx);
+        } 
+    };
 }
 
-function insertTextNodeBeforeInitialComments(tx : Copy) : Copy {
-    return { ...tx, HtmlComment: ctx =>
-        (ctx.index === 0 ? tx.HtmlText(ctx.swap(new HtmlText('&#xfeff;'))) : []).concat(tx.HtmlComment(ctx))
+function promoteInitialTextNodesToTextContentProperties(tx : Copy) : Copy {
+    return {
+        ...tx,
+        HtmlElement(ctx) {
+            const { tag, properties, content, loc } = ctx.node;
+            if (rx.lowerStart.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
+                var textContent = new StaticProperty("textContent", codeStr((content[0] as HtmlText).text)),
+                    node = new HtmlElement(tag, [ ...properties, textContent ], content.slice(1), loc);
+                ctx = ctx.swap(node);
+            }
+            return tx.HtmlElement.call(this, ctx);
+        }
     };
 }
 

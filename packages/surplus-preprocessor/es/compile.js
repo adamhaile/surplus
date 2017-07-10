@@ -1,6 +1,6 @@
 import { CodeText, HtmlElement, HtmlText, HtmlComment, HtmlInsert, StaticProperty, DynamicProperty } from './AST';
-import * as sourcemap from './sourcemap';
-export { compile };
+import { locationMark } from './sourcemap';
+export { compile, codeStr };
 // pre-compiled regular expressions
 var rx = {
     backslashes: /\\/g,
@@ -166,7 +166,7 @@ var noApparentSignals = function (code) {
         "'";
 };
 var markLoc = function (str, loc, opts) {
-    return opts.sourcemap ? sourcemap.locationMark(loc) + str : str;
+    return opts.sourcemap ? locationMark(loc) + str : str;
 }, markBlockLocs = function (str, loc, opts) {
     if (!opts.sourcemap)
         return str;
@@ -175,7 +175,7 @@ var markLoc = function (str, loc, opts) {
         var line = lines[i];
         offset += line.length;
         var lineloc = { line: loc.line + i, col: 0, pos: loc.pos + offset + i };
-        lines[i] = sourcemap.locationMark(lineloc) + line;
+        lines[i] = locationMark(lineloc) + line;
     }
-    return sourcemap.locationMark(loc) + lines.join('\n');
+    return locationMark(loc) + lines.join('\n');
 };

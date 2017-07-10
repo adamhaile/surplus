@@ -46,43 +46,27 @@ var __extends = (undefined && undefined.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-var Context = (function () {
-    function Context(node) {
+var Path = (function () {
+    function Path(node, parent) {
         this.node = node;
+        this.parent = parent;
     }
-    Context.prototype.child = function (node) { return new Child(node, this); };
-    Context.prototype.sibling = function (node, i, siblings) { return new Sibling(node, i, siblings, this); };
-    return Context;
+    Path.prototype.child = function (node) { return new Path(node, this); };
+    Path.prototype.sibling = function (node, i, siblings) { return new SiblingPath(node, i, siblings, this); };
+    Path.prototype.swap = function (node) { return new Path(node, this.parent); };
+    return Path;
 }());
-var Root = (function (_super) {
-    __extends(Root, _super);
-    function Root() {
-        return _super !== null && _super.apply(this, arguments) || this;
-    }
-    return Root;
-}(Context));
-var Child = (function (_super) {
-    __extends(Child, _super);
-    function Child(node, parent) {
-        var _this = _super.call(this, node) || this;
-        _this.parent = parent;
-        return _this;
-    }
-    Child.prototype.swap = function (node) { return new Child(node, this.parent); };
-    return Child;
-}(Context));
-var Sibling = (function (_super) {
-    __extends(Sibling, _super);
-    function Sibling(node, index, siblings, parent) {
-        var _this = _super.call(this, node) || this;
+var SiblingPath = (function (_super) {
+    __extends(SiblingPath, _super);
+    function SiblingPath(node, index, siblings, parent) {
+        var _this = _super.call(this, node, parent) || this;
         _this.index = index;
         _this.siblings = siblings;
-        _this.parent = parent;
         return _this;
     }
-    Sibling.prototype.swap = function (node) { return new Sibling(node, this.index, this.siblings, this.parent); };
-    return Sibling;
-}(Context));
+    SiblingPath.prototype.swap = function (node) { return new SiblingPath(node, this.index, this.siblings, this.parent); };
+    return SiblingPath;
+}(Path));
 
 var CodeTopLevel = (function () {
     function CodeTopLevel(segments) {
@@ -153,9 +137,19 @@ var Mixin = (function () {
     }
     return Mixin;
 }());
+
+
+
+
+
+
+
+
+
+
 var Copy = {
     CodeTopLevel: function (node) {
-        return new CodeTopLevel(flatten(node.segments.map(this.CodeSegment(new Root(node)))));
+        return new CodeTopLevel(node.segments.map(this.CodeSegment(new Path(node, null))));
     },
     CodeSegment: function (ctx) {
         var _this = this;
@@ -165,10 +159,10 @@ var Copy = {
         };
     },
     EmbeddedCode: function (ctx) {
-        return new EmbeddedCode(flatten(ctx.node.segments.map(this.CodeSegment(ctx))));
+        return new EmbeddedCode(ctx.node.segments.map(this.CodeSegment(ctx)));
     },
     HtmlElement: function (ctx) {
-        return [new HtmlElement(ctx.node.tag, flatten(ctx.node.properties.map(this.HtmlProperty(ctx))), flatten(ctx.node.content.map(this.HtmlContent(ctx))), ctx.node.loc)];
+        return new HtmlElement(ctx.node.tag, ctx.node.properties.map(this.HtmlProperty(ctx)), ctx.node.content.map(this.HtmlContent(ctx)), ctx.node.loc);
     },
     HtmlProperty: function (ctx) {
         var _this = this;
@@ -188,20 +182,19 @@ var Copy = {
         };
     },
     HtmlInsert: function (ctx) {
-        return [new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+        return new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     },
-    CodeText: function (ctx) { return [ctx.node]; },
-    HtmlText: function (ctx) { return [ctx.node]; },
-    HtmlComment: function (ctx) { return [ctx.node]; },
-    StaticProperty: function (ctx) { return [ctx.node]; },
+    CodeText: function (ctx) { return ctx.node; },
+    HtmlText: function (ctx) { return ctx.node; },
+    HtmlComment: function (ctx) { return ctx.node; },
+    StaticProperty: function (ctx) { return ctx.node; },
     DynamicProperty: function (ctx) {
-        return [new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+        return new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     },
     Mixin: function (ctx) {
-        return [new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+        return new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     }
 };
-var flatten = function (aas) { return aas.reduce(function (as, a) { return as.concat(a); }, []); };
 
 // pre-compiled regular expressions
 var rx$1 = {
@@ -537,60 +530,6 @@ function parse(TOKS, opts) {
     }
 }
 
-var __assign = (undefined && undefined.__assign) || Object.assign || function(t) {
-    for (var s, i = 1, n = arguments.length; i < n; i++) {
-        s = arguments[i];
-        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
-            t[p] = s[p];
-    }
-    return t;
-};
-// Cross-browser compatibility shims
-var rx$2 = {
-    ws: /^\s*$/
-};
-var transform = function (node, opt) {
-    var tx = Copy;
-    tx = removeWhitespaceTextNodes(tx);
-    if (typeof window !== 'undefined' && window.document && window.document.createElement) {
-        // browser-based shims
-        if (!browserPreservesWhitespaceTextNodes())
-            tx = addFEFFtoWhitespaceTextNodes(tx);
-        if (!browserPreservesInitialComments())
-            tx = insertTextNodeBeforeInitialComments(tx);
-    }
-    return tx.CodeTopLevel(node);
-};
-function removeWhitespaceTextNodes(tx) {
-    return __assign({}, tx, { HtmlText: function (ctx) { return rx$2.ws.test(ctx.node.text) ? [] : tx.HtmlText(ctx); } });
-}
-// IE <9 will removes text nodes that just contain whitespace in certain situations.
-// Solution is to add a zero-width non-breaking space (entity &#xfeff) to the nodes.
-function browserPreservesWhitespaceTextNodes() {
-    var ul = document.createElement("ul");
-    ul.innerHTML = "    <li></li>";
-    return ul.childNodes.length === 2;
-}
-function addFEFFtoWhitespaceTextNodes(tx) {
-    return __assign({}, tx, { HtmlText: function (ctx) {
-            return tx.HtmlText(rx$2.ws.test(ctx.node.text) && !(ctx.parent.node instanceof StaticProperty)
-                ? ctx.swap(new HtmlText('&#xfeff;' + ctx.node.text))
-                : ctx);
-        } });
-}
-// IE <9 will remove comments when they're the first child of certain elements
-// Solution is to prepend a non-whitespace text node, using the &#xfeff trick.
-function browserPreservesInitialComments() {
-    var ul = document.createElement("ul");
-    ul.innerHTML = "<!-- --><li></li>";
-    return ul.childNodes.length === 2;
-}
-function insertTextNodeBeforeInitialComments(tx) {
-    return __assign({}, tx, { HtmlComment: function (ctx) {
-            return (ctx.index === 0 ? tx.HtmlText(ctx.swap(new HtmlText('&#xfeff;'))) : []).concat(tx.HtmlComment(ctx));
-        } });
-}
-
 var rx$4 = {
     locs: /(\n)|(\u0000(\d+),(\d+)\u0000)/g
 };
@@ -874,6 +813,57 @@ var markBlockLocs = function (str, loc, opts) {
     }
     return locationMark(loc) + lines.join('\n');
 };
+
+var __assign = (undefined && undefined.__assign) || Object.assign || function(t) {
+    for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+            t[p] = s[p];
+    }
+    return t;
+};
+// Cross-browser compatibility shims
+var rx$2 = {
+    ws: /^\s*$/,
+    jsxEventProperty: /^on[A-Z]/,
+    lowerStart: /^[a-z]/,
+};
+var tf = [
+    removeWhitespaceTextNodes,
+    translateJSXPropertyNames,
+    promoteInitialTextNodesToTextContentProperties
+].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
+var transform = function (node, opt) { return tf.CodeTopLevel(node); };
+function removeWhitespaceTextNodes(tx) {
+    return __assign({}, tx, { HtmlElement: function (ctx) {
+            var _a = ctx.node, tag = _a.tag, properties = _a.properties, content = _a.content, loc = _a.loc;
+            content = content.filter(function (c) { return !(c instanceof HtmlText && rx$2.ws.test(c.text)); });
+            if (content.length !== ctx.node.content.length) {
+                ctx = ctx.swap(new HtmlElement(tag, properties, content, loc));
+            }
+            return tx.HtmlElement.call(this, ctx);
+        } });
+}
+function translateJSXPropertyNames(tx) {
+    return __assign({}, tx, { DynamicProperty: function (ctx) {
+            var _a = ctx.node, name = _a.name, code = _a.code, loc = _a.loc;
+            if (rx$2.lowerStart.test(ctx.parent.node.tag) && rx$2.jsxEventProperty.test(name)) {
+                name = name === "onDoubleClick" ? "ondblclick" : name.toLowerCase();
+                ctx = ctx.swap(new DynamicProperty(name, code, loc));
+            }
+            return tx.DynamicProperty.call(this, ctx);
+        } });
+}
+function promoteInitialTextNodesToTextContentProperties(tx) {
+    return __assign({}, tx, { HtmlElement: function (ctx) {
+            var _a = ctx.node, tag = _a.tag, properties = _a.properties, content = _a.content, loc = _a.loc;
+            if (rx$2.lowerStart.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
+                var textContent = new StaticProperty("textContent", codeStr(content[0].text)), node = new HtmlElement(tag, properties.concat([textContent]), content.slice(1), loc);
+                ctx = ctx.swap(node);
+            }
+            return tx.HtmlElement.call(this, ctx);
+        } });
+}
 
 function preprocess(str, opts) {
     opts = opts || {};

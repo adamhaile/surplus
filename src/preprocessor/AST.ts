@@ -1,10 +1,10 @@
 import { Params } from './preprocess';
 import { LOC } from './parse';
-import { Context, Root, Child, Sibling } from './treeContext';
+import { Path, SiblingPath } from './path';
 
 export class CodeTopLevel {
     constructor(
-        public segments : (CodeText | HtmlElement)[]
+        public segments : CodeSegment[]
     ) { }
 }
 
@@ -80,65 +80,62 @@ export type Node = CodeTopLevel | CodeText | EmbeddedCode | HtmlElement | HtmlTe
 
 // treeContext type declarations and a Copy transform, for building non-identity transforms on top of
 
-export type CodeSegmentContext     = Context<CodeTopLevel | EmbeddedCode>;
-export type EmbeddedCodeContext    = Child<EmbeddedCode, DynamicProperty | Mixin | HtmlInsert>;
-export type HtmlElementContext     = Sibling<HtmlElement, CodeText | HtmlContent, CodeTopLevel | EmbeddedCode | HtmlElement>;
-export type HtmlInsertContext      = Sibling<HtmlInsert, HtmlContent, HtmlElement>;
-export type CodeTextContext        = Sibling<CodeText, CodeSegment, CodeTopLevel | EmbeddedCode>;
-export type HtmlTextContext        = Sibling<HtmlText, HtmlContent, HtmlElement>;
-export type HtmlCommentContext     = Sibling<HtmlComment, HtmlContent, HtmlElement>;
-export type StaticPropertyContext  = Sibling<StaticProperty, HtmlProperty, HtmlElement>;
-export type DynamicPropertyContext = Sibling<DynamicProperty, HtmlProperty, HtmlElement>;
-export type MixinContext           = Sibling<Mixin, HtmlProperty, HtmlElement>;
+export interface CodeTopLevelPath    extends Path<CodeTopLevel, null> {};
+export interface EmbeddedCodePath    extends Path<EmbeddedCode, DynamicPropertyPath | MixinPath | HtmlInsertPath> {};
+export interface HtmlElementPath     extends SiblingPath<HtmlElement, CodeText | HtmlContent, CodeTopLevelPath | EmbeddedCodePath | HtmlElementPath> {};
+export interface HtmlInsertPath      extends SiblingPath<HtmlInsert, HtmlContent, HtmlElementPath> {};
+export interface CodeTextPath        extends SiblingPath<CodeText, CodeSegment, CodeTopLevelPath | EmbeddedCodePath> {};
+export interface HtmlTextPath        extends SiblingPath<HtmlText, HtmlContent, HtmlElementPath> {};
+export interface HtmlCommentPath     extends SiblingPath<HtmlComment, HtmlContent, HtmlElementPath> {};
+export interface StaticPropertyPath  extends SiblingPath<StaticProperty, HtmlProperty, HtmlElementPath> {};
+export interface DynamicPropertyPath extends SiblingPath<DynamicProperty, HtmlProperty, HtmlElementPath> {};
+export interface MixinPath           extends SiblingPath<Mixin, HtmlProperty, HtmlElementPath> {};
 
 export const Copy = {
     CodeTopLevel(node : CodeTopLevel) {
-        return new CodeTopLevel(flatten(node.segments.map(this.CodeSegment(new Root(node)))));
+        return new CodeTopLevel(node.segments.map(this.CodeSegment(new Path(node, null))));
     },
-    CodeSegment(ctx : CodeSegmentContext) {
-        return (n : CodeSegment, i : number, a : CodeSegment[]) : CodeSegment[] => 
+    CodeSegment(ctx : Path<CodeTopLevel | EmbeddedCode, any>) {
+        return (n : CodeSegment, i : number, a : CodeSegment[]) : CodeSegment => 
             n instanceof CodeText ? this.CodeText(ctx.sibling(n, i, a)) : 
             this.HtmlElement(ctx.sibling(n, i, a));
     },
-    EmbeddedCode(ctx : EmbeddedCodeContext) {
-        return new EmbeddedCode(flatten(ctx.node.segments.map(this.CodeSegment(ctx))));
+    EmbeddedCode(ctx : EmbeddedCodePath) {
+        return new EmbeddedCode(ctx.node.segments.map(this.CodeSegment(ctx)));
     },
-    HtmlElement(ctx : HtmlElementContext) : HtmlElement[] {
-        return [new HtmlElement(ctx.node.tag, 
-            flatten(ctx.node.properties.map(this.HtmlProperty(ctx))), 
-            flatten(ctx.node.content.map(this.HtmlContent(ctx))), 
+    HtmlElement(ctx : HtmlElementPath) : HtmlElement {
+        return new HtmlElement(ctx.node.tag, 
+            ctx.node.properties.map(this.HtmlProperty(ctx)), 
+            ctx.node.content.map(this.HtmlContent(ctx)), 
             ctx.node.loc
-        )];
+        );
     },
-    HtmlProperty(ctx : HtmlElementContext) {
-        return (n : HtmlProperty, i : number, a : HtmlProperty[]) : HtmlProperty[] =>
+    HtmlProperty(ctx : HtmlElementPath) {
+        return (n : HtmlProperty, i : number, a : HtmlProperty[]) : HtmlProperty =>
             n instanceof StaticProperty ? this.StaticProperty(ctx.sibling(n, i, a)) :
             n instanceof DynamicProperty ? this.DynamicProperty(ctx.sibling(n, i, a)) :
             this.Mixin(ctx.sibling(n, i, a));
     },
-    HtmlContent(ctx : HtmlElementContext) {
-        return (n : HtmlContent, i : number, a : HtmlContent[]) : HtmlContent[] =>
+    HtmlContent(ctx : HtmlElementPath) {
+        return (n : HtmlContent, i : number, a : HtmlContent[]) : HtmlContent =>
             n instanceof HtmlComment ? this.HtmlComment(ctx.sibling(n, i, a)) :
             n instanceof HtmlText ? this.HtmlText(ctx.sibling(n, i, a)) :
             n instanceof HtmlInsert ? this.HtmlInsert(ctx.sibling(n, i, a)) :
             this.HtmlElement(ctx.sibling(n, i, a));
     },
-    HtmlInsert(ctx : HtmlInsertContext) {
-        return [new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    HtmlInsert(ctx : HtmlInsertPath) {
+        return new HtmlInsert(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     },
-    CodeText(ctx : CodeTextContext) { return [ctx.node]; },
-    HtmlText(ctx : HtmlTextContext) { return [ctx.node]; },
-    HtmlComment(ctx : HtmlCommentContext) { return [ctx.node]; },
-    StaticProperty(ctx : StaticPropertyContext) { return [ctx.node]; },
-    DynamicProperty(ctx : DynamicPropertyContext) {
-        return [new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    CodeText(ctx : CodeTextPath) { return ctx.node; },
+    HtmlText(ctx : HtmlTextPath) { return ctx.node; },
+    HtmlComment(ctx : HtmlCommentPath) { return ctx.node; },
+    StaticProperty(ctx : StaticPropertyPath) { return ctx.node; },
+    DynamicProperty(ctx : DynamicPropertyPath) {
+        return new DynamicProperty(ctx.node.name, this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     },
-    Mixin(ctx : MixinContext) {
-        return [new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc)];
+    Mixin(ctx : MixinPath) {
+        return new Mixin(this.EmbeddedCode(ctx.child(ctx.node.code)), ctx.node.loc);
     }
 };
 
 export type Copy = typeof Copy;
-
-const flatten = <T>(aas : T[][]) => aas.reduce((as, a) => as.concat(a), []);
-
