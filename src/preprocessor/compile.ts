@@ -122,8 +122,7 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             const buildHtmlElement = (node : HtmlElement, parent : string, n : number) => {
                 const id = addId(parent, node.tag, n);
                 if (rx.upperStart.test(node.tag)) {
-                    const expr = compileSubComponent(buildSubComponent(node), "");
-                    buildHtmlInsert(new HtmlInsert(new EmbeddedCode([new CodeText(expr, node.loc)]), node.loc), parent, n);
+                    buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), node.loc), parent, n);
                 } else {
                     const exelen = computations.length;
                     addStatement(parent ? `${id} = Surplus.createElement(\'${node.tag}\', ${parent})`

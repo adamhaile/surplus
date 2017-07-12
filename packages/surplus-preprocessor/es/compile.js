@@ -90,8 +90,7 @@ var compile = function (ctl, opts) {
         var buildHtmlElement = function (node, parent, n) {
             var id = addId(parent, node.tag, n);
             if (rx.upperStart.test(node.tag)) {
-                var expr = compileSubComponent(buildSubComponent(node), "");
-                buildHtmlInsert(new HtmlInsert(new EmbeddedCode([new CodeText(expr, node.loc)]), node.loc), parent, n);
+                buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), node.loc), parent, n);
             }
             else {
                 var exelen = computations.length;
