@@ -30,9 +30,19 @@ const rx = {
 };
 
 class DOMExpression {
-    public readonly ids          = [] as string[];
-    public readonly statements   = [] as string[];
-    public readonly computations = [] as string[];
+    constructor(
+        public readonly ids          : string[],
+        public readonly statements   : string[],
+        public readonly computations : string[]
+    ) { }
+}
+
+class SubComponent {
+    constructor(
+        public readonly name : string,
+        public readonly properties : (string | { [ name : string ] : string })[],
+        public readonly children : string[]
+    ) { }
 }
 
 const compile = (ctl : CodeTopLevel, opts : Params) => {
@@ -43,88 +53,106 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, previousCode),
         compileCodeText = (node : CodeText) =>
             markBlockLocs(node.text, node.loc, opts),
-        compileHtmlElement = (node : HtmlElement, previousCode : string) => {
-            var code : string;
-            if (rx.upperStart.test(node.tag)) {
-                code = compileSubComponent(node, previousCode);
-            } else if (node.properties.length === 0 && node.content.length === 0) {
-                // optimization: don't need IIFE for simple single nodes
-                code = `document.createElement("${node.tag}")`;
-            } else {
-                code = compileDOMExpression(buildDOMExpression(node), previousCode);
-            }
+        compileHtmlElement = (node : HtmlElement, previousCode : string) : string => {
+            const code = 
+                rx.upperStart.test(node.tag) ? 
+                    compileSubComponent(buildSubComponent(node), previousCode) :
+                (node.properties.length === 0 && node.content.length === 0) ?
+                    // optimization: don't need IIFE for simple single nodes
+                    `Surplus.createRootElement("${node.tag}")` :
+                compileDOMExpression(buildDOMExpression(node), previousCode);
             return markLoc(code, node.loc, opts);
         },
-        compileSubComponent = (node : HtmlElement, prior : string) => {
-            var nl = "\r\n" + indent(prior),
-                inl = nl + '    ',
-                iinl = inl + '    ',
-                props = node.properties.map(p =>
-                    p instanceof StaticProperty  ? `${p.name}: ${p.value},` :
-                    p instanceof DynamicProperty ? `${p.name}: ${compileSegments(p.code)},` :
-                    ''),
+        buildSubComponent = (node : HtmlElement) => {
+            const 
+                // group successive properties into property objects, but mixins stand alone
+                // e.g. a="1" b={foo} {...mixin} c="3" gets combined into [{a: "1", b: foo}, mixin, {c: "3"}]
+                properties = node.properties.reduce((props : (string | { [name : string] : string })[], p) => {
+                    const lastSegment = props[props.length - 1],
+                        value = p instanceof StaticProperty ? p.value : compileSegments(p.code);
+                    
+                    if (p instanceof Mixin) props.push(value);
+                    else if (props.length === 0 || typeof lastSegment === 'string') props.push({ [p.name]: value });
+                    else lastSegment[p.name] = value;
+
+                    return props;
+                }, []),
                 children = node.content.map(c => 
-                    c instanceof HtmlElement ? compileHtmlElement(c, prior) :
+                    c instanceof HtmlElement ? compileHtmlElement(c, "") :
                     c instanceof HtmlText    ? codeStr(c.text.trim()) :
                     c instanceof HtmlInsert  ? compileSegments(c.code) :
-                    `document.createComment(${codeStr(c.text)})` ); // FIXME: translate to js comment maybe?
+                    `document.createComment(${codeStr(c.text)})`
+                ).filter(Boolean); 
 
-            return `${node.tag}({` + inl
-                + props.join(inl) + inl
-                + 'children: [' + iinl
-                + children.join(',' + iinl) + inl
-                + ']})';
+            return new SubComponent(node.tag, properties, children);
         },
-        compileDOMExpression = (code : DOMExpression, previousCode : string) => {
-            var nl = "\r\n" + indent(previousCode),
-                inl = nl + '    ',
-                iinl = inl + '    ';
+        compileSubComponent = (expr : SubComponent, prior : string) => {
+            const nl  = "\r\n" + indent(prior),
+                nli   = nl   + '    ',
+                nlii  = nli  + '    ',
+                // convert children to an array expression
+                children = expr.children.length === 0 ? '[]' : '[' + nlii
+                    + expr.children.join(',' + nlii) + nli
+                    + ']',
+                properties0 = expr.properties[0];
 
-            return '(function () {' + iinl 
-                + 'var ' + code.ids.join(', ') + ';' + iinl
-                + code.statements.join(iinl) + iinl 
-                + code.computations.join(iinl) + iinl
-                + 'return __;' + inl 
-                +  '})()';
+            // add children property to first property object (creating one if needed)
+            // this has the double purpose of creating the children property and making sure
+            // that the first property group is not a mixin and can therefore be used as a base for extending
+            if (typeof properties0 === 'string') expr.properties.unshift({ children: children });
+            else properties0['children'] = children;
+
+            // convert property objects to object expressions
+            const properties = expr.properties.map(obj =>
+                typeof obj === 'string' ? obj :
+                '{' + Object.keys(obj).map(p => `${nli}${p}: ${obj[p]}`).join(',') + nl + '}'
+            );
+
+            // join multiple object expressions using Object.assign()
+            const needLibrary = expr.properties.length > 1 || typeof expr.properties[0] === 'string';
+
+            return needLibrary ? `Surplus.subcomponent(${expr.name}, [${properties.join(', ')}])`
+                               : `${expr.name}(${properties[0]})`;
         },
         buildDOMExpression = (top : HtmlElement) => {
-            const code = new DOMExpression();
+            const ids = [] as string[],
+                statements = [] as string[],
+                computations = [] as string[];
 
             const buildHtmlElement = (node : HtmlElement, parent : string, n : number) => {
-                var id = addId(parent, node.tag, n);
+                const id = addId(parent, node.tag, n);
                 if (rx.upperStart.test(node.tag)) {
-                    var expr = compileSubComponent(node, "");
+                    const expr = compileSubComponent(buildSubComponent(node), "");
                     buildHtmlInsert(new HtmlInsert(new EmbeddedCode([new CodeText(expr, node.loc)]), node.loc), parent, n);
                 } else {
-                    const exelen = code.computations.length;
+                    const exelen = computations.length;
                     addStatement(parent ? `${id} = Surplus.createElement(\'${node.tag}\', ${parent})`
                                         : `${id} = Surplus.createRootElement(\'${node.tag}\')`);
                     node.properties.forEach((p, i) => buildProperty(p, id, i));
-                    const myexes = code.computations.splice(exelen);
+                    const myexes = computations.splice(exelen);
                     node.content.forEach((c, i) => buildChild(c, id, i));
-                    code.computations.push.apply(code.computations, myexes);
+                    computations.push.apply(computations, myexes);
                 }
             },
             buildProperty = (node : StaticProperty | DynamicProperty | Mixin, id : string, n : number) =>
                 node instanceof StaticProperty  ? buildStaticProperty(node, id, n) :
                 node instanceof DynamicProperty ? buildDynamicProperty(node, id, n) :
                 buildMixin(node, id, n),
-            buildStaticProperty = (node : StaticProperty, id : string, n : number) => {
-                addStatement(id + "." + node.name + " = " + node.value + ";");
-            },
+            buildStaticProperty = (node : StaticProperty, id : string, n : number) =>
+                addStatement(id + "." + node.name + " = " + node.value + ";"),
             buildDynamicProperty = (node : DynamicProperty, id : string, n : number) => {
-                var expr = compileSegments(node.code);
+                const expr = compileSegments(node.code);
                 if (node.name === "ref") {
                     addStatement(expr + " = " + id + ";");
                 } else {
-                    var setter = `${id}.${node.name} = ${expr};`;
+                    const setter = `${id}.${node.name} = ${expr};`;
 
                     if (noApparentSignals(expr)) addStatement(setter);
                     else addComputation(setter, "", "", node.loc);
                 }
             },
             buildMixin = (node : Mixin, id : string, n : number) => {
-                var expr = compileSegments(node.code);
+                const expr = compileSegments(node.code);
                 addComputation(`(${expr})(${id}, __state);`, "__state", "", node.loc);
             },
             buildChild = (node : HtmlElement | HtmlComment | HtmlText | HtmlInsert, parent : string, n : number) =>
@@ -137,7 +165,7 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             buildHtmlText = (node : HtmlText, parent : string, n : number) =>
                 addStatement(`Surplus.createTextNode(${codeStr(node.text)}, ${parent})`),
             buildHtmlInsert = (node : HtmlInsert, parent : string, n : number) => {
-                var id = addId(parent, 'insert', n),
+                const id = addId(parent, 'insert', n),
                     ins = compileSegments(node.code),
                     range = `{ start: ${id}, end: ${id} }`;
                 addStatement(`${id} = Surplus.createTextNode('', ${parent})`);
@@ -145,30 +173,42 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             },
             addId = (parent : string, tag : string, n : number) => {
                 const id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
-                code.ids.push(id);
+                ids.push(id);
                 return id;
             },
             addStatement = (stmt : string) =>
-                code.statements.push(stmt),
+                statements.push(stmt),
             addComputation = (body : string, varname : string , seed : string, loc : LOC) => {
                 body = varname ? `Surplus.S(function (${varname}) { return ${body} }${seed ? `, ${seed}` : ''});`
                                : `Surplus.S(function () { ${body} });`;
-                code.computations.push(markLoc(body, loc, opts));
+                computations.push(markLoc(body, loc, opts));
             }
 
             buildHtmlElement(top, '', 0);
 
-            return code;
+            return new DOMExpression(ids, statements, computations);
         };
 
         return compileSegments(ctl);
+    },
+    compileDOMExpression = (code : DOMExpression, previousCode : string) => {
+        var nl = "\r\n" + indent(previousCode),
+            inl = nl + '    ',
+            iinl = inl + '    ';
+
+        return '(function () {' + iinl 
+            + 'var ' + code.ids.join(', ') + ';' + iinl
+            + code.statements.join(iinl) + iinl 
+            + code.computations.join(iinl) + iinl
+            + 'return __;' + inl 
+            +  '})()';
     };
 
 const
     noApparentSignals = (code : string) =>
         !rx.hasParen.test(code) || rx.loneFunction.test(code),
     indent = (previousCode : string) => {
-        var m = rx.indent.exec(previousCode);
+        const m = rx.indent.exec(previousCode);
         return m ? m[1] : '';
     },
     codeStr = (str : string) =>
@@ -184,13 +224,13 @@ const
     markBlockLocs = (str : string, loc : LOC, opts : Params) => {
         if (!opts.sourcemap) return str;
 
-        var lines = str.split('\n'),
+        let lines = str.split('\n'),
             offset = 0;
 
-        for (var i = 1; i < lines.length; i++) {
-            var line = lines[i];
+        for (let i = 1; i < lines.length; i++) {
+            let line = lines[i];
             offset += line.length;
-            var lineloc = { line: loc.line + i, col: 0, pos: loc.pos + offset + i };
+            let lineloc = { line: loc.line + i, col: 0, pos: loc.pos + offset + i };
             lines[i] = locationMark(lineloc) + line;
         }
 

@@ -77,7 +77,7 @@ var Mixin = (function () {
     return Mixin;
 }());
 export { Mixin };
-// treeContext type declarations and a Copy transform, for building non-identity transforms on top of
+// a Copy transform, for building non-identity transforms on top of
 export var Copy = {
     CodeTopLevel: function (node) {
         return new CodeTopLevel(this.CodeSegments(node.segments));

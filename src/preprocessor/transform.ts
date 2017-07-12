@@ -10,6 +10,7 @@ const rx = {
 };
 
 const tf = [
+    // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
     promoteInitialTextNodesToTextContentProperties

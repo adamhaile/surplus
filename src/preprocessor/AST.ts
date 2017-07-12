@@ -76,8 +76,7 @@ export class Mixin {
 
 export type Node = CodeTopLevel | CodeText | EmbeddedCode | HtmlElement | HtmlText | HtmlComment | HtmlInsert | StaticProperty | DynamicProperty | Mixin;
 
-// treeContext type declarations and a Copy transform, for building non-identity transforms on top of
-
+// a Copy transform, for building non-identity transforms on top of
 export const Copy = {
     CodeTopLevel(node : CodeTopLevel) {
         return new CodeTopLevel(this.CodeSegments(node.segments));

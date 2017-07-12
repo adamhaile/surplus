@@ -105,7 +105,7 @@ var Mixin = (function () {
     }
     return Mixin;
 }());
-// treeContext type declarations and a Copy transform, for building non-identity transforms on top of
+// a Copy transform, for building non-identity transforms on top of
 var Copy = {
     CodeTopLevel: function (node) {
         return new CodeTopLevel(this.CodeSegments(node.segments));
@@ -570,12 +570,20 @@ var rx$3 = {
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
 var DOMExpression = (function () {
-    function DOMExpression() {
-        this.ids = [];
-        this.statements = [];
-        this.computations = [];
+    function DOMExpression(ids, statements, computations) {
+        this.ids = ids;
+        this.statements = statements;
+        this.computations = computations;
     }
     return DOMExpression;
+}());
+var SubComponent = (function () {
+    function SubComponent(name, properties, children) {
+        this.name = name;
+        this.properties = properties;
+        this.children = children;
+    }
+    return SubComponent;
 }());
 var compile = function (ctl, opts) {
     var compileSegments = function (node) {
@@ -585,65 +593,79 @@ var compile = function (ctl, opts) {
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
     }, compileHtmlElement = function (node, previousCode) {
-        var code;
-        if (rx$3.upperStart.test(node.tag)) {
-            code = compileSubComponent(node, previousCode);
-        }
-        else if (node.properties.length === 0 && node.content.length === 0) {
-            // optimization: don't need IIFE for simple single nodes
-            code = "document.createElement(\"" + node.tag + "\")";
-        }
-        else {
-            code = compileDOMExpression(buildDOMExpression(node), previousCode);
-        }
+        var code = rx$3.upperStart.test(node.tag) ?
+            compileSubComponent(buildSubComponent(node), previousCode) :
+            (node.properties.length === 0 && node.content.length === 0) ?
+                // optimization: don't need IIFE for simple single nodes
+                "Surplus.createRootElement(\"" + node.tag + "\")" :
+                compileDOMExpression(buildDOMExpression(node), previousCode);
         return markLoc(code, node.loc, opts);
-    }, compileSubComponent = function (node, prior) {
-        var nl = "\r\n" + indent(prior), inl = nl + '    ', iinl = inl + '    ', props = node.properties.map(function (p) {
-            return p instanceof StaticProperty ? p.name + ": " + p.value + "," :
-                p instanceof DynamicProperty ? p.name + ": " + compileSegments(p.code) + "," :
-                    '';
-        }), children = node.content.map(function (c) {
-            return c instanceof HtmlElement ? compileHtmlElement(c, prior) :
+    }, buildSubComponent = function (node) {
+        var 
+        // group successive properties into property objects, but mixins stand alone
+        // e.g. a="1" b={foo} {...mixin} c="3" gets combined into [{a: "1", b: foo}, mixin, {c: "3"}]
+        properties = node.properties.reduce(function (props, p) {
+            var lastSegment = props[props.length - 1], value = p instanceof StaticProperty ? p.value : compileSegments(p.code);
+            if (p instanceof Mixin)
+                props.push(value);
+            else if (props.length === 0 || typeof lastSegment === 'string')
+                props.push((_a = {}, _a[p.name] = value, _a));
+            else
+                lastSegment[p.name] = value;
+            return props;
+            var _a;
+        }, []), children = node.content.map(function (c) {
+            return c instanceof HtmlElement ? compileHtmlElement(c, "") :
                 c instanceof HtmlText ? codeStr(c.text.trim()) :
                     c instanceof HtmlInsert ? compileSegments(c.code) :
                         "document.createComment(" + codeStr(c.text) + ")";
-        }); // FIXME: translate to js comment maybe?
-        return node.tag + "({" + inl
-            + props.join(inl) + inl
-            + 'children: [' + iinl
-            + children.join(',' + iinl) + inl
-            + ']})';
-    }, compileDOMExpression = function (code, previousCode) {
-        var nl = "\r\n" + indent(previousCode), inl = nl + '    ', iinl = inl + '    ';
-        return '(function () {' + iinl
-            + 'var ' + code.ids.join(', ') + ';' + iinl
-            + code.statements.join(iinl) + iinl
-            + code.computations.join(iinl) + iinl
-            + 'return __;' + inl
-            + '})()';
+        }).filter(Boolean);
+        return new SubComponent(node.tag, properties, children);
+    }, compileSubComponent = function (expr, prior) {
+        var nl = "\r\n" + indent(prior), nli = nl + '    ', nlii = nli + '    ', 
+        // convert children to an array expression
+        children = expr.children.length === 0 ? '[]' : '[' + nlii
+            + expr.children.join(',' + nlii) + nli
+            + ']', properties0 = expr.properties[0];
+        // add children property to first property object (creating one if needed)
+        // this has the double purpose of creating the children property and making sure
+        // that the first property group is not a mixin and can therefore be used as a base for extending
+        if (typeof properties0 === 'string')
+            expr.properties.unshift({ children: children });
+        else
+            properties0['children'] = children;
+        // convert property objects to object expressions
+        var properties = expr.properties.map(function (obj) {
+            return typeof obj === 'string' ? obj :
+                '{' + Object.keys(obj).map(function (p) { return "" + nli + p + ": " + obj[p]; }).join(',') + nl + '}';
+        });
+        // join multiple object expressions using Object.assign()
+        var needLibrary = expr.properties.length > 1 || typeof expr.properties[0] === 'string';
+        return needLibrary ? "Surplus.subcomponent(" + expr.name + ", [" + properties.join(', ') + "])"
+            : expr.name + "(" + properties[0] + ")";
     }, buildDOMExpression = function (top) {
-        var code = new DOMExpression();
+        var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
             var id = addId(parent, node.tag, n);
             if (rx$3.upperStart.test(node.tag)) {
-                var expr = compileSubComponent(node, "");
+                var expr = compileSubComponent(buildSubComponent(node), "");
                 buildHtmlInsert(new HtmlInsert(new EmbeddedCode([new CodeText(expr, node.loc)]), node.loc), parent, n);
             }
             else {
-                var exelen = code.computations.length;
+                var exelen = computations.length;
                 addStatement(parent ? id + " = Surplus.createElement('" + node.tag + "', " + parent + ")"
                     : id + " = Surplus.createRootElement('" + node.tag + "')");
                 node.properties.forEach(function (p, i) { return buildProperty(p, id, i); });
-                var myexes = code.computations.splice(exelen);
+                var myexes = computations.splice(exelen);
                 node.content.forEach(function (c, i) { return buildChild(c, id, i); });
-                code.computations.push.apply(code.computations, myexes);
+                computations.push.apply(computations, myexes);
             }
         }, buildProperty = function (node, id, n) {
             return node instanceof StaticProperty ? buildStaticProperty(node, id, n) :
                 node instanceof DynamicProperty ? buildDynamicProperty(node, id, n) :
                     buildMixin(node, id, n);
         }, buildStaticProperty = function (node, id, n) {
-            addStatement(id + "." + node.name + " = " + node.value + ";");
+            return addStatement(id + "." + node.name + " = " + node.value + ";");
         }, buildDynamicProperty = function (node, id, n) {
             var expr = compileSegments(node.code);
             if (node.name === "ref") {
@@ -674,19 +696,28 @@ var compile = function (ctl, opts) {
             addComputation("Surplus.insert(range, " + ins + ");", "range", range, node.loc);
         }, addId = function (parent, tag, n) {
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
-            code.ids.push(id);
+            ids.push(id);
             return id;
         }, addStatement = function (stmt) {
-            return code.statements.push(stmt);
+            return statements.push(stmt);
         }, addComputation = function (body, varname, seed, loc) {
             body = varname ? "Surplus.S(function (" + varname + ") { return " + body + " }" + (seed ? ", " + seed : '') + ");"
                 : "Surplus.S(function () { " + body + " });";
-            code.computations.push(markLoc(body, loc, opts));
+            computations.push(markLoc(body, loc, opts));
         };
         buildHtmlElement(top, '', 0);
-        return code;
+        return new DOMExpression(ids, statements, computations);
     };
     return compileSegments(ctl);
+};
+var compileDOMExpression = function (code, previousCode) {
+    var nl = "\r\n" + indent(previousCode), inl = nl + '    ', iinl = inl + '    ';
+    return '(function () {' + iinl
+        + 'var ' + code.ids.join(', ') + ';' + iinl
+        + code.statements.join(iinl) + iinl
+        + code.computations.join(iinl) + iinl
+        + 'return __;' + inl
+        + '})()';
 };
 var noApparentSignals = function (code) {
     return !rx$3.hasParen.test(code) || rx$3.loneFunction.test(code);
@@ -733,6 +764,7 @@ var rx$2 = {
     lowerStart: /^[a-z]/,
 };
 var tf = [
+    // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
     promoteInitialTextNodesToTextContentProperties

@@ -30,41 +30,41 @@ describe("JSX syntax", function () {
     });
 
     it("can have sub-components with children", function () {
-        var code = window.SurplusPreprocessor.preprocess('                  \
-            var props = null,                                               \
-                SubComponent = p => props = p,                              \
-                sub =                                                       \
-                    <SubComponent foo="2">                                  \
-                        <span>text</span>                                   \
-                        some words                                          \
-                        <!-- comment -->                                    \
-                    </SubComponent>;                                        \
-                                                                            \
-            expect(props).not.toBe(null);                                   \
-            expect(props.foo).toBe("2");                                    \
-            expect(props.children.length).toBe(3);                          \
-            expect(props.children[0] instanceof HTMLSpanElement).toBe(true);\
-            expect(props.children[0].innerText).toBe("text");               \
-            expect(props.children[1]).toBe("some words");                   \
-            expect(props.children[2] instanceof Comment).toBe(true);        \
-            expect(props.children[2].data).toBe(" comment ");               \
+        var code = window.SurplusPreprocessor.preprocess('                  \n\
+            var props = null,                                               \n\
+                SubComponent = p => props = p,                              \n\
+                sub =                                                       \n\
+                    <SubComponent foo="2">                                  \n\
+                        <span>text</span>                                   \n\
+                        some words                                          \n\
+                        <!-- comment -->                                    \n\
+                    </SubComponent>;                                        \n\
+                                                                            \n\
+            expect(props).not.toBe(null);                                   \n\
+            expect(props.foo).toBe("2");                                    \n\
+            expect(props.children.length).toBe(3);                          \n\
+            expect(props.children[0] instanceof HTMLSpanElement).toBe(true);\n\
+            expect(props.children[0].innerText).toBe("text");               \n\
+            expect(props.children[1]).toBe("some words");                   \n\
+            expect(props.children[2] instanceof Comment).toBe(true);        \n\
+            expect(props.children[2].data).toBe(" comment ");               \n\
         ', { jsx: false });
 
         eval(code);
     });
 
     it("can have sub-components as children", function () {
-        var code = window.SurplusPreprocessor.preprocess('                  \
-            var SubComponent = p => <span>@p.text</span>,                   \
-                div =                                                       \
-                    <div>                                                   \
-                        <SubComponent text="foo" />                         \
-                    </div>;                                                 \
-                                                                            \
-            expect(div instanceof HTMLDivElement).toBe(true);               \
-            expect(div.childNodes.length).toBe(1);                          \
-            expect(div.childNodes[0] instanceof HTMLSpanElement).toBe(true);\
-            expect(div.childNodes[0].innerText).toBe("foo");                \
+        var code = window.SurplusPreprocessor.preprocess('                  \n\
+            var SubComponent = p => <span>@p.text</span>,                   \n\
+                div =                                                       \n\
+                    <div>                                                   \n\
+                        <SubComponent text="foo" />                         \n\
+                    </div>;                                                 \n\
+                                                                            \n\
+            expect(div instanceof HTMLDivElement).toBe(true);               \n\
+            expect(div.childNodes.length).toBe(1);                          \n\
+            expect(div.childNodes[0] instanceof HTMLSpanElement).toBe(true);\n\
+            expect(div.childNodes[0].innerText).toBe("foo");                \n\
         ', { jsx: false });
 
         eval(code);
