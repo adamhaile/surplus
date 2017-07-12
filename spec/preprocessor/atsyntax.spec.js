@@ -1,4 +1,4 @@
-describe("JSX syntax", function () {
+describe("@ syntax", function () {
     it("sets a property to the value of a JSX expression", function () {
         eval(window.SurplusPreprocessor.preprocess('        \
             var val = "foo",                                \
