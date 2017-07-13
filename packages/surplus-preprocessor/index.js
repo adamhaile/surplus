@@ -651,6 +651,12 @@ var compile = function (ctl, opts) {
                 buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), node.loc), parent, n);
             }
             else {
+                // cases for properties
+                // none
+                // all static
+                // mix of static & dynamic
+                // single mixin
+                // mix of mixin and props, static or dynamic
                 var exelen = computations.length;
                 addStatement(parent ? id + " = Surplus.createElement('" + node.tag + "', " + parent + ")"
                     : id + " = Surplus.createRootElement('" + node.tag + "')");
@@ -766,7 +772,8 @@ var tf = [
     // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
-    promoteInitialTextNodesToTextContentProperties
+    promoteInitialTextNodesToTextContentProperties,
+    removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 var transform = function (node, opt) { return tf.CodeTopLevel(node); };
 function removeWhitespaceTextNodes(tx) {
@@ -774,6 +781,17 @@ function removeWhitespaceTextNodes(tx) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof HtmlText && rx$2.ws.test(c.text)); });
             if (nonWhitespaceContent.length !== content.length) {
                 node = new HtmlElement(tag, properties, nonWhitespaceContent, loc);
+            }
+            return tx.HtmlElement.call(this, node);
+        } });
+}
+function removeDuplicateProperties(tx) {
+    return __assign({}, tx, { HtmlElement: function (node) {
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, lastid = {};
+            properties.forEach(function (p, i) { return p instanceof Mixin || (lastid[p.name] = i); });
+            var uniqueProperties = properties.filter(function (p, i) { return p instanceof Mixin || lastid[p.name] === i; });
+            if (properties.length !== uniqueProperties.length) {
+                node = new HtmlElement(tag, uniqueProperties, content, loc);
             }
             return tx.HtmlElement.call(this, node);
         } });

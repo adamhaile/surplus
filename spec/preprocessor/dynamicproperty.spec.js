@@ -56,7 +56,7 @@ describe("JSX dynamic property", function () {
                 div = <div id={id1()} id={id2()}></div>;    \n\
                                                             \n\
             expect(div.id).toBe("b");                       \n\
-            id("c");                                        \n\
+            id1("c");                                        \n\
             expect(div.id).toBe("b");                       \n\
         '));
     });

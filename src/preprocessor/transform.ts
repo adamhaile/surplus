@@ -1,5 +1,5 @@
 // Cross-browser compatibility shims
-import { CodeTopLevel, StaticProperty, DynamicProperty, HtmlElement, HtmlText, Copy } from './AST';
+import { CodeTopLevel, StaticProperty, DynamicProperty, Mixin, HtmlProperty, HtmlElement, HtmlText, Copy } from './AST';
 import { Params } from './preprocess';
 import { codeStr } from './compile';
 
@@ -13,7 +13,8 @@ const tf = [
     // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
-    promoteInitialTextNodesToTextContentProperties
+    promoteInitialTextNodesToTextContentProperties,
+    removeDuplicateProperties
 ].reverse().reduce((tf, fn) => fn(tf), Copy);
 
 export const transform = (node : CodeTopLevel, opt : Params) => tf.CodeTopLevel(node);
@@ -30,6 +31,26 @@ function removeWhitespaceTextNodes(tx : Copy) : Copy {
             return tx.HtmlElement.call(this, node);
         } 
     };
+}
+
+function removeDuplicateProperties(tx : Copy) : Copy {
+    return {
+        ...tx,
+        HtmlElement(node) {
+            const { tag, properties, content, loc } = node,
+                lastid = {} as { [ name : string ] : number };
+
+            properties.forEach((p, i) => p instanceof Mixin || (lastid[p.name] = i));
+
+            const uniqueProperties = properties.filter((p, i) => p instanceof Mixin || lastid[p.name] === i);
+
+            if (properties.length !== uniqueProperties.length) {
+                node = new HtmlElement(tag, uniqueProperties, content, loc);
+            }
+
+            return tx.HtmlElement.call(this, node);
+        }
+    }
 }
 
 function translateJSXPropertyNames(tx : Copy) : Copy {

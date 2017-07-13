@@ -7,7 +7,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
     return t;
 };
 // Cross-browser compatibility shims
-import { StaticProperty, DynamicProperty, HtmlElement, HtmlText, Copy } from './AST';
+import { StaticProperty, DynamicProperty, Mixin, HtmlElement, HtmlText, Copy } from './AST';
 import { codeStr } from './compile';
 var rx = {
     ws: /^\s*$/,
@@ -18,7 +18,8 @@ var tf = [
     // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
-    promoteInitialTextNodesToTextContentProperties
+    promoteInitialTextNodesToTextContentProperties,
+    removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 export var transform = function (node, opt) { return tf.CodeTopLevel(node); };
 function removeWhitespaceTextNodes(tx) {
@@ -26,6 +27,17 @@ function removeWhitespaceTextNodes(tx) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof HtmlText && rx.ws.test(c.text)); });
             if (nonWhitespaceContent.length !== content.length) {
                 node = new HtmlElement(tag, properties, nonWhitespaceContent, loc);
+            }
+            return tx.HtmlElement.call(this, node);
+        } });
+}
+function removeDuplicateProperties(tx) {
+    return __assign({}, tx, { HtmlElement: function (node) {
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, lastid = {};
+            properties.forEach(function (p, i) { return p instanceof Mixin || (lastid[p.name] = i); });
+            var uniqueProperties = properties.filter(function (p, i) { return p instanceof Mixin || lastid[p.name] === i; });
+            if (properties.length !== uniqueProperties.length) {
+                node = new HtmlElement(tag, uniqueProperties, content, loc);
             }
             return tx.HtmlElement.call(this, node);
         } });
