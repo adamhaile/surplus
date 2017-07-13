@@ -19,6 +19,15 @@ var DOMExpression = (function () {
     }
     return DOMExpression;
 }());
+var Computation = (function () {
+    function Computation(statements, loc, stateVar, seed) {
+        this.statements = statements;
+        this.loc = loc;
+        this.stateVar = stateVar;
+        this.seed = seed;
+    }
+    return Computation;
+}());
 var SubComponent = (function () {
     function SubComponent(name, properties, children) {
         this.name = name;
@@ -31,16 +40,16 @@ var compile = function (ctl, opts) {
     var compileSegments = function (node) {
         return node.segments.reduce(function (res, s) { return res + compileSegment(s, res); }, "");
     }, compileSegment = function (node, previousCode) {
-        return node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, previousCode);
+        return node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, indent(previousCode));
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
-    }, compileHtmlElement = function (node, previousCode) {
+    }, compileHtmlElement = function (node, indent) {
         var code = rx.upperStart.test(node.tag) ?
-            compileSubComponent(buildSubComponent(node), previousCode) :
+            emitSubComponent(buildSubComponent(node), indent) :
             (node.properties.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
                 "Surplus.createRootElement(\"" + node.tag + "\")" :
-                compileDOMExpression(buildDOMExpression(node), previousCode);
+                emitDOMExpression(buildDOMExpression(node), indent);
         return markLoc(code, node.loc, opts);
     }, buildSubComponent = function (node) {
         var 
@@ -63,8 +72,8 @@ var compile = function (ctl, opts) {
                         "document.createComment(" + codeStr(c.text) + ")";
         }).filter(Boolean);
         return new SubComponent(node.tag, properties, children);
-    }, compileSubComponent = function (expr, prior) {
-        var nl = "\r\n" + indent(prior), nli = nl + '    ', nlii = nli + '    ', 
+    }, emitSubComponent = function (expr, indent) {
+        var nl = "\r\n" + indent, nli = nl + '    ', nlii = nli + '    ', 
         // convert children to an array expression
         children = expr.children.length === 0 ? '[]' : '[' + nlii
             + expr.children.join(',' + nlii) + nli
@@ -88,40 +97,39 @@ var compile = function (ctl, opts) {
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
-            var id = addId(parent, node.tag, n);
-            if (rx.upperStart.test(node.tag)) {
-                buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), node.loc), parent, n);
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, id = addId(parent, tag, n);
+            if (rx.upperStart.test(tag)) {
+                buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
             }
             else {
-                var exelen = computations.length;
-                addStatement(parent ? id + " = Surplus.createElement('" + node.tag + "', " + parent + ")"
-                    : id + " = Surplus.createRootElement('" + node.tag + "')");
-                node.properties.forEach(function (p, i) { return buildProperty(p, id, i); });
-                var myexes = computations.splice(exelen);
-                node.content.forEach(function (c, i) { return buildChild(c, id, i); });
-                computations.push.apply(computations, myexes);
+                addStatement(parent ? id + " = Surplus.createElement('" + tag + "', " + parent + ")"
+                    : id + " = Surplus.createRootElement('" + tag + "')");
+                var exprs_1 = properties.map(function (p) { return p instanceof StaticProperty ? '' : compileSegments(p.code); }), mixins = properties.filter(function (p) { return p instanceof Mixin; }), lastMixin_1 = mixins[mixins.length - 1], finalMixin_1 = lastMixin_1 === properties[properties.length - 1], dynamic = mixins.length > 0 || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                    return p instanceof StaticProperty ? buildStaticProperty(p, id) :
+                        p instanceof DynamicProperty ? buildDynamicProperty(p, id, exprs_1[i]) :
+                            buildMixin(exprs_1[i], id, n, p === lastMixin_1, finalMixin_1);
+                });
+                if (!dynamic) {
+                    stmts.forEach(addStatement);
+                }
+                content.forEach(function (c, i) { return buildChild(c, id, i); });
+                if (dynamic) {
+                    if (content.length > 0)
+                        addStatement("\n");
+                    if (lastMixin_1 && !finalMixin_1)
+                        stmts.push("__state");
+                    addComputation(stmts, lastMixin_1 && "__state", null, loc);
+                }
             }
-        }, buildProperty = function (node, id, n) {
-            return node instanceof StaticProperty ? buildStaticProperty(node, id, n) :
-                node instanceof DynamicProperty ? buildDynamicProperty(node, id, n) :
-                    buildMixin(node, id, n);
-        }, buildStaticProperty = function (node, id, n) {
-            return addStatement(id + "." + node.name + " = " + node.value + ";");
-        }, buildDynamicProperty = function (node, id, n) {
-            var expr = compileSegments(node.code);
-            if (node.name === "ref") {
-                addStatement(expr + " = " + id + ";");
-            }
-            else {
-                var setter = id + "." + node.name + " = " + expr + ";";
-                if (noApparentSignals(expr))
-                    addStatement(setter);
-                else
-                    addComputation(setter, "", "", node.loc);
-            }
-        }, buildMixin = function (node, id, n) {
-            var expr = compileSegments(node.code);
-            addComputation("(" + expr + ")(" + id + ", __state);", "__state", "", node.loc);
+        }, buildStaticProperty = function (node, id) {
+            return id + "." + node.name + " = " + node.value + ";";
+        }, buildDynamicProperty = function (node, id, expr) {
+            return node.name === "ref"
+                ? expr + " = " + id + ";"
+                : id + "." + node.name + " = " + expr + ";";
+        }, buildMixin = function (expr, id, n, last, final) {
+            var state = last ? '__state' : addId(id, 'mixin', n), setter = last && final ? '' : state + " = ";
+            return setter + "Surplus.spread(" + expr + ", " + id + ", " + state + ");";
         }, buildChild = function (node, parent, n) {
             return node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :
                 node instanceof HtmlComment ? buildHtmlComment(node, parent) :
@@ -134,30 +142,34 @@ var compile = function (ctl, opts) {
         }, buildHtmlInsert = function (node, parent, n) {
             var id = addId(parent, 'insert', n), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
             addStatement(id + " = Surplus.createTextNode('', " + parent + ")");
-            addComputation("Surplus.insert(range, " + ins + ");", "range", range, node.loc);
+            addComputation(["Surplus.insert(range, " + ins + ");"], "range", range, node.loc);
         }, addId = function (parent, tag, n) {
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
             ids.push(id);
             return id;
         }, addStatement = function (stmt) {
             return statements.push(stmt);
-        }, addComputation = function (body, varname, seed, loc) {
-            body = varname ? "Surplus.S(function (" + varname + ") { return " + body + " }" + (seed ? ", " + seed : '') + ");"
-                : "Surplus.S(function () { " + body + " });";
-            computations.push(markLoc(body, loc, opts));
+        }, addComputation = function (body, stateVar, seed, loc) {
+            computations.push(new Computation(body, loc, stateVar, seed));
         };
         buildHtmlElement(top, '', 0);
         return new DOMExpression(ids, statements, computations);
+    }, emitDOMExpression = function (code, indent) {
+        var nl = "\r\n" + indent, nli = nl + '    ', nlii = nli + '    ';
+        return '(function () {' + nli
+            + 'var ' + code.ids.join(', ') + ';' + nli
+            + code.statements.join(nli) + nli
+            + code.computations.map(function (comp) {
+                var statements = comp.statements, loc = comp.loc, stateVar = comp.stateVar, seed = comp.seed;
+                if (stateVar)
+                    statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
+                var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nlii), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed ? ", " + seed : '') + ");";
+                return markLoc(code, loc, opts);
+            }).join(nli) + nli
+            + 'return __;' + nl
+            + '})()';
     };
     return compileSegments(ctl);
-}, compileDOMExpression = function (code, previousCode) {
-    var nl = "\r\n" + indent(previousCode), inl = nl + '    ', iinl = inl + '    ';
-    return '(function () {' + iinl
-        + 'var ' + code.ids.join(', ') + ';' + iinl
-        + code.statements.join(iinl) + iinl
-        + code.computations.join(iinl) + iinl
-        + 'return __;' + inl
-        + '})()';
 };
 var noApparentSignals = function (code) {
     return !rx.hasParen.test(code) || rx.loneFunction.test(code);

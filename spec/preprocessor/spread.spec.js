@@ -13,6 +13,17 @@ describe("JSX ...spreads", function () {
         '));
     });
 
+    it("convert JSX property names to DOM names", function () {
+        eval(window.SurplusPreprocessor.preprocess('            \n\
+            var func = () => null,                              \n\
+                spread = { onClick : func };                    \n\
+                                                                \n\
+            var a = <a {...spread} />;                          \n\
+                                                                \n\
+            expect(a.onclick).toBe(func);                       \n\
+        '));
+    });
+
     it("properties set by spreads are overriden by later properties", function () {
         eval(window.SurplusPreprocessor.preprocess('            \n\
             var spread = { id : "id" };                         \n\

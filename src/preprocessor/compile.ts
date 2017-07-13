@@ -33,7 +33,16 @@ class DOMExpression {
     constructor(
         public readonly ids          : string[],
         public readonly statements   : string[],
-        public readonly computations : string[]
+        public readonly computations : Computation[]
+    ) { }
+}
+
+class Computation {
+    constructor(
+        public statements : string[],
+        public loc : LOC,
+        public stateVar : string | null,
+        public seed : string | null,
     ) { }
 }
 
@@ -50,17 +59,17 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             return node.segments.reduce((res, s) => res + compileSegment(s, res), "");
         },
         compileSegment = (node : CodeSegment, previousCode : string) => 
-            node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, previousCode),
+            node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, indent(previousCode)),
         compileCodeText = (node : CodeText) =>
             markBlockLocs(node.text, node.loc, opts),
-        compileHtmlElement = (node : HtmlElement, previousCode : string) : string => {
+        compileHtmlElement = (node : HtmlElement, indent : string) : string => {
             const code = 
                 rx.upperStart.test(node.tag) ? 
-                    compileSubComponent(buildSubComponent(node), previousCode) :
+                    emitSubComponent(buildSubComponent(node), indent) :
                 (node.properties.length === 0 && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
                     `Surplus.createRootElement("${node.tag}")` :
-                compileDOMExpression(buildDOMExpression(node), previousCode);
+                emitDOMExpression(buildDOMExpression(node), indent);
             return markLoc(code, node.loc, opts);
         },
         buildSubComponent = (node : HtmlElement) => {
@@ -86,8 +95,8 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
 
             return new SubComponent(node.tag, properties, children);
         },
-        compileSubComponent = (expr : SubComponent, prior : string) => {
-            const nl  = "\r\n" + indent(prior),
+        emitSubComponent = (expr : SubComponent, indent : string) => {
+            const nl  = "\r\n" + indent,
                 nli   = nl   + '    ',
                 nlii  = nli  + '    ',
                 // convert children to an array expression
@@ -117,42 +126,51 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
         buildDOMExpression = (top : HtmlElement) => {
             const ids = [] as string[],
                 statements = [] as string[],
-                computations = [] as string[];
+                computations = [] as Computation[];
 
             const buildHtmlElement = (node : HtmlElement, parent : string, n : number) => {
-                const id = addId(parent, node.tag, n);
-                if (rx.upperStart.test(node.tag)) {
-                    buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), node.loc), parent, n);
+                const { tag, properties, content, loc } = node,
+                    id = addId(parent, tag, n);
+                if (rx.upperStart.test(tag)) {
+                    buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
                 } else {
-                    const exelen = computations.length;
-                    addStatement(parent ? `${id} = Surplus.createElement(\'${node.tag}\', ${parent})`
-                                        : `${id} = Surplus.createRootElement(\'${node.tag}\')`);
-                    node.properties.forEach((p, i) => buildProperty(p, id, i));
-                    const myexes = computations.splice(exelen);
-                    node.content.forEach((c, i) => buildChild(c, id, i));
-                    computations.push.apply(computations, myexes);
-                }
-            },
-            buildProperty = (node : StaticProperty | DynamicProperty | Mixin, id : string, n : number) =>
-                node instanceof StaticProperty  ? buildStaticProperty(node, id, n) :
-                node instanceof DynamicProperty ? buildDynamicProperty(node, id, n) :
-                buildMixin(node, id, n),
-            buildStaticProperty = (node : StaticProperty, id : string, n : number) =>
-                addStatement(id + "." + node.name + " = " + node.value + ";"),
-            buildDynamicProperty = (node : DynamicProperty, id : string, n : number) => {
-                const expr = compileSegments(node.code);
-                if (node.name === "ref") {
-                    addStatement(expr + " = " + id + ";");
-                } else {
-                    const setter = `${id}.${node.name} = ${expr};`;
+                    addStatement(parent ? `${id} = Surplus.createElement(\'${tag}\', ${parent})`
+                                        : `${id} = Surplus.createRootElement(\'${tag}\')`);
+                    const
+                        exprs      = properties.map(p => p instanceof StaticProperty ? '' : compileSegments(p.code)), 
+                        mixins     = properties.filter(p => p instanceof Mixin),
+                        lastMixin  = mixins[mixins.length - 1],
+                        finalMixin = lastMixin === properties[properties.length - 1],
+                        dynamic    = mixins.length > 0 || exprs.some(e => !noApparentSignals(e)),
+                        stmts      = properties.map((p, i) => 
+                            p instanceof StaticProperty  ? buildStaticProperty(p, id) :
+                            p instanceof DynamicProperty ? buildDynamicProperty(p, id, exprs[i]) :
+                            buildMixin(exprs[i], id, n, p === lastMixin, finalMixin)
+                        );
 
-                    if (noApparentSignals(expr)) addStatement(setter);
-                    else addComputation(setter, "", "", node.loc);
+                    if (!dynamic) {
+                        stmts.forEach(addStatement);
+                    }
+                    
+                    content.forEach((c, i) => buildChild(c, id, i));
+
+                    if (dynamic) {
+                        if (content.length > 0) addStatement("\n");
+                        if (lastMixin && !finalMixin) stmts.push("__state");
+                        addComputation(stmts, lastMixin && "__state", null, loc);
+                    }
                 }
             },
-            buildMixin = (node : Mixin, id : string, n : number) => {
-                const expr = compileSegments(node.code);
-                addComputation(`(${expr})(${id}, __state);`, "__state", "", node.loc);
+            buildStaticProperty = (node : StaticProperty, id : string) =>
+                `${id}.${node.name} = ${node.value };`,
+            buildDynamicProperty = (node : DynamicProperty, id : string, expr : string) =>
+                node.name === "ref"
+                ? `${expr} = ${id};`
+                : `${id}.${node.name} = ${expr};`,
+            buildMixin = (expr : string, id : string, n : number, last : boolean, final : boolean) => {
+                const state = last ? '__state' : addId(id, 'mixin', n),
+                    setter = last && final ? '' : `${state} = `;
+                return `${setter}Surplus.spread(${expr}, ${id}, ${state});`;
             },
             buildChild = (node : HtmlElement | HtmlComment | HtmlText | HtmlInsert, parent : string, n : number) =>
                 node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :
@@ -168,7 +186,7 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                     ins = compileSegments(node.code),
                     range = `{ start: ${id}, end: ${id} }`;
                 addStatement(`${id} = Surplus.createTextNode('', ${parent})`);
-                addComputation(`Surplus.insert(range, ${ins});`, "range", range, node.loc);
+                addComputation([`Surplus.insert(range, ${ins});`], "range", range, node.loc);
             },
             addId = (parent : string, tag : string, n : number) => {
                 const id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -177,30 +195,37 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             },
             addStatement = (stmt : string) =>
                 statements.push(stmt),
-            addComputation = (body : string, varname : string , seed : string, loc : LOC) => {
-                body = varname ? `Surplus.S(function (${varname}) { return ${body} }${seed ? `, ${seed}` : ''});`
-                               : `Surplus.S(function () { ${body} });`;
-                computations.push(markLoc(body, loc, opts));
+            addComputation = (body : string[], stateVar : string | null, seed : string | null, loc : LOC) => {
+                computations.push(new Computation(body, loc, stateVar, seed));
             }
 
             buildHtmlElement(top, '', 0);
 
             return new DOMExpression(ids, statements, computations);
+        },
+        emitDOMExpression = (code : DOMExpression, indent : string) => {
+            var nl    = "\r\n" + indent,
+                nli   = nl   + '    ',
+                nlii  = nli  + '    ';
+
+            return '(function () {' + nli
+                + 'var ' + code.ids.join(', ') + ';' + nli
+                + code.statements.join(nli) + nli
+                + code.computations.map(comp => {
+                    const { statements, loc, stateVar, seed } = comp;
+
+                    if (stateVar) statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
+
+                    const body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nlii),
+                        code = `Surplus.S(function (${stateVar || ''}) {${body}}${seed ? `, ${seed}` : ''});`;
+
+                    return markLoc(code, loc, opts);
+                }).join(nli) + nli
+                + 'return __;' + nl
+                +  '})()';
         };
 
         return compileSegments(ctl);
-    },
-    compileDOMExpression = (code : DOMExpression, previousCode : string) => {
-        var nl = "\r\n" + indent(previousCode),
-            inl = nl + '    ',
-            iinl = inl + '    ';
-
-        return '(function () {' + iinl 
-            + 'var ' + code.ids.join(', ') + ';' + iinl
-            + code.statements.join(iinl) + iinl 
-            + code.computations.join(iinl) + iinl
-            + 'return __;' + inl 
-            +  '})()';
     };
 
 const
