@@ -7,6 +7,14 @@ describe("JSX static property", function () {
         '));
     });
 
+    it("sets an attribute on the given node when no property is available", function () {
+        eval(window.SurplusPreprocessor.preprocess('                \n\
+            var input = <input aria-hidden="true" />;               \n\
+                                                                    \n\
+            expect(input.getAttribute("aria-hidden")).toBe("true"); \n\
+        '));
+    });
+
     it("can set multiple properties on the same node", function () {
         eval(window.SurplusPreprocessor.preprocess('        \n\
             var input = <input value="foo" id="id" />;      \n\

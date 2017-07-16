@@ -24,8 +24,10 @@ const rx = {
     newlines    : /\r?\n/g,
     hasParen    : /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
+    endsInParen : /\)\s*$/,
     upperStart  : /^[A-Z]/,
     singleQuotes: /'/g,
+    attribute   : /-/,
     indent      : /\n(?=[^\n]+$)([ \t]*)/
 };
 
@@ -162,11 +164,15 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                 }
             },
             buildStaticProperty = (node : StaticProperty, id : string) =>
-                `${id}.${node.name} = ${node.value };`,
+                buildProperty(id, node.name, node.value),
             buildDynamicProperty = (node : DynamicProperty, id : string, expr : string) =>
                 node.name === "ref"
                 ? `${expr} = ${id};`
-                : `${id}.${node.name} = ${expr};`,
+                : buildProperty(id, node.name, expr),
+            buildProperty = (id : string, prop : string, expr : string) =>
+                isAttribute(prop)
+                ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
+                : `${id}.${prop} = ${expr };`,
             buildMixin = (expr : string, id : string, n : number, last : boolean, final : boolean) => {
                 const state = last ? '__state' : addId(id, 'mixin', n),
                     setter = last && final ? '' : `${state} = `;
@@ -230,7 +236,9 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
 
 const
     noApparentSignals = (code : string) =>
-        !rx.hasParen.test(code) || rx.loneFunction.test(code),
+        !rx.hasParen.test(code) || (rx.loneFunction.test(code) && !rx.endsInParen.test(code)),
+    isAttribute = (prop : string) =>
+        rx.attribute.test(prop), // TODO: better heuristic for attributes than name contains a hyphen
     indent = (previousCode : string) => {
         const m = rx.indent.exec(previousCode);
         return m ? m[1] : '';

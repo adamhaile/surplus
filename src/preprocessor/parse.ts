@@ -3,7 +3,7 @@ import { Params } from './preprocess';
 
 // pre-compiled regular expressions
 const rx = {
-    identifier       : /^[a-zA-Z]\w*/,
+    identifier       : /^[a-zA-Z][A-Za-z0-9_-]*/,
     stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
     leadingWs        : /^\s+/,
     codeTerminator   : /^[\s<>/,;)\]}]/,

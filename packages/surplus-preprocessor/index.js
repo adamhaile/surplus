@@ -147,7 +147,7 @@ var Copy = {
 
 // pre-compiled regular expressions
 var rx$1 = {
-    identifier: /^[a-zA-Z]\w*/,
+    identifier: /^[a-zA-Z][A-Za-z0-9_-]*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
     leadingWs: /^\s+/,
     codeTerminator: /^[\s<>/,;)\]}]/,
@@ -565,8 +565,10 @@ var rx$3 = {
     newlines: /\r?\n/g,
     hasParen: /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
+    endsInParen: /\)\s*$/,
     upperStart: /^[A-Z]/,
     singleQuotes: /'/g,
+    attribute: /-/,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
 var DOMExpression = (function () {
@@ -680,11 +682,15 @@ var compile = function (ctl, opts) {
                 }
             }
         }, buildStaticProperty = function (node, id) {
-            return id + "." + node.name + " = " + node.value + ";";
+            return buildProperty(id, node.name, node.value);
         }, buildDynamicProperty = function (node, id, expr) {
             return node.name === "ref"
                 ? expr + " = " + id + ";"
-                : id + "." + node.name + " = " + expr + ";";
+                : buildProperty(id, node.name, expr);
+        }, buildProperty = function (id, prop, expr) {
+            return isAttribute(prop)
+                ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
+                : id + "." + prop + " = " + expr + ";";
         }, buildMixin = function (expr, id, n, last, final) {
             var state = last ? '__state' : addId(id, 'mixin', n), setter = last && final ? '' : state + " = ";
             return setter + "Surplus.spread(" + expr + ", " + id + ", " + state + ");";
@@ -730,7 +736,10 @@ var compile = function (ctl, opts) {
     return compileSegments(ctl);
 };
 var noApparentSignals = function (code) {
-    return !rx$3.hasParen.test(code) || rx$3.loneFunction.test(code);
+    return !rx$3.hasParen.test(code) || (rx$3.loneFunction.test(code) && !rx$3.endsInParen.test(code));
+};
+var isAttribute = function (prop) {
+    return rx$3.attribute.test(prop);
 };
 var indent = function (previousCode) {
     var m = rx$3.indent.exec(previousCode);

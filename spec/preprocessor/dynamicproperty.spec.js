@@ -8,6 +8,15 @@ describe("JSX dynamic property", function () {
         '));
     });
 
+    it("sets an attribute to the value of the javascript expression when no property is available", function () {
+        eval(window.SurplusPreprocessor.preprocess('                \n\
+            var val = "true",                                       \n\
+                input = <input aria-hidden = { val } />;            \n\
+                                                                    \n\
+            expect(input.getAttribute("aria-hidden")).toBe("true"); \n\
+        '));
+    });
+
     it("can set multiple properties on the same node", function () {
         eval(window.SurplusPreprocessor.preprocess('           \n\
             var val = "foo",                                   \n\

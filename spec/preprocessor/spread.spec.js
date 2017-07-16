@@ -5,11 +5,19 @@ describe("JSX ...spreads", function () {
 
     it("add properties on the node", function () {
         eval(window.SurplusPreprocessor.preprocess('            \n\
-            var spread = { id : "id" };                         \n\
-                                                                \n\
-            var a = <a {...spread} />;                          \n\
+            var spread = { id : "id" },                         \n\
+                a = <a {...spread} />;                          \n\
                                                                 \n\
             expect(a.id).toBe("id");                            \n\
+        '));
+    });
+
+    it("adds an attribute on the node when no property is available", function () {
+        eval(window.SurplusPreprocessor.preprocess('            \n\
+            var spread = { "aria-hidden" : "true" },            \n\
+                a = <a {...spread} />;                          \n\
+                                                                \n\
+            expect(a.getAttribute("aria-hidden")).toBe("true"); \n\
         '));
     });
 

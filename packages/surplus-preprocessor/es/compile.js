@@ -7,8 +7,10 @@ var rx = {
     newlines: /\r?\n/g,
     hasParen: /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
+    endsInParen: /\)\s*$/,
     upperStart: /^[A-Z]/,
     singleQuotes: /'/g,
+    attribute: /-/,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
 var DOMExpression = (function () {
@@ -122,11 +124,15 @@ var compile = function (ctl, opts) {
                 }
             }
         }, buildStaticProperty = function (node, id) {
-            return id + "." + node.name + " = " + node.value + ";";
+            return buildProperty(id, node.name, node.value);
         }, buildDynamicProperty = function (node, id, expr) {
             return node.name === "ref"
                 ? expr + " = " + id + ";"
-                : id + "." + node.name + " = " + expr + ";";
+                : buildProperty(id, node.name, expr);
+        }, buildProperty = function (id, prop, expr) {
+            return isAttribute(prop)
+                ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
+                : id + "." + prop + " = " + expr + ";";
         }, buildMixin = function (expr, id, n, last, final) {
             var state = last ? '__state' : addId(id, 'mixin', n), setter = last && final ? '' : state + " = ";
             return setter + "Surplus.spread(" + expr + ", " + id + ", " + state + ");";
@@ -172,8 +178,11 @@ var compile = function (ctl, opts) {
     return compileSegments(ctl);
 };
 var noApparentSignals = function (code) {
-    return !rx.hasParen.test(code) || rx.loneFunction.test(code);
-}, indent = function (previousCode) {
+    return !rx.hasParen.test(code) || (rx.loneFunction.test(code) && !rx.endsInParen.test(code));
+}, isAttribute = function (prop) {
+    return rx.attribute.test(prop);
+}, // TODO: better heuristic for attributes than name contains a hyphen
+indent = function (previousCode) {
     var m = rx.indent.exec(previousCode);
     return m ? m[1] : '';
 }, codeStr = function (str) {

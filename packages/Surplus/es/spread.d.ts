@@ -1,1 +1,1 @@
-export declare function spread<T>(spread: ((node: Node, state: T) => T | T), node: Node, state: T): T;
+export declare function spread<T>(spread: ((node: Element, state: T) => T | T), node: Element, state: T): T;

@@ -1,4 +1,4 @@
-export function spread<T>(spread : ((node : Node, state : T) => T | T), node : Node, state : T) : T {
+export function spread<T>(spread : ((node : Element, state : T) => T | T), node : Element, state : T) : T {
     if (typeof spread === 'function') {
         return spread(node, state);
     } else {
@@ -7,11 +7,15 @@ export function spread<T>(spread : ((node : Node, state : T) => T | T), node : N
     }
 }
 
-function applyProps(node : Node, props : { [ name : string ] : any }) {
+function applyProps(node : Element, props : { [ name : string ] : any }) {
     var domProp : string;
     for (var prop in props) if (props.hasOwnProperty(prop)) {
         domProp = translateJSXPropertyName(prop);
-        (node as any)[domProp] = props[prop];
+        if (isAttribute(domProp)) {
+            node.setAttribute(domProp, props[prop]);
+        } else {
+            (node as any)[domProp] = props[prop];
+        }
     }
 }
 
@@ -21,4 +25,10 @@ function translateJSXPropertyName(name : string) {
     return jsxEventProperty.test(name) 
     ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) 
     : name;
+}
+
+var attribute = /-/; // TODO: better heuristic for attributes than name contains a hyphen
+
+function isAttribute(prop : string) {
+    return attribute.test(prop);
 }

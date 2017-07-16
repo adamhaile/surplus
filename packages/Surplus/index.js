@@ -217,12 +217,23 @@ function applyProps(node, props) {
     for (var prop in props)
         if (props.hasOwnProperty(prop)) {
             domProp = translateJSXPropertyName(prop);
-            node[domProp] = props[prop];
+            if (isAttribute(domProp)) {
+                node.setAttribute(domProp, props[prop]);
+            }
+            else {
+                node[domProp] = props[prop];
+            }
         }
 }
 var jsxEventProperty = /^on[A-Z]/;
 function translateJSXPropertyName(name) {
-    return jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
+    return jsxEventProperty.test(name)
+        ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase())
+        : name;
+}
+var attribute = /-/; // TODO: better heuristic for attributes than name contains a hyphen
+function isAttribute(prop) {
+    return attribute.test(prop);
 }
 
 exports.insert = insert$$1;
