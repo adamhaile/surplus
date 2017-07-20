@@ -15,6 +15,14 @@ describe("JSX static property", function () {
         '));
     });
 
+    it("can be valueless", function () {
+        eval(window.SurplusPreprocessor.preprocess('                \n\
+            var input = <input type="checkbox" checked />;          \n\
+                                                                    \n\
+            expect(input.checked).toBe(true);                       \n\
+        '));
+    });
+
     it("can set multiple properties on the same node", function () {
         eval(window.SurplusPreprocessor.preprocess('        \n\
             var input = <input value="foo" id="id" />;      \n\

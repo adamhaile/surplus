@@ -175,20 +175,22 @@ export function parse(TOKS : string[], opts : Params) {
 
         SKIPWS(); // pass name
 
-        if (NOT('=')) ERR("expected equals sign after property name");
+        if (IS('=')) {
+            NEXT(); // pass '='
 
-        NEXT(); // pass '='
+            SKIPWS();
 
-        SKIPWS();
-
-        if (IS('"') || IS("'")) {
-            return new AST.StaticProperty(name, quotedString());
-        } else if (opts.jsx && IS('{')) {
-            return new AST.DynamicProperty(name, jsxEmbeddedCode(), loc);
-        } else if (!opts.jsx) {
-            return new AST.DynamicProperty(name, embeddedCode(), loc);
+            if (IS('"') || IS("'")) {
+                return new AST.StaticProperty(name, quotedString());
+            } else if (opts.jsx && IS('{')) {
+                return new AST.DynamicProperty(name, jsxEmbeddedCode(), loc);
+            } else if (!opts.jsx) {
+                return new AST.DynamicProperty(name, embeddedCode(), loc);
+            } else {
+                return ERR("unexepected value for JSX property");
+            }
         } else {
-            return ERR("unexepected value for JSX property");
+            return new AST.StaticProperty(name, "true");
         }
     }
 
