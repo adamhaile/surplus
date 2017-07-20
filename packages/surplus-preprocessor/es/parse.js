@@ -137,21 +137,24 @@ export function parse(TOKS, opts) {
             ERR("not at start of property declaration");
         var loc = LOC(), name = SPLIT(rx.identifier);
         SKIPWS(); // pass name
-        if (NOT('='))
-            ERR("expected equals sign after property name");
-        NEXT(); // pass '='
-        SKIPWS();
-        if (IS('"') || IS("'")) {
-            return new AST.StaticProperty(name, quotedString());
-        }
-        else if (opts.jsx && IS('{')) {
-            return new AST.DynamicProperty(name, jsxEmbeddedCode(), loc);
-        }
-        else if (!opts.jsx) {
-            return new AST.DynamicProperty(name, embeddedCode(), loc);
+        if (IS('=')) {
+            NEXT(); // pass '='
+            SKIPWS();
+            if (IS('"') || IS("'")) {
+                return new AST.StaticProperty(name, quotedString());
+            }
+            else if (opts.jsx && IS('{')) {
+                return new AST.DynamicProperty(name, jsxEmbeddedCode(), loc);
+            }
+            else if (!opts.jsx) {
+                return new AST.DynamicProperty(name, embeddedCode(), loc);
+            }
+            else {
+                return ERR("unexepected value for JSX property");
+            }
         }
         else {
-            return ERR("unexepected value for JSX property");
+            return new AST.StaticProperty(name, "true");
         }
     }
     function mixin() {

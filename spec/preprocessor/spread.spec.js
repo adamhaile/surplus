@@ -12,12 +12,55 @@ describe("JSX ...spreads", function () {
         '));
     });
 
-    it("adds an attribute on the node when no property is available", function () {
+    it("add an attribute on the node when no property is available", function () {
         eval(window.SurplusPreprocessor.preprocess('            \n\
             var spread = { "aria-hidden" : "true" },            \n\
                 a = <a {...spread} />;                          \n\
                                                                 \n\
             expect(a.getAttribute("aria-hidden")).toBe("true"); \n\
+        '));
+    });
+
+    it("remove properties from the node when no longer present", function () {
+        eval(window.SurplusPreprocessor.preprocess('            \n\
+            var flag = S.data(true),                            \n\
+                spread = { id : "id" },                         \n\
+                a = <a {...flag() ? spread : {}} />;            \n\
+                                                                \n\
+            expect(a.id).toBe("id");                            \n\
+            flag(false);                                        \n\
+            expect(a.id).toBe("");                              \n\
+        '));
+    });
+
+    it("do not remove properties from earlier sets when that property is no longer present", function () {
+        eval(window.SurplusPreprocessor.preprocess('            \n\
+            var flag = S.data(true),                            \n\
+                spread = { id : "id2" },                        \n\
+                a = <a                                          \n\
+                        id="id1"                                \n\
+                        {...flag() ? spread : {}}               \n\
+                    />;                                         \n\
+                                                                \n\
+            expect(a.id).toBe("id2");                           \n\
+            flag(false);                                        \n\
+            expect(a.id).toBe("id1");                           \n\
+        '));
+    });
+
+    it("do not remove properties from earlier spreads when that property is no longer present", function () {
+        eval(window.SurplusPreprocessor.preprocess('            \n\
+            var flag = S.data(true),                            \n\
+                spread1 = { id : "id1" },                       \n\
+                spread2 = { id : "id2" },                       \n\
+                a = <a                                          \n\
+                        {...flag() ? {} : spread1}              \n\
+                        {...flag() ? spread2 : {}}              \n\
+                    />;                                         \n\
+                                                                \n\
+            expect(a.id).toBe("id2");                           \n\
+            flag(false);                                        \n\
+            expect(a.id).toBe("id1");                           \n\
         '));
     });
 

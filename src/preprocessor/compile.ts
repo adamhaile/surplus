@@ -140,14 +140,12 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                                         : `${id} = Surplus.createRootElement(\'${tag}\')`);
                     const
                         exprs      = properties.map(p => p instanceof StaticProperty ? '' : compileSegments(p.code)), 
-                        mixins     = properties.filter(p => p instanceof Mixin),
-                        lastMixin  = mixins[mixins.length - 1],
-                        finalMixin = lastMixin === properties[properties.length - 1],
-                        dynamic    = mixins.length > 0 || exprs.some(e => !noApparentSignals(e)),
+                        hasMixins  = properties.some(p => p instanceof Mixin),
+                        dynamic    = hasMixins || exprs.some(e => !noApparentSignals(e)),
                         stmts      = properties.map((p, i) => 
                             p instanceof StaticProperty  ? buildStaticProperty(p, id) :
                             p instanceof DynamicProperty ? buildDynamicProperty(p, id, exprs[i]) :
-                            buildMixin(exprs[i], id, n, p === lastMixin, finalMixin)
+                            buildMixin(exprs[i], id, n)
                         );
 
                     if (!dynamic) {
@@ -157,9 +155,16 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                     content.forEach((c, i) => buildChild(c, id, i));
 
                     if (dynamic) {
-                        if (content.length > 0) addStatement("\n");
-                        if (lastMixin && !finalMixin) stmts.push("__state");
-                        addComputation(stmts, lastMixin && "__state", null, loc);
+                        if (hasMixins) {
+                            const propAges = { __current : 0 } as { [ name : string ] : number },
+                                maxAge = 1 << 31 - 1;
+                            properties.forEach(p => p instanceof Mixin || (propAges[p.name] = maxAge));
+                            stmts.unshift("__propAges.__current++;");
+                            stmts.push("__propAges");
+                            addComputation(stmts, "__propAges", JSON.stringify(propAges), loc);
+                        } else {
+                            addComputation(stmts, null, null, loc);
+                        }
                     }
                 }
             },
@@ -172,11 +177,10 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             buildProperty = (id : string, prop : string, expr : string) =>
                 isAttribute(prop)
                 ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
-                : `${id}.${prop} = ${expr };`,
-            buildMixin = (expr : string, id : string, n : number, last : boolean, final : boolean) => {
-                const state = last ? '__state' : addId(id, 'mixin', n),
-                    setter = last && final ? '' : `${state} = `;
-                return `${setter}Surplus.spread(${expr}, ${id}, ${state});`;
+                : `${id}.${prop} = ${expr};`,
+            buildMixin = (expr : string, id : string, n : number) => {
+                const state = addId(id, 'mixin', n);
+                return `${state} = Surplus.spread(${expr}, ${id}, ${state}, __propAges);`;
             },
             buildChild = (node : HtmlElement | HtmlComment | HtmlText | HtmlInsert, parent : string, n : number) =>
                 node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :

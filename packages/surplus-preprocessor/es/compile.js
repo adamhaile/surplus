@@ -106,21 +106,26 @@ var compile = function (ctl, opts) {
             else {
                 addStatement(parent ? id + " = Surplus.createElement('" + tag + "', " + parent + ")"
                     : id + " = Surplus.createRootElement('" + tag + "')");
-                var exprs_1 = properties.map(function (p) { return p instanceof StaticProperty ? '' : compileSegments(p.code); }), mixins = properties.filter(function (p) { return p instanceof Mixin; }), lastMixin_1 = mixins[mixins.length - 1], finalMixin_1 = lastMixin_1 === properties[properties.length - 1], dynamic = mixins.length > 0 || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                var exprs_1 = properties.map(function (p) { return p instanceof StaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof Mixin; }), dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
                     return p instanceof StaticProperty ? buildStaticProperty(p, id) :
                         p instanceof DynamicProperty ? buildDynamicProperty(p, id, exprs_1[i]) :
-                            buildMixin(exprs_1[i], id, n, p === lastMixin_1, finalMixin_1);
+                            buildMixin(exprs_1[i], id, n);
                 });
                 if (!dynamic) {
                     stmts.forEach(addStatement);
                 }
                 content.forEach(function (c, i) { return buildChild(c, id, i); });
                 if (dynamic) {
-                    if (content.length > 0)
-                        addStatement("\n");
-                    if (lastMixin_1 && !finalMixin_1)
-                        stmts.push("__state");
-                    addComputation(stmts, lastMixin_1 && "__state", null, loc);
+                    if (hasMixins) {
+                        var propAges_1 = { __current: 0 }, maxAge_1 = 1 << 31 - 1;
+                        properties.forEach(function (p) { return p instanceof Mixin || (propAges_1[p.name] = maxAge_1); });
+                        stmts.unshift("__propAges.__current++;");
+                        stmts.push("__propAges");
+                        addComputation(stmts, "__propAges", JSON.stringify(propAges_1), loc);
+                    }
+                    else {
+                        addComputation(stmts, null, null, loc);
+                    }
                 }
             }
         }, buildStaticProperty = function (node, id) {
@@ -133,9 +138,9 @@ var compile = function (ctl, opts) {
             return isAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
-        }, buildMixin = function (expr, id, n, last, final) {
-            var state = last ? '__state' : addId(id, 'mixin', n), setter = last && final ? '' : state + " = ";
-            return setter + "Surplus.spread(" + expr + ", " + id + ", " + state + ");";
+        }, buildMixin = function (expr, id, n) {
+            var state = addId(id, 'mixin', n);
+            return state + " = Surplus.spread(" + expr + ", " + id + ", " + state + ", __propAges);";
         }, buildChild = function (node, parent, n) {
             return node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :
                 node instanceof HtmlComment ? buildHtmlComment(node, parent) :
