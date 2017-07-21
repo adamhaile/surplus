@@ -1,4 +1,4 @@
-describe("upper-case subcomponent", function () {
+describe("subcomponent", function () {
     it("is called with a property object", function () {
         var code = window.SurplusPreprocessor.preprocess('              \n\
             var props = null,                                           \n\
@@ -64,6 +64,18 @@ describe("upper-case subcomponent", function () {
                         {...mixin} />;                                      \n\
                                                                             \n\
             expect(props).toEqual({ a: "2", b: true, c: 5, children: [], d: 6 }); \n\
+        ');
+
+        eval(code);
+    });
+
+    it("can have dotted identifiers", function () {
+        var code = window.SurplusPreprocessor.preprocess('              \n\
+            var props = null,                                           \n\
+                a = { b: { c: { sub: p => props = p } } },              \n\
+                sub = <a.b.c.sub foo="2" bar={3}/>;                     \n\
+                                                                        \n\
+            expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \n\
         ');
 
         eval(code);

@@ -8,7 +8,7 @@ var rx = {
     hasParen: /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen: /\)\s*$/,
-    upperStart: /^[A-Z]/,
+    subcomponent: /(^[A-Z])|\./,
     singleQuotes: /'/g,
     attribute: /-/,
     indent: /\n(?=[^\n]+$)([ \t]*)/
@@ -46,7 +46,7 @@ var compile = function (ctl, opts) {
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
     }, compileHtmlElement = function (node, indent) {
-        var code = rx.upperStart.test(node.tag) ?
+        var code = rx.subcomponent.test(node.tag) ?
             emitSubComponent(buildSubComponent(node), indent) :
             (node.properties.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
@@ -100,7 +100,7 @@ var compile = function (ctl, opts) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, id = addId(parent, tag, n);
-            if (rx.upperStart.test(tag)) {
+            if (rx.subcomponent.test(tag)) {
                 buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
             }
             else {

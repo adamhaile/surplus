@@ -47,7 +47,7 @@ function defaultValue(tag, name) {
     var emptyNode = defaultValues[tag] || (defaultValues[tag] = document.createElement(tag));
     return emptyNode[name];
 }
-var eventProperty = /^on/, jsxEventProperty = /^on[A-Z]/, attribute = /-/;
+var jsxEventProperty = /^on[A-Z]/, attribute = /-/;
 function translateJSXPropertyName(name) {
     return jsxEventProperty.test(name)
         ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase())

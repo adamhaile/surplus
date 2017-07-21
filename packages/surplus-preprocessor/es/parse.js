@@ -1,7 +1,7 @@
 import * as AST from './AST';
 // pre-compiled regular expressions
 var rx = {
-    identifier: /^[a-zA-Z][A-Za-z0-9_-]*/,
+    identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
     leadingWs: /^\s+/,
     codeTerminator: /^[\s<>/,;)\]}]/,

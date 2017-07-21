@@ -25,7 +25,7 @@ const rx = {
     hasParen    : /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen : /\)\s*$/,
-    upperStart  : /^[A-Z]/,
+    subcomponent: /(^[A-Z])|\./,
     singleQuotes: /'/g,
     attribute   : /-/,
     indent      : /\n(?=[^\n]+$)([ \t]*)/
@@ -66,7 +66,7 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             markBlockLocs(node.text, node.loc, opts),
         compileHtmlElement = (node : HtmlElement, indent : string) : string => {
             const code = 
-                rx.upperStart.test(node.tag) ? 
+                rx.subcomponent.test(node.tag) ? 
                     emitSubComponent(buildSubComponent(node), indent) :
                 (node.properties.length === 0 && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
@@ -133,7 +133,7 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             const buildHtmlElement = (node : HtmlElement, parent : string, n : number) => {
                 const { tag, properties, content, loc } = node,
                     id = addId(parent, tag, n);
-                if (rx.upperStart.test(tag)) {
+                if (rx.subcomponent.test(tag)) {
                     buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
                 } else {
                     addStatement(parent ? `${id} = Surplus.createElement(\'${tag}\', ${parent})`

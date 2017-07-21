@@ -50,8 +50,7 @@ function defaultValue(tag : string, name : string) {
     return emptyNode[name];
 }
 
-var eventProperty = /^on/,
-    jsxEventProperty = /^on[A-Z]/,
+var jsxEventProperty = /^on[A-Z]/,
     attribute = /-/; 
 
 function translateJSXPropertyName(name : string) {
