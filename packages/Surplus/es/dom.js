@@ -1,9 +1,9 @@
-export function createRootElement(tag) {
-    return document.createElement(tag);
-}
-export function createElement(tag, parent) {
+export function createElement(tag, className, parent) {
     var el = document.createElement(tag);
-    parent.appendChild(el);
+    if (className)
+        el.className = className;
+    if (parent)
+        parent.appendChild(el);
     return el;
 }
 export function createComment(text, parent) {

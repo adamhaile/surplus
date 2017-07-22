@@ -611,8 +611,14 @@ var compile = function (ctl, opts) {
             emitSubComponent(buildSubComponent(node), indent) :
             (node.properties.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
-                "Surplus.createRootElement(\"" + node.tag + "\")" :
-                emitDOMExpression(buildDOMExpression(node), indent);
+                "Surplus.createElement('" + node.tag + "', null, null)" :
+                (node.properties.length === 1
+                    && node.properties[0] instanceof StaticProperty
+                    && node.properties[0].name === "className"
+                    && node.content.length === 0) ?
+                    // optimization: don't need IIFE for simple single nodes
+                    "Surplus.createElement('" + node.tag + "', " + node.properties[0].value + ", null)" :
+                    emitDOMExpression(buildDOMExpression(node), indent);
         return markLoc(code, node.loc, opts);
     }, buildSubComponent = function (node) {
         var 
@@ -665,13 +671,13 @@ var compile = function (ctl, opts) {
                 buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
             }
             else {
-                addStatement(parent ? id + " = Surplus.createElement('" + tag + "', " + parent + ")"
-                    : id + " = Surplus.createRootElement('" + tag + "')");
-                var exprs_1 = properties.map(function (p) { return p instanceof StaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof Mixin; }), dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
-                    return p instanceof StaticProperty ? buildStaticProperty(p, id) :
-                        p instanceof DynamicProperty ? buildDynamicProperty(p, id, exprs_1[i]) :
-                            buildMixin(exprs_1[i], id, n);
-                });
+                var exprs_1 = properties.map(function (p) { return p instanceof StaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof Mixin; }), classProp_1 = !hasMixins && properties.filter(function (p) { return p instanceof StaticProperty && p.name === 'className'; })[0] || null, dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                    return p === classProp_1 ? '' :
+                        p instanceof StaticProperty ? buildStaticProperty(p, id) :
+                            p instanceof DynamicProperty ? buildDynamicProperty(p, id, exprs_1[i]) :
+                                buildMixin(exprs_1[i], id, n);
+                }).filter(function (s) { return s !== ''; });
+                addStatement(id + " = Surplus.createElement('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || 'null') + ");");
                 if (!dynamic) {
                     stmts.forEach(addStatement);
                 }

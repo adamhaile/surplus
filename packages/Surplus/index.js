@@ -159,12 +159,12 @@ function insert$$1(range, value) {
     }
 }
 
-function createRootElement(tag) {
-    return document.createElement(tag);
-}
-function createElement(tag, parent) {
+function createElement(tag, className, parent) {
     var el = document.createElement(tag);
-    parent.appendChild(el);
+    if (className)
+        el.className = className;
+    if (parent)
+        parent.appendChild(el);
     return el;
 }
 function createComment(text, parent) {
@@ -267,7 +267,6 @@ exports.insert = insert$$1;
 exports.subcomponent = subcomponent;
 exports.spread = spread;
 exports.S = S;
-exports.createRootElement = createRootElement;
 exports.createElement = createElement;
 exports.createComment = createComment;
 exports.createTextNode = createTextNode;

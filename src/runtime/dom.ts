@@ -1,10 +1,7 @@
-export function createRootElement(tag : string) {
-    return document.createElement(tag);
-}
-
-export function createElement(tag : string, parent : HTMLElement) {
+export function createElement(tag : string, className : string | null, parent : HTMLElement | null) {
     var el = document.createElement(tag);
-    parent.appendChild(el);
+    if (className) el.className = className;
+    if (parent) parent.appendChild(el);
     return el;
 }
 

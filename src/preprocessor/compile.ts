@@ -70,7 +70,13 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                     emitSubComponent(buildSubComponent(node), indent) :
                 (node.properties.length === 0 && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
-                    `Surplus.createRootElement("${node.tag}")` :
+                    `Surplus.createElement('${node.tag}', null, null)` :
+                (node.properties.length === 1 
+                    && node.properties[0] instanceof StaticProperty 
+                    && (node.properties[0] as StaticProperty).name === "className" 
+                    && node.content.length === 0) ?
+                    // optimization: don't need IIFE for simple single nodes
+                    `Surplus.createElement('${node.tag}', ${(node.properties[0] as StaticProperty).value}, null)` :
                 emitDOMExpression(buildDOMExpression(node), indent);
             return markLoc(code, node.loc, opts);
         },
@@ -136,18 +142,20 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                 if (rx.subcomponent.test(tag)) {
                     buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
                 } else {
-                    addStatement(parent ? `${id} = Surplus.createElement(\'${tag}\', ${parent})`
-                                        : `${id} = Surplus.createRootElement(\'${tag}\')`);
                     const
                         exprs      = properties.map(p => p instanceof StaticProperty ? '' : compileSegments(p.code)), 
                         hasMixins  = properties.some(p => p instanceof Mixin),
+                        classProp  = !hasMixins && properties.filter(p => p instanceof StaticProperty && p.name === 'className')[0] as StaticProperty || null,
                         dynamic    = hasMixins || exprs.some(e => !noApparentSignals(e)),
                         stmts      = properties.map((p, i) => 
+                            p === classProp              ? '' :
                             p instanceof StaticProperty  ? buildStaticProperty(p, id) :
                             p instanceof DynamicProperty ? buildDynamicProperty(p, id, exprs[i]) :
                             buildMixin(exprs[i], id, n)
-                        );
+                        ).filter(s => s !== '');
 
+                    addStatement(`${id} = Surplus.createElement('${tag}', ${classProp && classProp.value}, ${parent || 'null'});`);
+                    
                     if (!dynamic) {
                         stmts.forEach(addStatement);
                     }
