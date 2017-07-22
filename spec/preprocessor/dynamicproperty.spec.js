@@ -65,8 +65,19 @@ describe("JSX dynamic property", function () {
                 div = <div id={id1()} id={id2()}></div>;    \n\
                                                             \n\
             expect(div.id).toBe("b");                       \n\
-            id1("c");                                        \n\
+            id1("c");                                       \n\
             expect(div.id).toBe("b");                       \n\
+        '));
+    });
+
+    it("can set sub-properties", function () {
+        eval(window.SurplusPreprocessor.preprocess('        \n\
+            var width = S.data("50%"),                      \n\
+                input = <input style.width={width()} />;    \n\
+                                                            \n\
+            expect(input.style.width).toBe("50%");          \n\
+            width("75%");                                   \n\
+            expect(input.style.width).toBe("75%");          \n\
         '));
     });
 });

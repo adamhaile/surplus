@@ -32,6 +32,14 @@ describe("JSX static property", function () {
         '));
     });
 
+    it("can set sub-properties", function () {
+        eval(window.SurplusPreprocessor.preprocess('        \n\
+            var input = <input style.width="50%" />;       \n\
+                                                            \n\
+            expect(input.style.width).toBe("50%");         \n\
+        '));
+    });
+
     it("later properties take precedence", function () {
         eval(window.SurplusPreprocessor.preprocess('        \n\
             var div = <div id="a" id="b"></div>;            \n\
