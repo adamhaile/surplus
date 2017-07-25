@@ -26,6 +26,7 @@ const rx = {
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen : /\)\s*$/,
     subcomponent: /(^[A-Z])|\./,
+    nonIdChars  : /[^a-zA-Z0-9]/,
     singleQuotes: /'/g,
     attribute   : /-/,
     indent      : /\n(?=[^\n]+$)([ \t]*)/
@@ -137,12 +138,12 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                 computations = [] as Computation[];
 
             const buildHtmlElement = (node : HtmlElement, parent : string, n : number) => {
-                const { tag, properties, content, loc } = node,
-                    id = addId(parent, tag, n);
+                const { tag, properties, content, loc } = node;
                 if (rx.subcomponent.test(tag)) {
                     buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
                 } else {
                     const
+                        id         = addId(parent, tag, n),
                         exprs      = properties.map(p => p instanceof StaticProperty ? '' : compileSegments(p.code)), 
                         hasMixins  = properties.some(p => p instanceof Mixin),
                         classProp  = !hasMixins && properties.filter(p => p instanceof StaticProperty && p.name === 'className')[0] as StaticProperty || null,
@@ -207,6 +208,7 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
                 addComputation([`Surplus.insert(range, ${ins});`], "range", range, node.loc);
             },
             addId = (parent : string, tag : string, n : number) => {
+                tag = tag.replace(rx.nonIdChars, '_');
                 const id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
                 ids.push(id);
                 return id;

@@ -72,9 +72,26 @@ describe("subcomponent", function () {
     it("can have dotted identifiers", function () {
         var code = window.SurplusPreprocessor.preprocess('              \n\
             var props = null,                                           \n\
-                a = { b: { c: { sub: p => props = p } } },              \n\
+                a = { b: { c: { sub: p => (props = p, "sub") } } },     \n\
                 sub = <a.b.c.sub foo="2" bar={3}/>;                     \n\
                                                                         \n\
+            expect(sub).toEqual("sub");                                 \n\
+            expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \n\
+        ');
+
+        eval(code);
+    });
+
+    it("can be children with dotted identifiers", function () {
+        var code = window.SurplusPreprocessor.preprocess('              \n\
+            var props = null,                                           \n\
+                a = { b: { c: { sub: p => (props = p, "sub") } } },     \n\
+                div = <div><a.b.c.sub foo="2" bar={3}/></div>;          \n\
+                                                                        \n\
+            expect(div instanceof HTMLDivElement).toBe(true);           \n\
+            expect(div.childNodes.length).toBe(1);                      \n\
+            expect(div.childNodes[0] instanceof Text).toBe(true);       \n\
+            expect(div.childNodes[0].data).toBe("sub");                 \n\
             expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \n\
         ');
 
