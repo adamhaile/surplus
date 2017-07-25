@@ -116,7 +116,7 @@ const compile = (ctl : CodeTopLevel, opts : Params) => {
             // add children property to first property object (creating one if needed)
             // this has the double purpose of creating the children property and making sure
             // that the first property group is not a mixin and can therefore be used as a base for extending
-            if (typeof properties0 === 'string') expr.properties.unshift({ children: children });
+            if (properties0 === undefined || typeof properties0 === 'string') expr.properties.unshift({ children: children });
             else properties0['children'] = children;
 
             // convert property objects to object expressions
