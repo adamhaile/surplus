@@ -35,6 +35,22 @@ describe("subcomponent", function () {
         eval(code);
     });
 
+    it("can have a single text child", function () {
+        var code = window.SurplusPreprocessor.preprocess('                  \n\
+            var props = null,                                               \n\
+                SubComponent = p => (props = p, "sub"),                     \n\
+                sub = <SubComponent>some words</SubComponent>;              \n\
+                                                                            \n\
+            expect(sub).toBe("sub");                                        \n\
+            expect(props).not.toBe(null);                                   \n\
+            expect(props.children.length).toBe(1);                          \n\
+            expect(typeof props.children[0]).toBe("string");                \n\
+            expect(props.children[0]).toBe("some words");                   \n\
+        ');
+
+        eval(code);
+    });
+
     it("can be children", function () {
         var code = window.SurplusPreprocessor.preprocess('                  \n\
             var SubComponent = p => <span>{p.text}</span>,                  \n\

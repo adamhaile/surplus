@@ -6,7 +6,7 @@ import { codeStr } from './compile';
 const rx = {
     ws              : /^\s*$/,
     jsxEventProperty: /^on[A-Z]/,
-    lowerStart      : /^[a-z]/,
+    subcomponent    : /(^[A-Z])|\./,
 };
 
 const tf = [
@@ -58,7 +58,7 @@ function translateJSXPropertyNames(tx : Copy) : Copy {
         ...tx, 
         HtmlElement(node) {
             const { tag, properties, content, loc } = node;
-            if (rx.lowerStart.test(tag)) {
+            if (!rx.subcomponent.test(tag)) {
                 const nonJSXProperties = properties.map(p =>
                     p instanceof DynamicProperty 
                     ? new DynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc) 
@@ -80,7 +80,7 @@ function promoteInitialTextNodesToTextContentProperties(tx : Copy) : Copy {
         ...tx,
         HtmlElement(node) {
             const { tag, properties, content, loc } = node;
-            if (rx.lowerStart.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
+            if (!rx.subcomponent.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
                 var textContent = new StaticProperty("textContent", codeStr((content[0] as HtmlText).text));
                 node = new HtmlElement(tag, [ ...properties, textContent ], content.slice(1), loc);
             }

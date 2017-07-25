@@ -12,7 +12,7 @@ import { codeStr } from './compile';
 var rx = {
     ws: /^\s*$/,
     jsxEventProperty: /^on[A-Z]/,
-    lowerStart: /^[a-z]/,
+    subcomponent: /(^[A-Z])|\./,
 };
 var tf = [
     // active transforms, in order from first to last applied
@@ -45,7 +45,7 @@ function removeDuplicateProperties(tx) {
 function translateJSXPropertyNames(tx) {
     return __assign({}, tx, { HtmlElement: function (node) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
-            if (rx.lowerStart.test(tag)) {
+            if (!rx.subcomponent.test(tag)) {
                 var nonJSXProperties = properties.map(function (p) {
                     return p instanceof DynamicProperty
                         ? new DynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc)
@@ -62,7 +62,7 @@ function translateJSXPropertyName(name) {
 function promoteInitialTextNodesToTextContentProperties(tx) {
     return __assign({}, tx, { HtmlElement: function (node) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
-            if (rx.lowerStart.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
+            if (!rx.subcomponent.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
                 var textContent = new StaticProperty("textContent", codeStr(content[0].text));
                 node = new HtmlElement(tag, properties.concat([textContent]), content.slice(1), loc);
             }
