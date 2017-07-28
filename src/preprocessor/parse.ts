@@ -5,9 +5,7 @@ import { Params } from './preprocess';
 const rx = {
     identifier       : /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
-    leadingWs        : /^\s+/,
-    codeTerminator   : /^[\s<>/,;)\]}]/,
-    codeContinuation : /^[^\s<>/,;)\]}]+/
+    leadingWs        : /^\s+/
 };
 
 const parens : { [p : string] : string } = {
@@ -17,7 +15,7 @@ const parens : { [p : string] : string } = {
     "{...": "}"
 };
 
-export type LOC = { line: number, col: number, pos: number };
+export interface LOC { line: number, col: number, pos: number };
 
 export function parse(TOKS : string[], opts : Params) {
     var i = 0,
@@ -30,7 +28,7 @@ export function parse(TOKS : string[], opts : Params) {
     return codeTopLevel();
 
     function codeTopLevel() {
-        var segments = [],
+        var segments = [] as AST.CodeSegment[],
             text = "",
             loc = LOC();
 
@@ -53,16 +51,16 @@ export function parse(TOKS : string[], opts : Params) {
 
         if (text) segments.push(new AST.CodeText(text, loc));
 
-        return new AST.CodeTopLevel(segments);
+        return new AST.Program(segments);
     }
 
-    function htmlElement() : AST.HtmlElement {
+    function htmlElement() : AST.JSXElement {
         if (NOT('<')) ERR("not at start of html element");
 
         var start = LOC(),
             tag = "",
-            properties = [],
-            content = [],
+            properties = [] as AST.JSXProperty[],
+            content = [] as AST.JSXContent[],
             hasContent = true;
 
         NEXT(); // pass '<'
@@ -77,10 +75,8 @@ export function parse(TOKS : string[], opts : Params) {
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
                 properties.push(property());
-            } else if (!opts.jsx && IS('@')) {
-                properties.push(mixin());
-            } else if (opts.jsx && IS('{...')) {
-                properties.push(jsxMixin());
+            } else if (IS('{...')) {
+                properties.push(spread());
             } else {
                 ERR("unrecognized content in begin tag");
             }
@@ -98,10 +94,8 @@ export function parse(TOKS : string[], opts : Params) {
             while (!EOF && NOT('</')) {
                 if (IS('<')) {
                     content.push(htmlElement());
-                } else if (!opts.jsx && IS('@')) {
+                } else if (IS('{')) {
                     content.push(htmlInsert());
-                } else if (opts.jsx && IS('{')) {
-                    content.push(jsxHtmlInsert());
                 } else if (IS('<!--')) {
                     content.push(htmlComment());
                 } else {
@@ -120,17 +114,17 @@ export function parse(TOKS : string[], opts : Params) {
             NEXT(); // pass '>'
         }
 
-        return new AST.HtmlElement(tag, properties, content, start);
+        return new AST.JSXElement(tag, properties, content, start);
     }
 
     function htmlText() {
         var text = "";
 
-        while (!EOF && NOT('<') && NOT('<!--') && (opts.jsx ? NOT('{') : NOT('@')) && NOT('</')) {
+        while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
             text += TOK, NEXT();
         }
 
-        return new AST.HtmlText(text);
+        return new AST.JSXText(text);
     }
 
     function htmlComment() {
@@ -149,29 +143,20 @@ export function parse(TOKS : string[], opts : Params) {
 
         NEXT(); // skip '-->'
 
-        return new AST.HtmlComment(text);
+        return new AST.JSXComment(text);
     }
 
     function htmlInsert() {
-        if (NOT('@')) ERR("not at start of code insert");
-
         var loc = LOC();
-
-        NEXT(); // pass '@'
-
-        return new AST.HtmlInsert(embeddedCode(), loc);
-    }
-
-    function jsxHtmlInsert() {
-        var loc = LOC();
-        return new AST.HtmlInsert(jsxEmbeddedCode(), loc);
+        return new AST.JSXInsert(embeddedCode(), loc);
     }
 
     function property() {
         if (!MATCH(rx.identifier)) ERR("not at start of property declaration");
 
         var loc = LOC(),
-            name = SPLIT(rx.identifier);
+            name = SPLIT(rx.identifier),
+            code : AST.EmbeddedCode;
 
         SKIPWS(); // pass name
 
@@ -181,66 +166,30 @@ export function parse(TOKS : string[], opts : Params) {
             SKIPWS();
 
             if (IS('"') || IS("'")) {
-                return new AST.StaticProperty(name, quotedString());
-            } else if (opts.jsx && IS('{')) {
-                return new AST.DynamicProperty(name, jsxEmbeddedCode(), loc);
-            } else if (!opts.jsx) {
-                return new AST.DynamicProperty(name, embeddedCode(), loc);
+                return new AST.JSXStaticProperty(name, quotedString());
+            } else if (IS('{')) {
+                return new AST.JSXDynamicProperty(name, embeddedCode(), loc);
             } else {
                 return ERR("unexepected value for JSX property");
             }
         } else {
-            return new AST.StaticProperty(name, "true");
+            return new AST.JSXStaticProperty(name, "true");
         }
     }
 
-    function mixin() {
-        if (NOT('@')) ERR("not at start of mixin");
+    function spread() {
+        if (NOT('{...')) ERR("not at start of JSX spread");
 
         var loc = LOC();
 
-        NEXT(); // pass '@'
-
-        return new AST.Mixin(embeddedCode(), loc);
-    }
-
-    function jsxMixin() {
-        if (NOT('{...')) ERR("not at start of JSX mixin");
-
-        var loc = LOC();
-
-        return new AST.Mixin(jsxEmbeddedCode(), loc);
+        return new AST.JSXSpreadProperty(embeddedCode(), loc);
     }
 
     function embeddedCode() {
-        var start = LOC(),
-            segments = [] as (AST.CodeText | AST.HtmlElement)[],
-            text = "",
-            loc = LOC();
-
-        // consume source text up to the first top-level terminating character
-        while(!EOF && !MATCH(rx.codeTerminator)) {
-            if (PARENS()) {
-                text = balancedParens(segments, text, loc);
-            } else if (IS("'") || IS('"')) {
-                text += quotedString();
-            } else {
-                text += SPLIT(rx.codeContinuation);
-            }
-        }
-
-        if (text) segments.push(new AST.CodeText(text, loc));
-
-        if (segments.length === 0) ERR("not in embedded code", start);
-
-        return new AST.EmbeddedCode(segments);
-    }
-
-    function jsxEmbeddedCode() {
         if (NOT('{') && NOT('{...')) ERR("not at start of JSX embedded code");
 
         var prefixLength = TOK.length,
-            segments = [] as (AST.CodeText | AST.HtmlElement)[],
+            segments = [] as AST.CodeSegment[],
             loc = LOC(),
             last = balancedParens(segments, "", loc);
         
@@ -256,7 +205,7 @@ export function parse(TOKS : string[], opts : Params) {
         return new AST.EmbeddedCode(segments);
     }
 
-    function balancedParens(segments : (AST.CodeText | AST.HtmlElement)[], text : string, loc : LOC) {
+    function balancedParens(segments : AST.JSXContent[], text : string, loc : LOC) {
         var start = LOC(),
             end = PARENS();
 
@@ -296,8 +245,8 @@ export function parse(TOKS : string[], opts : Params) {
         if (NOT("'") && NOT('"')) ERR("not in quoted string");
 
         var start = LOC(),
-            quote,
-            text;
+            quote : string,
+            text : string;
 
         quote = text = TOK, NEXT();
 
@@ -401,7 +350,7 @@ export function parse(TOKS : string[], opts : Params) {
         }
     }
 
-    function LOC() {
+    function LOC() : LOC {
         return { line: LINE, col: COL, pos: POS };
     }
 };

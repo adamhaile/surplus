@@ -187,6 +187,7 @@ declare global {
 
 		interface SurplusAtributes<T> {
 			ref?: T;
+			S?: <U>(node : T, state? : U) => any;
 		}
 
 		interface DOMAttributes<T> extends SurplusAtributes<T> {

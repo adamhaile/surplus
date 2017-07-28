@@ -1,3 +1,3 @@
-import { CodeTopLevel } from './AST';
+import { Program } from './AST';
 import { Params } from './preprocess';
-export declare const transform: (node: CodeTopLevel, opt: Params) => CodeTopLevel;
+export declare const transform: (node: Program, opt: Params) => Program;

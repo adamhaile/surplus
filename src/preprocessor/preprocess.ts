@@ -14,8 +14,7 @@ export interface Options {
 export interface Params {
     sourcemap  : 'extract' | 'append' | null,
     sourcefile : string,
-    targetfile : string,
-    jsx        : boolean;
+    targetfile : string
 }
 
 export function preprocess(str : string, opts : Options) {

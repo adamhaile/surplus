@@ -3,9 +3,7 @@ import * as AST from './AST';
 var rx = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
-    leadingWs: /^\s+/,
-    codeTerminator: /^[\s<>/,;)\]}]/,
-    codeContinuation: /^[^\s<>/,;)\]}]+/
+    leadingWs: /^\s+/
 };
 var parens = {
     "(": ")",
@@ -13,6 +11,7 @@ var parens = {
     "{": "}",
     "{...": "}"
 };
+;
 export function parse(TOKS, opts) {
     var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
     return codeTopLevel();
@@ -41,7 +40,7 @@ export function parse(TOKS, opts) {
         }
         if (text)
             segments.push(new AST.CodeText(text, loc));
-        return new AST.CodeTopLevel(segments);
+        return new AST.Program(segments);
     }
     function htmlElement() {
         if (NOT('<'))
@@ -57,11 +56,8 @@ export function parse(TOKS, opts) {
             if (MATCH(rx.identifier)) {
                 properties.push(property());
             }
-            else if (!opts.jsx && IS('@')) {
-                properties.push(mixin());
-            }
-            else if (opts.jsx && IS('{...')) {
-                properties.push(jsxMixin());
+            else if (IS('{...')) {
+                properties.push(spread());
             }
             else {
                 ERR("unrecognized content in begin tag");
@@ -77,11 +73,8 @@ export function parse(TOKS, opts) {
                 if (IS('<')) {
                     content.push(htmlElement());
                 }
-                else if (!opts.jsx && IS('@')) {
+                else if (IS('{')) {
                     content.push(htmlInsert());
-                }
-                else if (opts.jsx && IS('{')) {
-                    content.push(jsxHtmlInsert());
                 }
                 else if (IS('<!--')) {
                     content.push(htmlComment());
@@ -99,14 +92,14 @@ export function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return new AST.HtmlElement(tag, properties, content, start);
+        return new AST.JSXElement(tag, properties, content, start);
     }
     function htmlText() {
         var text = "";
-        while (!EOF && NOT('<') && NOT('<!--') && (opts.jsx ? NOT('{') : NOT('@')) && NOT('</')) {
+        while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
             text += TOK, NEXT();
         }
-        return new AST.HtmlText(text);
+        return new AST.JSXText(text);
     }
     function htmlComment() {
         if (NOT('<!--'))
@@ -119,78 +112,41 @@ export function parse(TOKS, opts) {
         if (EOF)
             ERR("unterminated html comment", start);
         NEXT(); // skip '-->'
-        return new AST.HtmlComment(text);
+        return new AST.JSXComment(text);
     }
     function htmlInsert() {
-        if (NOT('@'))
-            ERR("not at start of code insert");
         var loc = LOC();
-        NEXT(); // pass '@'
-        return new AST.HtmlInsert(embeddedCode(), loc);
-    }
-    function jsxHtmlInsert() {
-        var loc = LOC();
-        return new AST.HtmlInsert(jsxEmbeddedCode(), loc);
+        return new AST.JSXInsert(embeddedCode(), loc);
     }
     function property() {
         if (!MATCH(rx.identifier))
             ERR("not at start of property declaration");
-        var loc = LOC(), name = SPLIT(rx.identifier);
+        var loc = LOC(), name = SPLIT(rx.identifier), code;
         SKIPWS(); // pass name
         if (IS('=')) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
-                return new AST.StaticProperty(name, quotedString());
+                return new AST.JSXStaticProperty(name, quotedString());
             }
-            else if (opts.jsx && IS('{')) {
-                return new AST.DynamicProperty(name, jsxEmbeddedCode(), loc);
-            }
-            else if (!opts.jsx) {
-                return new AST.DynamicProperty(name, embeddedCode(), loc);
+            else if (IS('{')) {
+                return new AST.JSXDynamicProperty(name, embeddedCode(), loc);
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return new AST.StaticProperty(name, "true");
+            return new AST.JSXStaticProperty(name, "true");
         }
     }
-    function mixin() {
-        if (NOT('@'))
-            ERR("not at start of mixin");
-        var loc = LOC();
-        NEXT(); // pass '@'
-        return new AST.Mixin(embeddedCode(), loc);
-    }
-    function jsxMixin() {
+    function spread() {
         if (NOT('{...'))
-            ERR("not at start of JSX mixin");
+            ERR("not at start of JSX spread");
         var loc = LOC();
-        return new AST.Mixin(jsxEmbeddedCode(), loc);
+        return new AST.JSXSpreadProperty(embeddedCode(), loc);
     }
     function embeddedCode() {
-        var start = LOC(), segments = [], text = "", loc = LOC();
-        // consume source text up to the first top-level terminating character
-        while (!EOF && !MATCH(rx.codeTerminator)) {
-            if (PARENS()) {
-                text = balancedParens(segments, text, loc);
-            }
-            else if (IS("'") || IS('"')) {
-                text += quotedString();
-            }
-            else {
-                text += SPLIT(rx.codeContinuation);
-            }
-        }
-        if (text)
-            segments.push(new AST.CodeText(text, loc));
-        if (segments.length === 0)
-            ERR("not in embedded code", start);
-        return new AST.EmbeddedCode(segments);
-    }
-    function jsxEmbeddedCode() {
         if (NOT('{') && NOT('{...'))
             ERR("not at start of JSX embedded code");
         var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);

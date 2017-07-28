@@ -11,7 +11,6 @@
 /// />
 /// <!--
 /// -->
-/// @
 /// =
 /// {...
 /// )
@@ -29,18 +28,18 @@
 /// misc (any string not containing one of the above)
 // pre-compiled regular expressions
 var rx = {
-    tokens: /<\/?(?=\w)|\/?>|<!--|-->|@|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|\/\/|\n|\/\*|\*\/|(?:[^<>@=\/@=()[\]{}"'\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?)+/g,
+    tokens: /<\/?(?=\w)|\/?>|<!--|-->|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|\/\/|\n|\/\*|\*\/|(?:[^<>@=\/@=()[\]{}"'\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?)+/g,
 };
 function tokenize(str, opts) {
     var toks = str.match(rx.tokens);
     return toks || [];
 }
 
-var CodeTopLevel = (function () {
-    function CodeTopLevel(segments) {
+var Program = (function () {
+    function Program(segments) {
         this.segments = segments;
     }
-    return CodeTopLevel;
+    return Program;
 }());
 var CodeText = (function () {
     function CodeText(text, loc) {
@@ -55,93 +54,100 @@ var EmbeddedCode = (function () {
     }
     return EmbeddedCode;
 }());
-var HtmlElement = (function () {
-    function HtmlElement(tag, properties, content, loc) {
+var JSXElement = (function () {
+    function JSXElement(tag, properties, content, loc) {
         this.tag = tag;
         this.properties = properties;
         this.content = content;
         this.loc = loc;
+        this.isHTML = JSXElement.domTag.test(this.tag);
     }
-    return HtmlElement;
+    JSXElement.domTag = /^[a-z][^\.]*$/;
+    return JSXElement;
 }());
-var HtmlText = (function () {
-    function HtmlText(text) {
+var JSXText = (function () {
+    function JSXText(text) {
         this.text = text;
     }
-    return HtmlText;
+    return JSXText;
 }());
-var HtmlComment = (function () {
-    function HtmlComment(text) {
+var JSXComment = (function () {
+    function JSXComment(text) {
         this.text = text;
     }
-    return HtmlComment;
+    return JSXComment;
 }());
-var HtmlInsert = (function () {
-    function HtmlInsert(code, loc) {
+var JSXInsert = (function () {
+    function JSXInsert(code, loc) {
         this.code = code;
         this.loc = loc;
     }
-    return HtmlInsert;
+    return JSXInsert;
 }());
-var StaticProperty = (function () {
-    function StaticProperty(name, value) {
+var JSXStaticProperty = (function () {
+    function JSXStaticProperty(name, value) {
         this.name = name;
         this.value = value;
     }
-    return StaticProperty;
+    return JSXStaticProperty;
 }());
-var DynamicProperty = (function () {
-    function DynamicProperty(name, code, loc) {
+var JSXDynamicProperty = (function () {
+    function JSXDynamicProperty(name, code, loc) {
         this.name = name;
         this.code = code;
         this.loc = loc;
     }
-    return DynamicProperty;
+    return JSXDynamicProperty;
 }());
-var Mixin = (function () {
-    function Mixin(code, loc) {
+var JSXSpreadProperty = (function () {
+    function JSXSpreadProperty(code, loc) {
         this.code = code;
         this.loc = loc;
     }
-    return Mixin;
+    return JSXSpreadProperty;
 }());
 // a Copy transform, for building non-identity transforms on top of
 var Copy = {
-    CodeTopLevel: function (node) {
-        return new CodeTopLevel(this.CodeSegments(node.segments));
+    Program: function (node) {
+        return new Program(this.CodeSegments(node.segments));
     },
     CodeSegments: function (segments) {
         var _this = this;
-        return segments.map(function (node) { return node instanceof CodeText ? _this.CodeText(node) : _this.HtmlElement(node); });
+        return segments.map(function (node) {
+            return node instanceof CodeText ? _this.CodeText(node) :
+                _this.JSXElement(node);
+        });
     },
     EmbeddedCode: function (node) {
         return new EmbeddedCode(this.CodeSegments(node.segments));
     },
-    HtmlElement: function (node) {
+    JSXElement: function (node) {
         var _this = this;
-        return new HtmlElement(node.tag, node.properties.map(function (p) {
-            return p instanceof StaticProperty ? _this.StaticProperty(p) :
-                p instanceof DynamicProperty ? _this.DynamicProperty(p) :
-                    _this.Mixin(p);
-        }), node.content.map(function (c) {
-            return c instanceof HtmlComment ? _this.HtmlComment(c) :
-                c instanceof HtmlText ? _this.HtmlText(c) :
-                    c instanceof HtmlInsert ? _this.HtmlInsert(c) :
-                        _this.HtmlElement(c);
-        }), node.loc);
+        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.content.map(function (c) { return _this.JSXContent(c); }), node.loc);
     },
-    HtmlInsert: function (node) {
-        return new HtmlInsert(this.EmbeddedCode(node.code), node.loc);
+    JSXProperty: function (node) {
+        return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node) :
+            node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
+                this.JSXSpreadProperty(node);
+    },
+    JSXContent: function (node) {
+        return node instanceof JSXComment ? this.JSXComment(node) :
+            node instanceof JSXText ? this.JSXText(node) :
+                node instanceof JSXInsert ? this.JSXInsert(node) :
+                    this.JSXElement(node);
+    },
+    JSXInsert: function (node) {
+        return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
     },
     CodeText: function (node) { return node; },
-    HtmlText: function (node) { return node; },
-    HtmlComment: function (node) { return node; },
-    StaticProperty: function (node) { return node; },
-    DynamicProperty: function (node) {
-        return new DynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
+    JSXText: function (node) { return node; },
+    JSXComment: function (node) { return node; },
+    JSXStaticProperty: function (node) { return node; },
+    JSXDynamicProperty: function (node) {
+        return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
-    Mixin: function (node) {
-        return new Mixin(this.EmbeddedCode(node.code), node.loc);
+    JSXSpreadProperty: function (node) {
+        return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
     }
 };
 
@@ -149,9 +155,7 @@ var Copy = {
 var rx$1 = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
-    leadingWs: /^\s+/,
-    codeTerminator: /^[\s<>/,;)\]}]/,
-    codeContinuation: /^[^\s<>/,;)\]}]+/
+    leadingWs: /^\s+/
 };
 var parens = {
     "(": ")",
@@ -159,6 +163,7 @@ var parens = {
     "{": "}",
     "{...": "}"
 };
+
 function parse(TOKS, opts) {
     var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
     return codeTopLevel();
@@ -187,7 +192,7 @@ function parse(TOKS, opts) {
         }
         if (text)
             segments.push(new CodeText(text, loc));
-        return new CodeTopLevel(segments);
+        return new Program(segments);
     }
     function htmlElement() {
         if (NOT('<'))
@@ -203,11 +208,8 @@ function parse(TOKS, opts) {
             if (MATCH(rx$1.identifier)) {
                 properties.push(property());
             }
-            else if (!opts.jsx && IS('@')) {
-                properties.push(mixin());
-            }
-            else if (opts.jsx && IS('{...')) {
-                properties.push(jsxMixin());
+            else if (IS('{...')) {
+                properties.push(spread());
             }
             else {
                 ERR("unrecognized content in begin tag");
@@ -223,11 +225,8 @@ function parse(TOKS, opts) {
                 if (IS('<')) {
                     content.push(htmlElement());
                 }
-                else if (!opts.jsx && IS('@')) {
+                else if (IS('{')) {
                     content.push(htmlInsert());
-                }
-                else if (opts.jsx && IS('{')) {
-                    content.push(jsxHtmlInsert());
                 }
                 else if (IS('<!--')) {
                     content.push(htmlComment());
@@ -245,14 +244,14 @@ function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return new HtmlElement(tag, properties, content, start);
+        return new JSXElement(tag, properties, content, start);
     }
     function htmlText() {
         var text = "";
-        while (!EOF && NOT('<') && NOT('<!--') && (opts.jsx ? NOT('{') : NOT('@')) && NOT('</')) {
+        while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
             text += TOK, NEXT();
         }
-        return new HtmlText(text);
+        return new JSXText(text);
     }
     function htmlComment() {
         if (NOT('<!--'))
@@ -265,78 +264,41 @@ function parse(TOKS, opts) {
         if (EOF)
             ERR("unterminated html comment", start);
         NEXT(); // skip '-->'
-        return new HtmlComment(text);
+        return new JSXComment(text);
     }
     function htmlInsert() {
-        if (NOT('@'))
-            ERR("not at start of code insert");
         var loc = LOC();
-        NEXT(); // pass '@'
-        return new HtmlInsert(embeddedCode(), loc);
-    }
-    function jsxHtmlInsert() {
-        var loc = LOC();
-        return new HtmlInsert(jsxEmbeddedCode(), loc);
+        return new JSXInsert(embeddedCode(), loc);
     }
     function property() {
         if (!MATCH(rx$1.identifier))
             ERR("not at start of property declaration");
-        var loc = LOC(), name = SPLIT(rx$1.identifier);
+        var loc = LOC(), name = SPLIT(rx$1.identifier), code;
         SKIPWS(); // pass name
         if (IS('=')) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
-                return new StaticProperty(name, quotedString());
+                return new JSXStaticProperty(name, quotedString());
             }
-            else if (opts.jsx && IS('{')) {
-                return new DynamicProperty(name, jsxEmbeddedCode(), loc);
-            }
-            else if (!opts.jsx) {
-                return new DynamicProperty(name, embeddedCode(), loc);
+            else if (IS('{')) {
+                return new JSXDynamicProperty(name, embeddedCode(), loc);
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return new StaticProperty(name, "true");
+            return new JSXStaticProperty(name, "true");
         }
     }
-    function mixin() {
-        if (NOT('@'))
-            ERR("not at start of mixin");
-        var loc = LOC();
-        NEXT(); // pass '@'
-        return new Mixin(embeddedCode(), loc);
-    }
-    function jsxMixin() {
+    function spread() {
         if (NOT('{...'))
-            ERR("not at start of JSX mixin");
+            ERR("not at start of JSX spread");
         var loc = LOC();
-        return new Mixin(jsxEmbeddedCode(), loc);
+        return new JSXSpreadProperty(embeddedCode(), loc);
     }
     function embeddedCode() {
-        var start = LOC(), segments = [], text = "", loc = LOC();
-        // consume source text up to the first top-level terminating character
-        while (!EOF && !MATCH(rx$1.codeTerminator)) {
-            if (PARENS()) {
-                text = balancedParens(segments, text, loc);
-            }
-            else if (IS("'") || IS('"')) {
-                text += quotedString();
-            }
-            else {
-                text += SPLIT(rx$1.codeContinuation);
-            }
-        }
-        if (text)
-            segments.push(new CodeText(text, loc));
-        if (segments.length === 0)
-            ERR("not in embedded code", start);
-        return new EmbeddedCode(segments);
-    }
-    function jsxEmbeddedCode() {
         if (NOT('{') && NOT('{...'))
             ERR("not at start of JSX embedded code");
         var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
@@ -569,7 +531,6 @@ var rx$3 = {
     hasParen: /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen: /\)\s*$/,
-    subcomponent: /(^[A-Z])|\./,
     nonIdChars: /[^a-zA-Z0-9]/,
     singleQuotes: /'/g,
     attribute: /-/,
@@ -608,13 +569,13 @@ var compile = function (ctl, opts) {
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
     }, compileHtmlElement = function (node, indent) {
-        var code = rx$3.subcomponent.test(node.tag) ?
+        var code = !node.isHTML ?
             emitSubComponent(buildSubComponent(node), indent) :
             (node.properties.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
                 "Surplus.createElement('" + node.tag + "', null, null)" :
                 (node.properties.length === 1
-                    && node.properties[0] instanceof StaticProperty
+                    && node.properties[0] instanceof JSXStaticProperty
                     && node.properties[0].name === "className"
                     && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
@@ -626,8 +587,8 @@ var compile = function (ctl, opts) {
         // group successive properties into property objects, but mixins stand alone
         // e.g. a="1" b={foo} {...mixin} c="3" gets combined into [{a: "1", b: foo}, mixin, {c: "3"}]
         properties = node.properties.reduce(function (props, p) {
-            var lastSegment = props[props.length - 1], value = p instanceof StaticProperty ? p.value : compileSegments(p.code);
-            if (p instanceof Mixin)
+            var lastSegment = props[props.length - 1], value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
+            if (p instanceof JSXSpreadProperty)
                 props.push(value);
             else if (props.length === 0 || typeof lastSegment === 'string')
                 props.push((_a = {}, _a[p.name] = value, _a));
@@ -636,11 +597,11 @@ var compile = function (ctl, opts) {
             return props;
             var _a;
         }, []), children = node.content.map(function (c) {
-            return c instanceof HtmlElement ? compileHtmlElement(c, "") :
-                c instanceof HtmlText ? codeStr(c.text.trim()) :
-                    c instanceof HtmlInsert ? compileSegments(c.code) :
+            return c instanceof JSXElement ? compileHtmlElement(c, "") :
+                c instanceof JSXText ? codeStr(c.text.trim()) :
+                    c instanceof JSXInsert ? compileSegments(c.code) :
                         "document.createComment(" + codeStr(c.text) + ")";
-        }).filter(Boolean);
+        });
         return new SubComponent(node.tag, properties, children);
     }, emitSubComponent = function (expr, indent) {
         var nl = "\r\n" + indent, nli = nl + '    ', nlii = nli + '    ', 
@@ -668,15 +629,15 @@ var compile = function (ctl, opts) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
-            if (rx$3.subcomponent.test(tag)) {
-                buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
+            if (!node.isHTML) {
+                buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof StaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof Mixin; }), classProp_1 = !hasMixins && properties.filter(function (p) { return p instanceof StaticProperty && p.name === 'className'; })[0] || null, dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof JSXSpreadProperty; }), classProp_1 = !hasMixins && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p instanceof StaticProperty ? buildStaticProperty(p, id_1) :
-                            p instanceof DynamicProperty ? buildDynamicProperty(p, id_1, exprs_1[i]) :
-                                buildMixin(exprs_1[i], id_1, n);
+                        p instanceof JSXStaticProperty ? buildStaticProperty(p, id_1) :
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, exprs_1[i]) :
+                                buildSpread(p, id_1, n, exprs_1[i]);
                 }).filter(function (s) { return s !== ''; });
                 addStatement(id_1 + " = Surplus.createElement('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || 'null') + ");");
                 if (!dynamic) {
@@ -685,8 +646,9 @@ var compile = function (ctl, opts) {
                 content.forEach(function (c, i) { return buildChild(c, id_1, i); });
                 if (dynamic) {
                     if (hasMixins) {
+                        // create propAges object and use it as state of our computation
                         var propAges_1 = { __current: 0 }, maxAge_1 = 1 << 31 - 1;
-                        properties.forEach(function (p) { return p instanceof Mixin || (propAges_1[p.name] = maxAge_1); });
+                        properties.forEach(function (p) { return p instanceof JSXSpreadProperty || (propAges_1[p.name] = maxAge_1); });
                         stmts.unshift("__propAges.__current++;");
                         stmts.push("__propAges");
                         addComputation(stmts, "__propAges", JSON.stringify(propAges_1), loc);
@@ -699,21 +661,28 @@ var compile = function (ctl, opts) {
         }, buildStaticProperty = function (node, id) {
             return buildProperty(id, node.name, node.value);
         }, buildDynamicProperty = function (node, id, expr) {
-            return node.name === "ref"
-                ? expr + " = " + id + ";"
-                : buildProperty(id, node.name, expr);
+            return node.name === "ref" ? buildReference(expr, id) :
+                node.name === 'S' ? buildMixin(node, id, expr) :
+                    buildProperty(id, node.name, expr);
         }, buildProperty = function (id, prop, expr) {
             return isAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
-        }, buildMixin = function (expr, id, n) {
+        }, buildReference = function (ref, id) {
+            return ref + " = " + id + ";";
+        }, buildSpread = function (node, id, n, expr) {
             var state = addId(id, 'mixin', n);
             return state + " = Surplus.spread(" + expr + ", " + id + ", " + state + ", __propAges);";
+        }, buildMixin = function (node, id, expr) {
+            addComputation(["(" + expr + ")(" + id + ", __state)"], '__state', null, node.loc);
+            return '';
         }, buildChild = function (node, parent, n) {
-            return node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :
-                node instanceof HtmlComment ? buildHtmlComment(node, parent) :
-                    node instanceof HtmlText ? buildHtmlText(node, parent, n) :
+            return node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
+                node instanceof JSXComment ? buildHtmlComment(node, parent) :
+                    node instanceof JSXText ? buildHtmlText(node, parent, n) :
                         buildHtmlInsert(node, parent, n);
+        }, buildInsertedSubComponent = function (node, parent, n) {
+            return buildHtmlInsert(new JSXInsert(new EmbeddedCode([node]), node.loc), parent, n);
         }, buildHtmlComment = function (node, parent) {
             return addStatement("Surplus.createComment(" + codeStr(node.text) + ", " + parent + ")");
         }, buildHtmlText = function (node, parent, n) {
@@ -795,8 +764,7 @@ var __assign = (undefined && undefined.__assign) || Object.assign || function(t)
 // Cross-browser compatibility shims
 var rx$2 = {
     ws: /^\s*$/,
-    jsxEventProperty: /^on[A-Z]/,
-    subcomponent: /(^[A-Z])|\./,
+    jsxEventProperty: /^on[A-Z]/
 };
 var tf = [
     // active transforms, in order from first to last applied
@@ -805,52 +773,52 @@ var tf = [
     promoteInitialTextNodesToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
-var transform = function (node, opt) { return tf.CodeTopLevel(node); };
+var transform = function (node, opt) { return tf.Program(node); };
 function removeWhitespaceTextNodes(tx) {
-    return __assign({}, tx, { HtmlElement: function (node) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof HtmlText && rx$2.ws.test(c.text)); });
+    return __assign({}, tx, { JSXElement: function (node) {
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof JSXText && rx$2.ws.test(c.text)); });
             if (nonWhitespaceContent.length !== content.length) {
-                node = new HtmlElement(tag, properties, nonWhitespaceContent, loc);
+                node = new JSXElement(tag, properties, nonWhitespaceContent, loc);
             }
-            return tx.HtmlElement.call(this, node);
+            return tx.JSXElement.call(this, node);
         } });
 }
 function removeDuplicateProperties(tx) {
-    return __assign({}, tx, { HtmlElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, lastid = {};
-            properties.forEach(function (p, i) { return p instanceof Mixin || (lastid[p.name] = i); });
-            var uniqueProperties = properties.filter(function (p, i) { return p instanceof Mixin || lastid[p.name] === i; });
+            properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || (lastid[p.name] = i); });
+            var uniqueProperties = properties.filter(function (p, i) { return p instanceof JSXSpreadProperty || lastid[p.name] === i; });
             if (properties.length !== uniqueProperties.length) {
-                node = new HtmlElement(tag, uniqueProperties, content, loc);
+                node = new JSXElement(tag, uniqueProperties, content, loc);
             }
-            return tx.HtmlElement.call(this, node);
+            return tx.JSXElement.call(this, node);
         } });
 }
 function translateJSXPropertyNames(tx) {
-    return __assign({}, tx, { HtmlElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
-            if (!rx$2.subcomponent.test(tag)) {
+            if (node.isHTML) {
                 var nonJSXProperties = properties.map(function (p) {
-                    return p instanceof DynamicProperty
-                        ? new DynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc)
+                    return p instanceof JSXDynamicProperty
+                        ? new JSXDynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc)
                         : p;
                 });
-                node = new HtmlElement(tag, nonJSXProperties, content, loc);
+                node = new JSXElement(tag, nonJSXProperties, content, loc);
             }
-            return tx.HtmlElement.call(this, node);
+            return tx.JSXElement.call(this, node);
         } });
 }
 function translateJSXPropertyName(name) {
     return rx$2.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
 function promoteInitialTextNodesToTextContentProperties(tx) {
-    return __assign({}, tx, { HtmlElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
-            if (!rx$2.subcomponent.test(tag) && content.length > 0 && content[0] instanceof HtmlText) {
-                var textContent = new StaticProperty("textContent", codeStr(content[0].text));
-                node = new HtmlElement(tag, properties.concat([textContent]), content.slice(1), loc);
+            if (node.isHTML && content.length > 0 && content[0] instanceof JSXText) {
+                var textContent = new JSXStaticProperty("textContent", codeStr(content[0].text));
+                node = new JSXElement(tag, properties.concat([textContent]), content.slice(1), loc);
             }
-            return tx.HtmlElement.call(this, node);
+            return tx.JSXElement.call(this, node);
         } });
 }
 

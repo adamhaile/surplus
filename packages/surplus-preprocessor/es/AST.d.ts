@@ -1,68 +1,71 @@
 import { LOC } from './parse';
-export declare class CodeTopLevel {
+export declare class Program {
     segments: CodeSegment[];
     constructor(segments: CodeSegment[]);
 }
+export declare type CodeSegment = CodeText | JSXElement;
 export declare class CodeText {
     readonly text: string;
     readonly loc: LOC;
     constructor(text: string, loc: LOC);
 }
-export declare type CodeSegment = CodeText | HtmlElement;
 export declare class EmbeddedCode {
     readonly segments: CodeSegment[];
     constructor(segments: CodeSegment[]);
 }
-export declare type HtmlProperty = StaticProperty | DynamicProperty | Mixin;
-export declare type HtmlContent = HtmlElement | HtmlComment | HtmlText | HtmlInsert;
-export declare class HtmlElement {
+export declare type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXSpreadProperty;
+export declare type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
+export declare class JSXElement {
     readonly tag: string;
-    readonly properties: HtmlProperty[];
-    readonly content: HtmlContent[];
+    readonly properties: JSXProperty[];
+    readonly content: JSXContent[];
     readonly loc: LOC;
-    constructor(tag: string, properties: HtmlProperty[], content: HtmlContent[], loc: LOC);
+    constructor(tag: string, properties: JSXProperty[], content: JSXContent[], loc: LOC);
+    private static domTag;
+    isHTML: boolean;
 }
-export declare class HtmlText {
+export declare class JSXText {
     readonly text: string;
     constructor(text: string);
 }
-export declare class HtmlComment {
+export declare class JSXComment {
     readonly text: string;
     constructor(text: string);
 }
-export declare class HtmlInsert {
+export declare class JSXInsert {
     readonly code: EmbeddedCode;
     readonly loc: LOC;
     constructor(code: EmbeddedCode, loc: LOC);
 }
-export declare class StaticProperty {
+export declare class JSXStaticProperty {
     readonly name: string;
     readonly value: string;
     constructor(name: string, value: string);
 }
-export declare class DynamicProperty {
+export declare class JSXDynamicProperty {
     readonly name: string;
     readonly code: EmbeddedCode;
     readonly loc: LOC;
     constructor(name: string, code: EmbeddedCode, loc: LOC);
 }
-export declare class Mixin {
+export declare class JSXSpreadProperty {
     readonly code: EmbeddedCode;
     readonly loc: LOC;
     constructor(code: EmbeddedCode, loc: LOC);
 }
-export declare type Node = CodeTopLevel | CodeText | EmbeddedCode | HtmlElement | HtmlText | HtmlComment | HtmlInsert | StaticProperty | DynamicProperty | Mixin;
 export declare const Copy: {
-    CodeTopLevel(node: CodeTopLevel): CodeTopLevel;
+    Program(node: Program): Program;
     CodeSegments(segments: CodeSegment[]): CodeSegment[];
     EmbeddedCode(node: EmbeddedCode): EmbeddedCode;
-    HtmlElement(node: HtmlElement): HtmlElement;
-    HtmlInsert(node: HtmlInsert): HtmlInsert;
+    JSXElement(node: JSXElement): JSXElement;
+    JSXProperty(node: JSXProperty): JSXStaticProperty | JSXSpreadProperty;
+    JSXContent(node: JSXContent): JSXElement | JSXText | JSXInsert;
+    JSXInsert(node: JSXInsert): JSXInsert;
     CodeText(node: CodeText): CodeText;
-    HtmlText(node: HtmlText): HtmlText;
-    HtmlComment(node: HtmlComment): HtmlComment;
-    StaticProperty(node: StaticProperty): StaticProperty;
-    DynamicProperty(node: DynamicProperty): DynamicProperty;
-    Mixin(node: Mixin): Mixin;
+    JSXText(node: JSXText): JSXText;
+    JSXComment(node: JSXComment): JSXComment;
+    JSXStaticProperty(node: JSXStaticProperty): JSXStaticProperty;
+    JSXDynamicProperty(node: JSXDynamicProperty): JSXDynamicProperty;
+    JSXSpreadProperty(node: JSXSpreadProperty): JSXSpreadProperty;
 };
 export declare type Copy = typeof Copy;

@@ -1,10 +1,12 @@
 import { LOC } from './parse';
 
-export class CodeTopLevel {
+export class Program {
     constructor(
         public segments : CodeSegment[]
     ) { }
 }
+
+export type CodeSegment = CodeText | JSXElement;
 
 export class CodeText { 
     constructor(
@@ -13,53 +15,54 @@ export class CodeText {
     ) { }
 }
 
-export type CodeSegment = CodeText | HtmlElement;
-
 export class EmbeddedCode {
     constructor(
         public readonly segments : CodeSegment[]
     ) { }
 }
 
-export type HtmlProperty = StaticProperty | DynamicProperty | Mixin;
-export type HtmlContent = HtmlElement | HtmlComment | HtmlText | HtmlInsert;
+export type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXSpreadProperty;
+export type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
 
-export class HtmlElement {
+export class JSXElement {
     constructor(
         public readonly tag : string, 
-        public readonly properties : HtmlProperty[], 
-        public readonly content : HtmlContent[],
+        public readonly properties : JSXProperty[], 
+        public readonly content : JSXContent[],
         public readonly loc : LOC
     ) { }    
+
+    private static domTag = /^[a-z][^\.]*$/;
+    isHTML = JSXElement.domTag.test(this.tag);
 }
 
-export class HtmlText {
+export class JSXText {
     constructor(
         public readonly text : string
     ) { }
 }
 
-export class HtmlComment {
+export class JSXComment {
     constructor(
         public readonly text : string
     ) { }
 }
 
-export class HtmlInsert {
+export class JSXInsert {
     constructor(
         public readonly code : EmbeddedCode,
         public readonly loc : LOC
     ) { }
 }
 
-export class StaticProperty {
+export class JSXStaticProperty {
     constructor(
         public readonly name : string, 
         public readonly value : string
     ) { }
 }
 
-export class DynamicProperty {
+export class JSXDynamicProperty {
     constructor(
         public readonly name : string, 
         public readonly code : EmbeddedCode,
@@ -67,52 +70,56 @@ export class DynamicProperty {
     ) { }
 }
 
-export class Mixin {
+export class JSXSpreadProperty {
     constructor(
         public readonly code : EmbeddedCode,
         public readonly loc : LOC
     ) { }
 }
 
-export type Node = CodeTopLevel | CodeText | EmbeddedCode | HtmlElement | HtmlText | HtmlComment | HtmlInsert | StaticProperty | DynamicProperty | Mixin;
-
 // a Copy transform, for building non-identity transforms on top of
 export const Copy = {
-    CodeTopLevel(node : CodeTopLevel) {
-        return new CodeTopLevel(this.CodeSegments(node.segments));
+    Program(node : Program) {
+        return new Program(this.CodeSegments(node.segments));
     },
     CodeSegments(segments : CodeSegment[]) {
-        return segments.map(node => node instanceof CodeText ? this.CodeText(node) : this.HtmlElement(node));
+        return segments.map(node => 
+            node instanceof CodeText ? this.CodeText(node) : 
+            this.JSXElement(node));
     },
     EmbeddedCode(node : EmbeddedCode) {
         return new EmbeddedCode(this.CodeSegments(node.segments));
     },
-    HtmlElement(node : HtmlElement) : HtmlElement {
-        return new HtmlElement(node.tag, 
-            node.properties.map(p => 
-                p instanceof StaticProperty  ? this.StaticProperty(p) :
-                p instanceof DynamicProperty ? this.DynamicProperty(p) :
-                this.Mixin(p)), 
-            node.content.map(c => 
-                c instanceof HtmlComment ? this.HtmlComment(c) :
-                c instanceof HtmlText    ? this.HtmlText(c) :
-                c instanceof HtmlInsert  ? this.HtmlInsert(c) :
-                this.HtmlElement(c)), 
+    JSXElement(node : JSXElement) : JSXElement {
+        return new JSXElement(node.tag, 
+            node.properties.map(p => this.JSXProperty(p)),
+            node.content.map(c => this.JSXContent(c)),
             node.loc
         );
     },
-    HtmlInsert(node : HtmlInsert) {
-        return new HtmlInsert(this.EmbeddedCode(node.code), node.loc);
+    JSXProperty(node : JSXProperty) {
+        return node instanceof JSXStaticProperty  ? this.JSXStaticProperty(node) :
+               node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
+               this.JSXSpreadProperty(node);
+    },
+    JSXContent(node : JSXContent) {
+        return node instanceof JSXComment ? this.JSXComment(node) :
+               node instanceof JSXText    ? this.JSXText(node) :
+               node instanceof JSXInsert  ? this.JSXInsert(node) :
+               this.JSXElement(node);
+    },
+    JSXInsert(node : JSXInsert) {
+        return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
     },
     CodeText(node : CodeText) { return node; },
-    HtmlText(node : HtmlText) { return node; },
-    HtmlComment(node : HtmlComment) { return node; },
-    StaticProperty(node : StaticProperty) { return node; },
-    DynamicProperty(node : DynamicProperty) {
-        return new DynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
+    JSXText(node : JSXText) { return node; },
+    JSXComment(node : JSXComment) { return node; },
+    JSXStaticProperty(node : JSXStaticProperty) { return node; },
+    JSXDynamicProperty(node : JSXDynamicProperty) {
+        return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
-    Mixin(node : Mixin) {
-        return new Mixin(this.EmbeddedCode(node.code), node.loc);
+    JSXSpreadProperty(node : JSXSpreadProperty) {
+        return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
     }
 };
 

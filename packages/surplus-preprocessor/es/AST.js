@@ -1,10 +1,10 @@
-var CodeTopLevel = (function () {
-    function CodeTopLevel(segments) {
+var Program = (function () {
+    function Program(segments) {
         this.segments = segments;
     }
-    return CodeTopLevel;
+    return Program;
 }());
-export { CodeTopLevel };
+export { Program };
 var CodeText = (function () {
     function CodeText(text, loc) {
         this.text = text;
@@ -20,99 +20,106 @@ var EmbeddedCode = (function () {
     return EmbeddedCode;
 }());
 export { EmbeddedCode };
-var HtmlElement = (function () {
-    function HtmlElement(tag, properties, content, loc) {
+var JSXElement = (function () {
+    function JSXElement(tag, properties, content, loc) {
         this.tag = tag;
         this.properties = properties;
         this.content = content;
         this.loc = loc;
+        this.isHTML = JSXElement.domTag.test(this.tag);
     }
-    return HtmlElement;
+    JSXElement.domTag = /^[a-z][^\.]*$/;
+    return JSXElement;
 }());
-export { HtmlElement };
-var HtmlText = (function () {
-    function HtmlText(text) {
+export { JSXElement };
+var JSXText = (function () {
+    function JSXText(text) {
         this.text = text;
     }
-    return HtmlText;
+    return JSXText;
 }());
-export { HtmlText };
-var HtmlComment = (function () {
-    function HtmlComment(text) {
+export { JSXText };
+var JSXComment = (function () {
+    function JSXComment(text) {
         this.text = text;
     }
-    return HtmlComment;
+    return JSXComment;
 }());
-export { HtmlComment };
-var HtmlInsert = (function () {
-    function HtmlInsert(code, loc) {
+export { JSXComment };
+var JSXInsert = (function () {
+    function JSXInsert(code, loc) {
         this.code = code;
         this.loc = loc;
     }
-    return HtmlInsert;
+    return JSXInsert;
 }());
-export { HtmlInsert };
-var StaticProperty = (function () {
-    function StaticProperty(name, value) {
+export { JSXInsert };
+var JSXStaticProperty = (function () {
+    function JSXStaticProperty(name, value) {
         this.name = name;
         this.value = value;
     }
-    return StaticProperty;
+    return JSXStaticProperty;
 }());
-export { StaticProperty };
-var DynamicProperty = (function () {
-    function DynamicProperty(name, code, loc) {
+export { JSXStaticProperty };
+var JSXDynamicProperty = (function () {
+    function JSXDynamicProperty(name, code, loc) {
         this.name = name;
         this.code = code;
         this.loc = loc;
     }
-    return DynamicProperty;
+    return JSXDynamicProperty;
 }());
-export { DynamicProperty };
-var Mixin = (function () {
-    function Mixin(code, loc) {
+export { JSXDynamicProperty };
+var JSXSpreadProperty = (function () {
+    function JSXSpreadProperty(code, loc) {
         this.code = code;
         this.loc = loc;
     }
-    return Mixin;
+    return JSXSpreadProperty;
 }());
-export { Mixin };
+export { JSXSpreadProperty };
 // a Copy transform, for building non-identity transforms on top of
 export var Copy = {
-    CodeTopLevel: function (node) {
-        return new CodeTopLevel(this.CodeSegments(node.segments));
+    Program: function (node) {
+        return new Program(this.CodeSegments(node.segments));
     },
     CodeSegments: function (segments) {
         var _this = this;
-        return segments.map(function (node) { return node instanceof CodeText ? _this.CodeText(node) : _this.HtmlElement(node); });
+        return segments.map(function (node) {
+            return node instanceof CodeText ? _this.CodeText(node) :
+                _this.JSXElement(node);
+        });
     },
     EmbeddedCode: function (node) {
         return new EmbeddedCode(this.CodeSegments(node.segments));
     },
-    HtmlElement: function (node) {
+    JSXElement: function (node) {
         var _this = this;
-        return new HtmlElement(node.tag, node.properties.map(function (p) {
-            return p instanceof StaticProperty ? _this.StaticProperty(p) :
-                p instanceof DynamicProperty ? _this.DynamicProperty(p) :
-                    _this.Mixin(p);
-        }), node.content.map(function (c) {
-            return c instanceof HtmlComment ? _this.HtmlComment(c) :
-                c instanceof HtmlText ? _this.HtmlText(c) :
-                    c instanceof HtmlInsert ? _this.HtmlInsert(c) :
-                        _this.HtmlElement(c);
-        }), node.loc);
+        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.content.map(function (c) { return _this.JSXContent(c); }), node.loc);
     },
-    HtmlInsert: function (node) {
-        return new HtmlInsert(this.EmbeddedCode(node.code), node.loc);
+    JSXProperty: function (node) {
+        return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node) :
+            node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
+                this.JSXSpreadProperty(node);
+    },
+    JSXContent: function (node) {
+        return node instanceof JSXComment ? this.JSXComment(node) :
+            node instanceof JSXText ? this.JSXText(node) :
+                node instanceof JSXInsert ? this.JSXInsert(node) :
+                    this.JSXElement(node);
+    },
+    JSXInsert: function (node) {
+        return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
     },
     CodeText: function (node) { return node; },
-    HtmlText: function (node) { return node; },
-    HtmlComment: function (node) { return node; },
-    StaticProperty: function (node) { return node; },
-    DynamicProperty: function (node) {
-        return new DynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
+    JSXText: function (node) { return node; },
+    JSXComment: function (node) { return node; },
+    JSXStaticProperty: function (node) { return node; },
+    JSXDynamicProperty: function (node) {
+        return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
-    Mixin: function (node) {
-        return new Mixin(this.EmbeddedCode(node.code), node.loc);
+    JSXSpreadProperty: function (node) {
+        return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
     }
 };

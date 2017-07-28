@@ -1,4 +1,4 @@
-import { EmbeddedCode, CodeText, HtmlElement, HtmlText, HtmlComment, HtmlInsert, StaticProperty, DynamicProperty, Mixin } from './AST';
+import { EmbeddedCode, CodeText, JSXElement, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXSpreadProperty } from './AST';
 import { locationMark } from './sourcemap';
 export { compile, codeStr };
 // pre-compiled regular expressions
@@ -8,7 +8,6 @@ var rx = {
     hasParen: /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen: /\)\s*$/,
-    subcomponent: /(^[A-Z])|\./,
     nonIdChars: /[^a-zA-Z0-9]/,
     singleQuotes: /'/g,
     attribute: /-/,
@@ -47,13 +46,13 @@ var compile = function (ctl, opts) {
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
     }, compileHtmlElement = function (node, indent) {
-        var code = rx.subcomponent.test(node.tag) ?
+        var code = !node.isHTML ?
             emitSubComponent(buildSubComponent(node), indent) :
             (node.properties.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
                 "Surplus.createElement('" + node.tag + "', null, null)" :
                 (node.properties.length === 1
-                    && node.properties[0] instanceof StaticProperty
+                    && node.properties[0] instanceof JSXStaticProperty
                     && node.properties[0].name === "className"
                     && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
@@ -65,8 +64,8 @@ var compile = function (ctl, opts) {
         // group successive properties into property objects, but mixins stand alone
         // e.g. a="1" b={foo} {...mixin} c="3" gets combined into [{a: "1", b: foo}, mixin, {c: "3"}]
         properties = node.properties.reduce(function (props, p) {
-            var lastSegment = props[props.length - 1], value = p instanceof StaticProperty ? p.value : compileSegments(p.code);
-            if (p instanceof Mixin)
+            var lastSegment = props[props.length - 1], value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
+            if (p instanceof JSXSpreadProperty)
                 props.push(value);
             else if (props.length === 0 || typeof lastSegment === 'string')
                 props.push((_a = {}, _a[p.name] = value, _a));
@@ -75,11 +74,11 @@ var compile = function (ctl, opts) {
             return props;
             var _a;
         }, []), children = node.content.map(function (c) {
-            return c instanceof HtmlElement ? compileHtmlElement(c, "") :
-                c instanceof HtmlText ? codeStr(c.text.trim()) :
-                    c instanceof HtmlInsert ? compileSegments(c.code) :
+            return c instanceof JSXElement ? compileHtmlElement(c, "") :
+                c instanceof JSXText ? codeStr(c.text.trim()) :
+                    c instanceof JSXInsert ? compileSegments(c.code) :
                         "document.createComment(" + codeStr(c.text) + ")";
-        }).filter(Boolean);
+        });
         return new SubComponent(node.tag, properties, children);
     }, emitSubComponent = function (expr, indent) {
         var nl = "\r\n" + indent, nli = nl + '    ', nlii = nli + '    ', 
@@ -107,15 +106,15 @@ var compile = function (ctl, opts) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
-            if (rx.subcomponent.test(tag)) {
-                buildHtmlInsert(new HtmlInsert(new EmbeddedCode([node]), loc), parent, n);
+            if (!node.isHTML) {
+                buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof StaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof Mixin; }), classProp_1 = !hasMixins && properties.filter(function (p) { return p instanceof StaticProperty && p.name === 'className'; })[0] || null, dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof JSXSpreadProperty; }), classProp_1 = !hasMixins && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p instanceof StaticProperty ? buildStaticProperty(p, id_1) :
-                            p instanceof DynamicProperty ? buildDynamicProperty(p, id_1, exprs_1[i]) :
-                                buildMixin(exprs_1[i], id_1, n);
+                        p instanceof JSXStaticProperty ? buildStaticProperty(p, id_1) :
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, exprs_1[i]) :
+                                buildSpread(p, id_1, n, exprs_1[i]);
                 }).filter(function (s) { return s !== ''; });
                 addStatement(id_1 + " = Surplus.createElement('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || 'null') + ");");
                 if (!dynamic) {
@@ -124,8 +123,9 @@ var compile = function (ctl, opts) {
                 content.forEach(function (c, i) { return buildChild(c, id_1, i); });
                 if (dynamic) {
                     if (hasMixins) {
+                        // create propAges object and use it as state of our computation
                         var propAges_1 = { __current: 0 }, maxAge_1 = 1 << 31 - 1;
-                        properties.forEach(function (p) { return p instanceof Mixin || (propAges_1[p.name] = maxAge_1); });
+                        properties.forEach(function (p) { return p instanceof JSXSpreadProperty || (propAges_1[p.name] = maxAge_1); });
                         stmts.unshift("__propAges.__current++;");
                         stmts.push("__propAges");
                         addComputation(stmts, "__propAges", JSON.stringify(propAges_1), loc);
@@ -138,21 +138,28 @@ var compile = function (ctl, opts) {
         }, buildStaticProperty = function (node, id) {
             return buildProperty(id, node.name, node.value);
         }, buildDynamicProperty = function (node, id, expr) {
-            return node.name === "ref"
-                ? expr + " = " + id + ";"
-                : buildProperty(id, node.name, expr);
+            return node.name === "ref" ? buildReference(expr, id) :
+                node.name === 'S' ? buildMixin(node, id, expr) :
+                    buildProperty(id, node.name, expr);
         }, buildProperty = function (id, prop, expr) {
             return isAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
-        }, buildMixin = function (expr, id, n) {
+        }, buildReference = function (ref, id) {
+            return ref + " = " + id + ";";
+        }, buildSpread = function (node, id, n, expr) {
             var state = addId(id, 'mixin', n);
             return state + " = Surplus.spread(" + expr + ", " + id + ", " + state + ", __propAges);";
+        }, buildMixin = function (node, id, expr) {
+            addComputation(["(" + expr + ")(" + id + ", __state)"], '__state', null, node.loc);
+            return '';
         }, buildChild = function (node, parent, n) {
-            return node instanceof HtmlElement ? buildHtmlElement(node, parent, n) :
-                node instanceof HtmlComment ? buildHtmlComment(node, parent) :
-                    node instanceof HtmlText ? buildHtmlText(node, parent, n) :
+            return node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
+                node instanceof JSXComment ? buildHtmlComment(node, parent) :
+                    node instanceof JSXText ? buildHtmlText(node, parent, n) :
                         buildHtmlInsert(node, parent, n);
+        }, buildInsertedSubComponent = function (node, parent, n) {
+            return buildHtmlInsert(new JSXInsert(new EmbeddedCode([node]), node.loc), parent, n);
         }, buildHtmlComment = function (node, parent) {
             return addStatement("Surplus.createComment(" + codeStr(node.text) + ", " + parent + ")");
         }, buildHtmlText = function (node, parent, n) {
