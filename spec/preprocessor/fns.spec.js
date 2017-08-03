@@ -30,7 +30,7 @@ describe("JSX fn", function () {
         eval(code);
     });
 
-    it("can be multiple for the same node", function () {
+    it("can be repeated for multiple fns on the same node", function () {
         eval(window.SurplusPreprocessor.preprocess('            \n\
             var fn1 = el => el.id = "foo",                      \n\
                 fn2 = el => el.href = "http://bar/";            \n\

@@ -531,6 +531,14 @@ function vlq(num) {
     return str;
 }
 
+var __assign$1 = (undefined && undefined.__assign) || Object.assign || function(t) {
+    for (var s, i = 1, n = arguments.length; i < n; i++) {
+        s = arguments[i];
+        for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p))
+            t[p] = s[p];
+    }
+    return t;
+};
 // pre-compiled regular expressions
 var rx$3 = {
     backslashes: /\\/g,
@@ -561,10 +569,13 @@ var Computation = (function () {
     return Computation;
 }());
 var SubComponent = (function () {
-    function SubComponent(name, properties, children) {
+    function SubComponent(name, refs, fns, properties, children, loc) {
         this.name = name;
+        this.refs = refs;
+        this.fns = fns;
         this.properties = properties;
         this.children = children;
+        this.loc = loc;
     }
     return SubComponent;
 }());
@@ -590,48 +601,61 @@ var compile = function (ctl, opts) {
                     emitDOMExpression(buildDOMExpression(node), indent);
         return markLoc(code, node.loc, opts);
     }, buildSubComponent = function (node) {
-        var 
-        // group successive properties into property objects, but mixins stand alone
-        // e.g. a="1" b={foo} {...mixin} c="3" gets combined into [{a: "1", b: foo}, mixin, {c: "3"}]
+        var refs = [], fns = [], 
+        // group successive properties into property objects, but spreads stand alone
+        // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
         properties = node.properties.reduce(function (props, p) {
-            var lastSegment = props[props.length - 1], value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
+            var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
             if (p instanceof JSXSpreadProperty)
                 props.push(value);
-            else if (props.length === 0 || typeof lastSegment === 'string')
+            else if (p instanceof JSXDynamicProperty && p.isRef)
+                refs.push(value);
+            else if (p instanceof JSXDynamicProperty && p.isFn)
+                fns.push(value);
+            else if (lastSegment === null || typeof lastSegment === 'string')
                 props.push((_a = {}, _a[p.name] = value, _a));
             else
                 lastSegment[p.name] = value;
             return props;
             var _a;
         }, []), children = node.content.map(function (c) {
-            return c instanceof JSXElement ? compileHtmlElement(c, "") :
+            return c instanceof JSXElement ? compileHtmlElement(c, indent("")) :
                 c instanceof JSXText ? codeStr(c.text.trim()) :
                     c instanceof JSXInsert ? compileSegments(c.code) :
                         "document.createComment(" + codeStr(c.text) + ")";
         });
-        return new SubComponent(node.tag, properties, children);
-    }, emitSubComponent = function (expr, indent) {
-        var nl = "\r\n" + indent, nli = nl + '    ', nlii = nli + '    ', 
+        return new SubComponent(node.tag, refs, fns, properties, children, node.loc);
+    }, emitSubComponent = function (sub, indent) {
+        var nl = indent.nl, nli = indent.nli, nlii = indent.nlii;
+        // build properties expression
+        var 
         // convert children to an array expression
-        children = expr.children.length === 0 ? '[]' : '[' + nlii
-            + expr.children.join(',' + nlii) + nli
-            + ']', properties0 = expr.properties[0];
-        // add children property to first property object (creating one if needed)
-        // this has the double purpose of creating the children property and making sure
-        // that the first property group is not a mixin and can therefore be used as a base for extending
-        if (properties0 === undefined || typeof properties0 === 'string')
-            expr.properties.unshift({ children: children });
-        else
-            properties0['children'] = children;
-        // convert property objects to object expressions
-        var properties = expr.properties.map(function (obj) {
+        children = sub.children.length === 0 ? '[]' : '[' + nlii
+            + sub.children.join(',' + nlii) + nli
+            + ']', property0 = sub.properties.length === 0 ? null : sub.properties[0], propertiesWithChildren = property0 === null || typeof property0 === 'string'
+            ? [{ children: children }].concat(sub.properties) : [__assign$1({}, property0, { children: children })].concat(sub.properties.splice(1)), propertyExprs = propertiesWithChildren.map(function (obj) {
             return typeof obj === 'string' ? obj :
                 '{' + Object.keys(obj).map(function (p) { return "" + nli + p + ": " + obj[p]; }).join(',') + nl + '}';
-        });
-        // join multiple object expressions using Object.assign()
-        var needLibrary = expr.properties.length > 1 || typeof expr.properties[0] === 'string';
-        return needLibrary ? "Surplus.subcomponent(" + expr.name + ", [" + properties.join(', ') + "])"
-            : expr.name + "(" + properties[0] + ")";
+        }), properties = propertyExprs.length === 1 ? propertyExprs[0] :
+            "Object.assign(" + propertyExprs.join(', ') + ")";
+        // main call to sub-component
+        var expr = sub.name + "(" + properties + ")";
+        // ref assignments
+        if (sub.refs.length > 0) {
+            expr = sub.refs.map(function (r) { return r + " = "; }).join("") + expr;
+        }
+        // build computation for fns
+        if (sub.fns.length > 0) {
+            var vars = sub.fns.length === 1 ? null : sub.fns.map(function (fn, i) { return "__state{i}"; }), comp = sub.fns.length === 1
+                ? new Computation(["(" + sub.fns[0] + ")(__, __state);"], sub.loc, '__state', null)
+                : new Computation(sub.fns.map(function (fn, i) { return "__state" + i + " = (" + fn + ")(__, __state" + i + ");"; }), sub.loc, null, null);
+            expr = '(function (__) { ' + nli +
+                (vars ? "var " + vars.join(', ') + ";" + nli : '') +
+                emitComputation(comp, indent) + nli +
+                'return __;' + nl +
+                ("})(" + expr + ")");
+        }
+        return expr;
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
@@ -703,7 +727,7 @@ var compile = function (ctl, opts) {
         }, buildHtmlInsert = function (node, parent, n) {
             var id = addId(parent, 'insert', n), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
             addStatement(id + " = Surplus.createTextNode('', " + parent + ")");
-            addComputation(["Surplus.insert(range, " + ins + ");"], "range", range, node.loc);
+            addComputation(["Surplus.insert(__range, " + ins + ");"], "__range", range, node.loc);
         }, addId = function (parent, tag, n) {
             tag = tag.replace(rx$3.nonIdChars, '_');
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -717,19 +741,21 @@ var compile = function (ctl, opts) {
         buildHtmlElement(top, '', 0);
         return new DOMExpression(ids, statements, computations);
     }, emitDOMExpression = function (code, indent) {
-        var nl = "\r\n" + indent, nli = nl + '    ', nlii = nli + '    ';
+        var nl = indent.nl, nli = indent.nli, nlii = indent.nlii;
         return '(function () {' + nli
             + 'var ' + code.ids.join(', ') + ';' + nli
             + code.statements.join(nli) + nli
-            + code.computations.map(function (comp) {
-                var statements = comp.statements, loc = comp.loc, stateVar = comp.stateVar, seed = comp.seed;
-                if (stateVar)
-                    statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
-                var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed ? ", " + seed : '') + ");";
-                return markLoc(code, loc, opts);
-            }).join(nli) + (code.computations.length === 0 ? '' : nli)
+            + code.computations.map(function (comp) { return emitComputation(comp, indent); })
+                .join(nli) + (code.computations.length === 0 ? '' : nli)
             + 'return __;' + nl
             + '})()';
+    }, emitComputation = function (comp, _a) {
+        var nli = _a.nli, nlii = _a.nlii;
+        var statements = comp.statements, loc = comp.loc, stateVar = comp.stateVar, seed = comp.seed;
+        if (stateVar)
+            statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
+        var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed ? ", " + seed : '') + ");";
+        return markLoc(code, loc, opts);
     };
     return compileSegments(ctl);
 };
@@ -740,8 +766,8 @@ var isAttribute = function (prop) {
     return rx$3.attribute.test(prop);
 };
 var indent = function (previousCode) {
-    var m = rx$3.indent.exec(previousCode);
-    return m ? m[1] : '';
+    var m = rx$3.indent.exec(previousCode), pad = m ? m[1] : '', nl = "\r\n" + pad, nli = nl + '    ', nlii = nli + '    ';
+    return { nl: nl, nli: nli, nlii: nlii };
 };
 var codeStr = function (str) {
     return "'" +

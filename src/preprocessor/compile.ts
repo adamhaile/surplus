@@ -42,18 +42,21 @@ class DOMExpression {
 
 class Computation {
     constructor(
-        public statements : string[],
-        public loc : LOC,
-        public stateVar : string | null,
-        public seed : string | null,
+        public readonly statements : string[],
+        public readonly loc : LOC,
+        public readonly stateVar : string | null,
+        public readonly seed : string | null,
     ) { }
 }
 
 class SubComponent {
     constructor(
         public readonly name : string,
+        public readonly refs : string[],
+        public readonly fns : string[],
         public readonly properties : (string | { [ name : string ] : string })[],
-        public readonly children : string[]
+        public readonly children : string[],
+        public readonly loc : LOC
     ) { }
 }
 
@@ -65,7 +68,7 @@ const compile = (ctl : Program, opts : Params) => {
             node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, indent(previousCode)),
         compileCodeText = (node : CodeText) =>
             markBlockLocs(node.text, node.loc, opts),
-        compileHtmlElement = (node : JSXElement, indent : string) : string => {
+        compileHtmlElement = (node : JSXElement, indent : Indents) : string => {
             const code = 
                 !node.isHTML ?
                     emitSubComponent(buildSubComponent(node), indent) :
@@ -83,54 +86,76 @@ const compile = (ctl : Program, opts : Params) => {
         },
         buildSubComponent = (node : JSXElement) => {
             const 
-                // group successive properties into property objects, but mixins stand alone
-                // e.g. a="1" b={foo} {...mixin} c="3" gets combined into [{a: "1", b: foo}, mixin, {c: "3"}]
+                refs = [] as string[],
+                fns = [] as string[],
+                // group successive properties into property objects, but spreads stand alone
+                // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
                 properties = node.properties.reduce((props : (string | { [name : string] : string })[], p) => {
-                    const lastSegment = props[props.length - 1],
+                    const lastSegment = props.length > 0 ? props[props.length - 1] : null,
                         value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
                     
                     if (p instanceof JSXSpreadProperty) props.push(value);
-                    else if (props.length === 0 || typeof lastSegment === 'string') props.push({ [p.name]: value });
+                    else if (p instanceof JSXDynamicProperty && p.isRef) refs.push(value);
+                    else if (p instanceof JSXDynamicProperty && p.isFn) fns.push(value);
+                    else if (lastSegment === null || typeof lastSegment === 'string') props.push({ [p.name]: value });
                     else lastSegment[p.name] = value;
 
                     return props;
                 }, []),
                 children = node.content.map(c => 
-                    c instanceof JSXElement ? compileHtmlElement(c, "") :
+                    c instanceof JSXElement ? compileHtmlElement(c, indent("")) :
                     c instanceof JSXText    ? codeStr(c.text.trim()) :
                     c instanceof JSXInsert  ? compileSegments(c.code) :
                     `document.createComment(${codeStr(c.text)})`
                 ); 
 
-            return new SubComponent(node.tag, properties, children);
+            return new SubComponent(node.tag, refs, fns, properties, children, node.loc);
         },
-        emitSubComponent = (expr : SubComponent, indent : string) => {
-            const nl  = "\r\n" + indent,
-                nli   = nl   + '    ',
-                nlii  = nli  + '    ',
+        emitSubComponent = (sub : SubComponent, indent : Indents) => {
+            const { nl, nli, nlii } = indent;
+
+            // build properties expression
+            const 
                 // convert children to an array expression
-                children = expr.children.length === 0 ? '[]' : '[' + nlii
-                    + expr.children.join(',' + nlii) + nli
+                children = sub.children.length === 0 ? '[]' : '[' + nlii
+                    + sub.children.join(',' + nlii) + nli
                     + ']',
-                properties0 = expr.properties[0];
+                property0 = sub.properties.length === 0 ? null : sub.properties[0],
+                propertiesWithChildren = property0 === null || typeof property0 === 'string' 
+                    // add children to first property object if we can, otherwise add an initial property object with just children
+                    ? [{ children: children }, ...sub.properties ]
+                    : [{ ...property0, children: children }, ...sub.properties.splice(1)],
+                propertyExprs = propertiesWithChildren.map(obj =>
+                    typeof obj === 'string' ? obj :
+                    '{' + Object.keys(obj).map(p => `${nli}${p}: ${obj[p]}`).join(',') + nl + '}'
+                ),
+                properties = propertyExprs.length === 1 ? propertyExprs[0] :
+                    `Object.assign(${propertyExprs.join(', ')})`;
+            
+            // main call to sub-component
+            let expr = `${sub.name}(${properties})`;
 
-            // add children property to first property object (creating one if needed)
-            // this has the double purpose of creating the children property and making sure
-            // that the first property group is not a mixin and can therefore be used as a base for extending
-            if (properties0 === undefined || typeof properties0 === 'string') expr.properties.unshift({ children: children });
-            else properties0['children'] = children;
+            // ref assignments
+            if (sub.refs.length > 0) {
+                expr = sub.refs.map(r => r + " = ").join("") + expr;
+            }
 
-            // convert property objects to object expressions
-            const properties = expr.properties.map(obj =>
-                typeof obj === 'string' ? obj :
-                '{' + Object.keys(obj).map(p => `${nli}${p}: ${obj[p]}`).join(',') + nl + '}'
-            );
-
-            // join multiple object expressions using Object.assign()
-            const needLibrary = expr.properties.length > 1 || typeof expr.properties[0] === 'string';
-
-            return needLibrary ? `Surplus.subcomponent(${expr.name}, [${properties.join(', ')}])`
-                               : `${expr.name}(${properties[0]})`;
+            // build computation for fns
+            if (sub.fns.length > 0) {
+                const 
+                    vars = sub.fns.length === 1 ? null : sub.fns.map((fn, i) => `__state{i}`),
+                    comp = sub.fns.length === 1 
+                        ? new Computation([`(${sub.fns[0]})(__, __state);`], sub.loc, '__state', null)
+                        : new Computation(sub.fns.map((fn, i) => `__state${i} = (${fn})(__, __state${i});`), sub.loc, null, null);
+                
+                expr = '(function (__) { ' + nli +
+                    (vars ? `var ${vars.join(', ')};` + nli : '') +
+                    emitComputation(comp, indent) + nli +
+                    'return __;' + nl +
+                `})(${expr})`;
+            }
+            
+            return expr;
         },
         buildDOMExpression = (top : JSXElement) => {
             const ids = [] as string[],
@@ -142,7 +167,7 @@ const compile = (ctl : Program, opts : Params) => {
                 if (!node.isHTML) {
                     buildInsertedSubComponent(node, parent, n);
                 } else {
-                    const                    
+                    const
                         id         = addId(parent, tag, n),
                         exprs      = properties.map(p => p instanceof JSXStaticProperty ? '' : compileSegments(p.code)), 
                         spreads    = properties.filter(p => p instanceof JSXSpreadProperty) as JSXSpreadProperty[],
@@ -224,7 +249,7 @@ const compile = (ctl : Program, opts : Params) => {
                     ins = compileSegments(node.code),
                     range = `{ start: ${id}, end: ${id} }`;
                 addStatement(`${id} = Surplus.createTextNode('', ${parent})`);
-                addComputation([`Surplus.insert(range, ${ins});`], "range", range, node.loc);
+                addComputation([`Surplus.insert(__range, ${ins});`], "__range", range, node.loc);
             },
             addId = (parent : string, tag : string, n : number) => {
                 tag = tag.replace(rx.nonIdChars, '_');
@@ -242,26 +267,25 @@ const compile = (ctl : Program, opts : Params) => {
 
             return new DOMExpression(ids, statements, computations);
         },
-        emitDOMExpression = (code : DOMExpression, indent : string) => {
-            var nl    = "\r\n" + indent,
-                nli   = nl   + '    ',
-                nlii  = nli  + '    ';
-
+        emitDOMExpression = (code : DOMExpression, indent : Indents) => {
+            const { nl, nli, nlii } = indent;
             return '(function () {' + nli
                 + 'var ' + code.ids.join(', ') + ';' + nli
                 + code.statements.join(nli) + nli
-                + code.computations.map(comp => {
-                    const { statements, loc, stateVar, seed } = comp;
-
-                    if (stateVar) statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
-
-                    const body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli),
-                        code = `Surplus.S(function (${stateVar || ''}) {${body}}${seed ? `, ${seed}` : ''});`;
-
-                    return markLoc(code, loc, opts);
-                }).join(nli) + (code.computations.length === 0 ? '' : nli)
+                + code.computations.map(comp => emitComputation(comp, indent))
+                    .join(nli) + (code.computations.length === 0 ? '' : nli)
                 + 'return __;' + nl
                 +  '})()';
+        },
+        emitComputation = (comp : Computation, { nli, nlii } : Indents) => {
+            const { statements, loc, stateVar, seed } = comp;
+
+            if (stateVar) statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
+
+            const body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli),
+                code = `Surplus.S(function (${stateVar || ''}) {${body}}${seed ? `, ${seed}` : ''});`;
+
+            return markLoc(code, loc, opts);
         };
 
         return compileSegments(ctl);
@@ -272,9 +296,14 @@ const
         !rx.hasParen.test(code) || (rx.loneFunction.test(code) && !rx.endsInParen.test(code)),
     isAttribute = (prop : string) =>
         rx.attribute.test(prop), // TODO: better heuristic for attributes than name contains a hyphen
-    indent = (previousCode : string) => {
-        const m = rx.indent.exec(previousCode);
-        return m ? m[1] : '';
+    indent = (previousCode : string) : Indents => {
+        const m  = rx.indent.exec(previousCode),
+            pad  = m ? m[1] : '',
+            nl   = "\r\n" + pad,
+            nli  = nl   + '    ',
+            nlii = nli  + '    ';
+
+        return { nl, nli, nlii };
     },
     codeStr = (str : string) =>
         "'" + 
@@ -282,6 +311,8 @@ const
            .replace(rx.singleQuotes, "\\'")
            .replace(rx.newlines, "\\\n") +
         "'";
+
+interface Indents { nl : string, nli : string, nlii : string }
 
 const 
     markLoc = (str : string, loc : LOC, opts : Params) =>

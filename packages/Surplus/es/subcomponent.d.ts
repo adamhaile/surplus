@@ -1,1 +1,1 @@
-export declare function subcomponent<T, U>(fn: (props: T) => U, params: (Partial<T> | ((res: U) => void))[]): U;
+export declare function subcomponent<T, U>(cmp: (props: T) => U, params: Partial<T>[], fns: null | ((res: U) => void)[]): U;

@@ -7,7 +7,6 @@ describe("subcomponent", function () {
                                                                         \n\
             expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \n\
         ');
-
         eval(code);
     });
 
@@ -31,7 +30,6 @@ describe("subcomponent", function () {
             expect(props.children[2] instanceof Comment).toBe(true);        \n\
             expect(props.children[2].data).toBe(" comment ");               \n\
         ');
-
         eval(code);
     });
 
@@ -47,7 +45,6 @@ describe("subcomponent", function () {
             expect(typeof props.children[0]).toBe("string");                \n\
             expect(props.children[0]).toBe("some words");                   \n\
         ');
-
         eval(code);
     });
 
@@ -64,24 +61,33 @@ describe("subcomponent", function () {
             expect(div.childNodes[0] instanceof HTMLSpanElement).toBe(true);\n\
             expect(div.childNodes[0].innerText).toBe("foo");                \n\
         ');
-
         eval(code);
     });
 
-    it("can have spread properties", function () {
-        var code = window.SurplusPreprocessor.preprocess('                  \n\
-            var props = null,                                               \n\
-                SubComponent = p => props = p,                              \n\
-                mixin = p => p.d = 6,                                       \n\
-                sub = <SubComponent                                         \n\
-                        a="1"                                               \n\
-                        {...{ a: "2", b: true, c: "4"}}                     \n\
-                        c={5}                                               \n\
-                        {...mixin} />;                                      \n\
-                                                                            \n\
+    it("can have spread and fn properties", function () {
+        var code = window.SurplusPreprocessor.preprocess('                        \n\
+            var props = null,                                                     \n\
+                SubComponent = p => props = p,                                    \n\
+                mixin = p => p.d = 6,                                             \n\
+                sub = <SubComponent                                               \n\
+                        a="1"                                                     \n\
+                        {...{ a: "2", b: true, c: "4"}}                           \n\
+                        c={5}                                                     \n\
+                        fn={mixin} />;                                            \n\
+                                                                                  \n\
             expect(props).toEqual({ a: "2", b: true, c: 5, children: [], d: 6 }); \n\
         ');
+        eval(code);
+    });
 
+    it("is re-called when a property changes", function () {
+        var code = window.SurplusPreprocessor.preprocess('              \n\
+            var props = null,                                           \n\
+                SubComponent = p => props = p,                          \n\
+                sub = <SubComponent foo="2" bar={3}/>;                  \n\
+                                                                        \n\
+            expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \n\
+        ');
         eval(code);
     });
 
@@ -94,7 +100,6 @@ describe("subcomponent", function () {
             expect(sub).toEqual("sub");                                 \n\
             expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \n\
         ');
-
         eval(code);
     });
 
@@ -110,7 +115,6 @@ describe("subcomponent", function () {
             expect(div.childNodes[0].data).toBe("sub");                 \n\
             expect(props).toEqual({ foo: "2", bar: 3, children: [] });  \n\
         ');
-
         eval(code);
     });
 });
