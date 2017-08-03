@@ -68,6 +68,11 @@ export class JSXDynamicProperty {
         public readonly code : EmbeddedCode,
         public readonly loc : LOC
     ) { }
+
+    static RefName = "ref";
+    isRef = this.name === JSXDynamicProperty.RefName;
+    static FnName = "fn";
+    isFn = this.name === JSXDynamicProperty.FnName;
 }
 
 export class JSXSpreadProperty {
