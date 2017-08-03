@@ -30,6 +30,20 @@ describe("JSX fn", function () {
         eval(code);
     });
 
+    it("can be multiple for the same node", function () {
+        eval(window.SurplusPreprocessor.preprocess('            \n\
+            var fn1 = el => el.id = "foo",                      \n\
+                fn2 = el => el.href = "http://bar/";            \n\
+                fn3 = el => el.name = "blech";                  \n\
+                                                                \n\
+            var a = <a fn={fn1} fn={fn2} fn={fn3} />;           \n\
+                                                                \n\
+            expect(a.id).toBe("foo");                           \n\
+            expect(a.href).toBe("http://bar/");                 \n\
+            expect(a.name).toBe("blech");                       \n\
+        '));
+    });
+
     it("can set properties on the node", function () {
         eval(window.SurplusPreprocessor.preprocess('            \n\
             var mixin = el => el.id = "id";                     \n\
