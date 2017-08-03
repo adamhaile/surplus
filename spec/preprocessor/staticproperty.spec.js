@@ -34,9 +34,9 @@ describe("JSX static property", function () {
 
     it("can set sub-properties", function () {
         eval(window.SurplusPreprocessor.preprocess('        \n\
-            var input = <input style.width="50%" />;       \n\
+            var input = <input style.width="50%" />;        \n\
                                                             \n\
-            expect(input.style.width).toBe("50%");         \n\
+            expect(input.style.width).toBe("50%");          \n\
         '));
     });
 
@@ -46,5 +46,15 @@ describe("JSX static property", function () {
                                                             \n\
             expect(div.id).toBe("b");                       \n\
         '));
+    });
+
+    it("throws if named 'ref' or 'fn'", function () {
+        expect(() => window.SurplusPreprocessor.preprocess(
+            '<div ref="ref"></div>'
+        )).toThrowError(/ref/);
+        
+        expect(() => window.SurplusPreprocessor.preprocess(
+            '<div fn="fn"></div>'
+        )).toThrowError(/fn/);
     });
 });
