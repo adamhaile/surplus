@@ -5,7 +5,8 @@ import { Params } from './preprocess';
 const rx = {
     identifier       : /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
-    leadingWs        : /^\s+/
+    leadingWs        : /^\s+/,
+    badStaticPropName: new RegExp(`^(${AST.JSXDynamicProperty.RefName}|${AST.JSXDynamicProperty.FnName})$`)
 };
 
 const parens : { [p : string] : string } = {
@@ -25,9 +26,9 @@ export function parse(TOKS : string[], opts : Params) {
         COL = 0,
         POS = 0;
 
-    return codeTopLevel();
+    return program();
 
-    function codeTopLevel() {
+    function program() {
         var segments = [] as AST.CodeSegment[],
             text = "",
             loc = LOC();
@@ -36,7 +37,7 @@ export function parse(TOKS : string[], opts : Params) {
             if (IS('<')) {
                 if (text) segments.push(new AST.CodeText(text, loc));
                 text = "";
-                segments.push(htmlElement());
+                segments.push(jsxElement());
                 loc = LOC();
             } else if (IS('"') || IS("'")) {
                 text += quotedString();
@@ -54,7 +55,7 @@ export function parse(TOKS : string[], opts : Params) {
         return new AST.Program(segments);
     }
 
-    function htmlElement() : AST.JSXElement {
+    function jsxElement() : AST.JSXElement {
         if (NOT('<')) ERR("not at start of html element");
 
         var start = LOC(),
@@ -74,9 +75,9 @@ export function parse(TOKS : string[], opts : Params) {
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
-                properties.push(property());
+                properties.push(jsxProperty());
             } else if (IS('{...')) {
-                properties.push(spread());
+                properties.push(jsxSpreadProperty());
             } else {
                 ERR("unrecognized content in begin tag");
             }
@@ -93,13 +94,13 @@ export function parse(TOKS : string[], opts : Params) {
         if (hasContent) {
             while (!EOF && NOT('</')) {
                 if (IS('<')) {
-                    content.push(htmlElement());
+                    content.push(jsxElement());
                 } else if (IS('{')) {
-                    content.push(htmlInsert());
+                    content.push(jsxInsert());
                 } else if (IS('<!--')) {
-                    content.push(htmlComment());
+                    content.push(jsxComment());
                 } else {
-                    content.push(htmlText());
+                    content.push(jsxText());
                 }
             }
 
@@ -117,7 +118,7 @@ export function parse(TOKS : string[], opts : Params) {
         return new AST.JSXElement(tag, properties, content, start);
     }
 
-    function htmlText() {
+    function jsxText() {
         var text = "";
 
         while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
@@ -127,7 +128,7 @@ export function parse(TOKS : string[], opts : Params) {
         return new AST.JSXText(text);
     }
 
-    function htmlComment() {
+    function jsxComment() {
         if (NOT('<!--')) ERR("not in HTML comment");
 
         var start = LOC(),
@@ -146,12 +147,12 @@ export function parse(TOKS : string[], opts : Params) {
         return new AST.JSXComment(text);
     }
 
-    function htmlInsert() {
+    function jsxInsert() {
         var loc = LOC();
         return new AST.JSXInsert(embeddedCode(), loc);
     }
 
-    function property() {
+    function jsxProperty() {
         if (!MATCH(rx.identifier)) ERR("not at start of property declaration");
 
         var loc = LOC(),
@@ -166,6 +167,7 @@ export function parse(TOKS : string[], opts : Params) {
             SKIPWS();
 
             if (IS('"') || IS("'")) {
+                if (rx.badStaticPropName.test(name)) ERR("cannot name a static property 'ref' or 'fn'", loc);
                 return new AST.JSXStaticProperty(name, quotedString());
             } else if (IS('{')) {
                 return new AST.JSXDynamicProperty(name, embeddedCode(), loc);
@@ -177,7 +179,7 @@ export function parse(TOKS : string[], opts : Params) {
         }
     }
 
-    function spread() {
+    function jsxSpreadProperty() {
         if (NOT('{...')) ERR("not at start of JSX spread");
 
         var loc = LOC();
@@ -223,7 +225,7 @@ export function parse(TOKS : string[], opts : Params) {
             } else if (IS("<")) {
                 if (text) segments.push(new AST.CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
                 text = "";
-                segments.push(htmlElement());
+                segments.push(jsxElement());
                 loc.line = LINE;
                 loc.col = COL;
                 loc.pos = POS;
