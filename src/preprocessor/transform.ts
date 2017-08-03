@@ -41,7 +41,11 @@ function removeDuplicateProperties(tx : Copy) : Copy {
 
             properties.forEach((p, i) => p instanceof JSXSpreadProperty || (lastid[p.name] = i));
 
-            const uniqueProperties = properties.filter((p, i) => p instanceof JSXSpreadProperty || lastid[p.name] === i);
+            const uniqueProperties = properties.filter((p, i) => 
+                p instanceof JSXSpreadProperty 
+                || JSXDynamicProperty.SpecialPropName.test(p.name) 
+                || lastid[p.name] === i
+            );
 
             if (properties.length !== uniqueProperties.length) {
                 node = new JSXElement(tag, uniqueProperties, content, loc);

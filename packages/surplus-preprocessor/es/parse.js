@@ -3,8 +3,7 @@ import * as AST from './AST';
 var rx = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
-    leadingWs: /^\s+/,
-    badStaticPropName: new RegExp("^(" + AST.JSXDynamicProperty.RefName + "|" + AST.JSXDynamicProperty.FnName + ")$")
+    leadingWs: /^\s+/
 };
 var parens = {
     "(": ")",
@@ -128,7 +127,7 @@ export function parse(TOKS, opts) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
-                if (rx.badStaticPropName.test(name))
+                if (AST.JSXDynamicProperty.SpecialPropName.test(name))
                     ERR("cannot name a static property 'ref' or 'fn'", loc);
                 return new AST.JSXStaticProperty(name, quotedString());
             }

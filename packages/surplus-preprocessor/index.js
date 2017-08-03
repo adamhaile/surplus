@@ -101,6 +101,7 @@ var JSXDynamicProperty = (function () {
     }
     JSXDynamicProperty.RefName = "ref";
     JSXDynamicProperty.FnName = "fn";
+    JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + ")$");
     return JSXDynamicProperty;
 }());
 var JSXSpreadProperty = (function () {
@@ -159,8 +160,7 @@ var Copy = {
 var rx$1 = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
-    leadingWs: /^\s+/,
-    badStaticPropName: new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + ")$")
+    leadingWs: /^\s+/
 };
 var parens = {
     "(": ")",
@@ -284,7 +284,7 @@ function parse(TOKS, opts) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
-                if (rx$1.badStaticPropName.test(name))
+                if (JSXDynamicProperty.SpecialPropName.test(name))
                     ERR("cannot name a static property 'ref' or 'fn'", loc);
                 return new JSXStaticProperty(name, quotedString());
             }
@@ -800,7 +800,11 @@ function removeDuplicateProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, lastid = {};
             properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || (lastid[p.name] = i); });
-            var uniqueProperties = properties.filter(function (p, i) { return p instanceof JSXSpreadProperty || lastid[p.name] === i; });
+            var uniqueProperties = properties.filter(function (p, i) {
+                return p instanceof JSXSpreadProperty
+                    || JSXDynamicProperty.SpecialPropName.test(p.name)
+                    || lastid[p.name] === i;
+            });
             if (properties.length !== uniqueProperties.length) {
                 node = new JSXElement(tag, uniqueProperties, content, loc);
             }

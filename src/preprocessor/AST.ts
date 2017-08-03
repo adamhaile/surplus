@@ -73,6 +73,7 @@ export class JSXDynamicProperty {
     isRef = this.name === JSXDynamicProperty.RefName;
     static FnName = "fn";
     isFn = this.name === JSXDynamicProperty.FnName;
+    static SpecialPropName = new RegExp(`^(${JSXDynamicProperty.RefName}|${JSXDynamicProperty.FnName})$`);
 }
 
 export class JSXSpreadProperty {

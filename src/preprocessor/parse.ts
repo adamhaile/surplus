@@ -5,8 +5,7 @@ import { Params } from './preprocess';
 const rx = {
     identifier       : /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
-    leadingWs        : /^\s+/,
-    badStaticPropName: new RegExp(`^(${AST.JSXDynamicProperty.RefName}|${AST.JSXDynamicProperty.FnName})$`)
+    leadingWs        : /^\s+/
 };
 
 const parens : { [p : string] : string } = {
@@ -167,7 +166,7 @@ export function parse(TOKS : string[], opts : Params) {
             SKIPWS();
 
             if (IS('"') || IS("'")) {
-                if (rx.badStaticPropName.test(name)) ERR("cannot name a static property 'ref' or 'fn'", loc);
+                if (AST.JSXDynamicProperty.SpecialPropName.test(name)) ERR("cannot name a static property 'ref' or 'fn'", loc);
                 return new AST.JSXStaticProperty(name, quotedString());
             } else if (IS('{')) {
                 return new AST.JSXDynamicProperty(name, embeddedCode(), loc);

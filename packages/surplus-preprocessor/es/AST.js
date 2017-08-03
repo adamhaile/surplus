@@ -72,6 +72,7 @@ var JSXDynamicProperty = (function () {
     }
     JSXDynamicProperty.RefName = "ref";
     JSXDynamicProperty.FnName = "fn";
+    JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + ")$");
     return JSXDynamicProperty;
 }());
 export { JSXDynamicProperty };
