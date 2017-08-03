@@ -145,17 +145,20 @@ const compile = (ctl : Program, opts : Params) => {
                     const                    
                         id         = addId(parent, tag, n),
                         exprs      = properties.map(p => p instanceof JSXStaticProperty ? '' : compileSegments(p.code)), 
-                        hasMixins  = properties.some(p => p instanceof JSXSpreadProperty),
-                        classProp  = !hasMixins && properties.filter(p => p instanceof JSXStaticProperty && p.name === 'className')[0] as JSXStaticProperty || null,
-                        dynamic    = hasMixins || exprs.some(e => !noApparentSignals(e)),
+                        spreads    = properties.filter(p => p instanceof JSXSpreadProperty) as JSXSpreadProperty[],
+                        fns        = properties.filter(p => p instanceof JSXDynamicProperty && p.isFn) as JSXDynamicProperty[],
+                        refs       = properties.filter(p => p instanceof JSXDynamicProperty && p.isRef) as JSXDynamicProperty[],
+                        classProp  = spreads.length === 0 && fns.length === 0 && properties.filter(p => p instanceof JSXStaticProperty && p.name === 'className')[0] as JSXStaticProperty || null,
+                        dynamic    = fns.length > 0 || exprs.some(e => !noApparentSignals(e)),
                         stmts      = properties.map((p, i) => 
-                            p === classProp              ? '' :
+                            p === classProp                 ? '' :
                             p instanceof JSXStaticProperty  ? buildStaticProperty(p, id) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id, exprs[i]) :
-                            buildSpread(p, id, n, exprs[i])
-                        ).filter(s => s !== '');
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id, i, exprs[i]) :
+                            buildSpread(p, id, exprs[i], dynamic, spreads)
+                        ).filter(s => s !== ''),
+                        refStmts   = refs.map(r => compileSegments(r.code) + ' = ').join('');
 
-                    addStatement(`${id} = Surplus.createElement('${tag}', ${classProp && classProp.value}, ${parent || 'null'});`);
+                    addStatement(`${id} = ${refStmts}Surplus.createElement('${tag}', ${classProp && classProp.value}, ${parent || null});`);
                     
                     if (!dynamic) {
                         stmts.forEach(addStatement);
@@ -164,14 +167,13 @@ const compile = (ctl : Program, opts : Params) => {
                     content.forEach((c, i) => buildChild(c, id, i));
 
                     if (dynamic) {
-                        if (hasMixins) {
-                            // create propAges object and use it as state of our computation
-                            const propAges = { __current : 0 } as { [ name : string ] : number },
-                                maxAge = 1 << 31 - 1;
-                            properties.forEach(p => p instanceof JSXSpreadProperty || (propAges[p.name] = maxAge));
-                            stmts.unshift("__propAges.__current++;");
-                            stmts.push("__propAges");
-                            addComputation(stmts, "__propAges", JSON.stringify(propAges), loc);
+                        if (spreads.length > 0) {
+                            // create namedProps object and use it to initialize our spread state
+                            const namedProps = {} as { [ name : string ] : boolean };
+                            properties.forEach(p => p instanceof JSXSpreadProperty || (namedProps[p.name] = true));
+                            const state = `new Surplus.${spreads.length === 1 ? 'Single' : 'Multi'}SpreadState(${JSON.stringify(namedProps)})`;
+                            stmts.push("__spread;");
+                            addComputation(stmts, "__spread", state, loc);
                         } else {
                             addComputation(stmts, null, null, loc);
                         }
@@ -180,23 +182,31 @@ const compile = (ctl : Program, opts : Params) => {
             },
             buildStaticProperty = (node : JSXStaticProperty, id : string) =>
                 buildProperty(id, node.name, node.value),
-            buildDynamicProperty = (node : JSXDynamicProperty, id : string, expr : string) =>
-                node.name === "ref" ? buildReference(expr, id) :
-                node.name === 'S' ? buildMixin(node, id, expr) :
+            buildDynamicProperty = (node : JSXDynamicProperty, id : string, n : number, expr : string) =>
+                node.isRef ? buildReference(expr, id) :
+                node.isFn ? buildNodeFn(node, id, n, expr) :
                 buildProperty(id, node.name, expr),
             buildProperty = (id : string, prop : string, expr : string) =>
                 isAttribute(prop)
                 ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
-            buildReference = (ref : string, id : string) =>
-                `${ref} = ${id};`,
-            buildSpread = (node : JSXSpreadProperty, id : string, n : number, expr : string) => {
-                const state = addId(id, 'mixin', n);
-                return `${state} = Surplus.spread(${expr}, ${id}, ${state}, __propAges);`;
+            buildReference = (ref : string, id : string) => '',
+            buildSpread = (node : JSXSpreadProperty, id : string, expr : string, dynamic : boolean, spreads : JSXSpreadProperty[]) =>
+                !dynamic             ? buildStaticSpread(node, id, expr) :
+                spreads.length === 1 ? buildSingleSpread(node, id, expr) :
+                buildMultiSpread(node, id, expr, spreads),
+            buildStaticSpread = (node : JSXSpreadProperty, id : string, expr : string) =>
+                `Surplus.staticSpread(${id}, ${expr});`,
+            buildSingleSpread = (node : JSXSpreadProperty, id : string, expr : string) =>
+                `__spread.apply(${id}, ${expr});`,
+            buildMultiSpread = (node : JSXSpreadProperty, id : string, expr : string, spreads : JSXSpreadProperty[]) => {
+                var n = spreads.indexOf(node),
+                    final = n === spreads.length - 1;
+                return `__spread.apply(${id}, ${expr}, ${n}, ${final});`;
             },
-            buildMixin = (node : JSXDynamicProperty, id : string, expr : string) => {
-                addComputation([`(${expr})(${id}, __state)`], '__state', null, node.loc);
-                return '';
+            buildNodeFn = (node : JSXDynamicProperty, id : string, n : number, expr : string) => {
+                const state = addId(id, 'fn', n);
+                return `${state} = (${expr})(${id}, ${state});`;
             },
             buildChild = (node : JSXContent, parent : string, n : number) =>
                 node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
@@ -245,11 +255,11 @@ const compile = (ctl : Program, opts : Params) => {
 
                     if (stateVar) statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
 
-                    const body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nlii),
+                    const body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli),
                         code = `Surplus.S(function (${stateVar || ''}) {${body}}${seed ? `, ${seed}` : ''});`;
 
                     return markLoc(code, loc, opts);
-                }).join(nli) + nli
+                }).join(nli) + (code.computations.length === 0 ? '' : nli)
                 + 'return __;' + nl
                 +  '})()';
         };

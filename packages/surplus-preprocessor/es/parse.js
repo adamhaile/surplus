@@ -3,7 +3,8 @@ import * as AST from './AST';
 var rx = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
-    leadingWs: /^\s+/
+    leadingWs: /^\s+/,
+    badStaticPropName: new RegExp("^(" + AST.JSXDynamicProperty.RefName + "|" + AST.JSXDynamicProperty.FnName + ")$")
 };
 var parens = {
     "(": ")",
@@ -14,15 +15,15 @@ var parens = {
 ;
 export function parse(TOKS, opts) {
     var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
-    return codeTopLevel();
-    function codeTopLevel() {
+    return program();
+    function program() {
         var segments = [], text = "", loc = LOC();
         while (!EOF) {
             if (IS('<')) {
                 if (text)
                     segments.push(new AST.CodeText(text, loc));
                 text = "";
-                segments.push(htmlElement());
+                segments.push(jsxElement());
                 loc = LOC();
             }
             else if (IS('"') || IS("'")) {
@@ -42,7 +43,7 @@ export function parse(TOKS, opts) {
             segments.push(new AST.CodeText(text, loc));
         return new AST.Program(segments);
     }
-    function htmlElement() {
+    function jsxElement() {
         if (NOT('<'))
             ERR("not at start of html element");
         var start = LOC(), tag = "", properties = [], content = [], hasContent = true;
@@ -54,10 +55,10 @@ export function parse(TOKS, opts) {
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
-                properties.push(property());
+                properties.push(jsxProperty());
             }
             else if (IS('{...')) {
-                properties.push(spread());
+                properties.push(jsxSpreadProperty());
             }
             else {
                 ERR("unrecognized content in begin tag");
@@ -71,16 +72,16 @@ export function parse(TOKS, opts) {
         if (hasContent) {
             while (!EOF && NOT('</')) {
                 if (IS('<')) {
-                    content.push(htmlElement());
+                    content.push(jsxElement());
                 }
                 else if (IS('{')) {
-                    content.push(htmlInsert());
+                    content.push(jsxInsert());
                 }
                 else if (IS('<!--')) {
-                    content.push(htmlComment());
+                    content.push(jsxComment());
                 }
                 else {
-                    content.push(htmlText());
+                    content.push(jsxText());
                 }
             }
             if (EOF)
@@ -94,14 +95,14 @@ export function parse(TOKS, opts) {
         }
         return new AST.JSXElement(tag, properties, content, start);
     }
-    function htmlText() {
+    function jsxText() {
         var text = "";
         while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
             text += TOK, NEXT();
         }
         return new AST.JSXText(text);
     }
-    function htmlComment() {
+    function jsxComment() {
         if (NOT('<!--'))
             ERR("not in HTML comment");
         var start = LOC(), text = "";
@@ -114,11 +115,11 @@ export function parse(TOKS, opts) {
         NEXT(); // skip '-->'
         return new AST.JSXComment(text);
     }
-    function htmlInsert() {
+    function jsxInsert() {
         var loc = LOC();
         return new AST.JSXInsert(embeddedCode(), loc);
     }
-    function property() {
+    function jsxProperty() {
         if (!MATCH(rx.identifier))
             ERR("not at start of property declaration");
         var loc = LOC(), name = SPLIT(rx.identifier), code;
@@ -127,6 +128,8 @@ export function parse(TOKS, opts) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
+                if (rx.badStaticPropName.test(name))
+                    ERR("cannot name a static property 'ref' or 'fn'", loc);
                 return new AST.JSXStaticProperty(name, quotedString());
             }
             else if (IS('{')) {
@@ -140,7 +143,7 @@ export function parse(TOKS, opts) {
             return new AST.JSXStaticProperty(name, "true");
         }
     }
-    function spread() {
+    function jsxSpreadProperty() {
         if (NOT('{...'))
             ERR("not at start of JSX spread");
         var loc = LOC();
@@ -178,7 +181,7 @@ export function parse(TOKS, opts) {
                 if (text)
                     segments.push(new AST.CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
                 text = "";
-                segments.push(htmlElement());
+                segments.push(jsxElement());
                 loc.line = LINE;
                 loc.col = COL;
                 loc.pos = POS;

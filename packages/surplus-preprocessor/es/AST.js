@@ -67,7 +67,11 @@ var JSXDynamicProperty = (function () {
         this.name = name;
         this.code = code;
         this.loc = loc;
+        this.isRef = this.name === JSXDynamicProperty.RefName;
+        this.isFn = this.name === JSXDynamicProperty.FnName;
     }
+    JSXDynamicProperty.RefName = "ref";
+    JSXDynamicProperty.FnName = "fn";
     return JSXDynamicProperty;
 }());
 export { JSXDynamicProperty };

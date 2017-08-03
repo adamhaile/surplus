@@ -47,6 +47,10 @@ export declare class JSXDynamicProperty {
     readonly code: EmbeddedCode;
     readonly loc: LOC;
     constructor(name: string, code: EmbeddedCode, loc: LOC);
+    static RefName: string;
+    isRef: boolean;
+    static FnName: string;
+    isFn: boolean;
 }
 export declare class JSXSpreadProperty {
     readonly code: EmbeddedCode;

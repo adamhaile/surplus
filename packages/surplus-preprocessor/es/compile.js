@@ -110,25 +110,25 @@ var compile = function (ctl, opts) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), hasMixins = properties.some(function (p) { return p instanceof JSXSpreadProperty; }), classProp_1 = !hasMixins && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic = hasMixins || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty; }), fns = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isFn; }), refs = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isRef; }), classProp_1 = spreads_1.length === 0 && fns.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic_1 = fns.length > 0 || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
                         p instanceof JSXStaticProperty ? buildStaticProperty(p, id_1) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, exprs_1[i]) :
-                                buildSpread(p, id_1, n, exprs_1[i]);
-                }).filter(function (s) { return s !== ''; });
-                addStatement(id_1 + " = Surplus.createElement('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || 'null') + ");");
-                if (!dynamic) {
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, i, exprs_1[i]) :
+                                buildSpread(p, id_1, exprs_1[i], dynamic_1, spreads_1);
+                }).filter(function (s) { return s !== ''; }), refStmts = refs.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
+                addStatement(id_1 + " = " + refStmts + "Surplus.createElement('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
+                if (!dynamic_1) {
                     stmts.forEach(addStatement);
                 }
                 content.forEach(function (c, i) { return buildChild(c, id_1, i); });
-                if (dynamic) {
-                    if (hasMixins) {
-                        // create propAges object and use it as state of our computation
-                        var propAges_1 = { __current: 0 }, maxAge_1 = 1 << 31 - 1;
-                        properties.forEach(function (p) { return p instanceof JSXSpreadProperty || (propAges_1[p.name] = maxAge_1); });
-                        stmts.unshift("__propAges.__current++;");
-                        stmts.push("__propAges");
-                        addComputation(stmts, "__propAges", JSON.stringify(propAges_1), loc);
+                if (dynamic_1) {
+                    if (spreads_1.length > 0) {
+                        // create namedProps object and use it to initialize our spread state
+                        var namedProps_1 = {};
+                        properties.forEach(function (p) { return p instanceof JSXSpreadProperty || (namedProps_1[p.name] = true); });
+                        var state = "new Surplus." + (spreads_1.length === 1 ? 'Single' : 'Multi') + "SpreadState(" + JSON.stringify(namedProps_1) + ")";
+                        stmts.push("__spread;");
+                        addComputation(stmts, "__spread", state, loc);
                     }
                     else {
                         addComputation(stmts, null, null, loc);
@@ -137,22 +137,28 @@ var compile = function (ctl, opts) {
             }
         }, buildStaticProperty = function (node, id) {
             return buildProperty(id, node.name, node.value);
-        }, buildDynamicProperty = function (node, id, expr) {
-            return node.name === "ref" ? buildReference(expr, id) :
-                node.name === 'S' ? buildMixin(node, id, expr) :
+        }, buildDynamicProperty = function (node, id, n, expr) {
+            return node.isRef ? buildReference(expr, id) :
+                node.isFn ? buildNodeFn(node, id, n, expr) :
                     buildProperty(id, node.name, expr);
         }, buildProperty = function (id, prop, expr) {
             return isAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
-        }, buildReference = function (ref, id) {
-            return ref + " = " + id + ";";
-        }, buildSpread = function (node, id, n, expr) {
-            var state = addId(id, 'mixin', n);
-            return state + " = Surplus.spread(" + expr + ", " + id + ", " + state + ", __propAges);";
-        }, buildMixin = function (node, id, expr) {
-            addComputation(["(" + expr + ")(" + id + ", __state)"], '__state', null, node.loc);
-            return '';
+        }, buildReference = function (ref, id) { return ''; }, buildSpread = function (node, id, expr, dynamic, spreads) {
+            return !dynamic ? buildStaticSpread(node, id, expr) :
+                spreads.length === 1 ? buildSingleSpread(node, id, expr) :
+                    buildMultiSpread(node, id, expr, spreads);
+        }, buildStaticSpread = function (node, id, expr) {
+            return "Surplus.staticSpread(" + id + ", " + expr + ");";
+        }, buildSingleSpread = function (node, id, expr) {
+            return "__spread.apply(" + id + ", " + expr + ");";
+        }, buildMultiSpread = function (node, id, expr, spreads) {
+            var n = spreads.indexOf(node), final = n === spreads.length - 1;
+            return "__spread.apply(" + id + ", " + expr + ", " + n + ", " + final + ");";
+        }, buildNodeFn = function (node, id, n, expr) {
+            var state = addId(id, 'fn', n);
+            return state + " = (" + expr + ")(" + id + ", " + state + ");";
         }, buildChild = function (node, parent, n) {
             return node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :
@@ -189,9 +195,9 @@ var compile = function (ctl, opts) {
                 var statements = comp.statements, loc = comp.loc, stateVar = comp.stateVar, seed = comp.seed;
                 if (stateVar)
                     statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
-                var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nlii), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed ? ", " + seed : '') + ");";
+                var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed ? ", " + seed : '') + ");";
                 return markLoc(code, loc, opts);
-            }).join(nli) + nli
+            }).join(nli) + (code.computations.length === 0 ? '' : nli)
             + 'return __;' + nl
             + '})()';
     };
