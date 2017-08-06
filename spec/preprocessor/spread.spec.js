@@ -14,6 +14,17 @@ describe("JSX ...spreads", function () {
         eval(code);
     });
 
+    it("add styles on the node", function () {
+        var code = window.SurplusPreprocessor.preprocess('      \n\
+            var spread = { style : { width: "50%" } },          \n\
+                a = <a {...spread} />;                          \n\
+                                                                \n\
+            expect(a.style.width).toBe("50%");                  \n\
+        ');
+
+        eval(code);
+    });
+
     it("add an attribute on the node when no property is available", function () {
         var code = window.SurplusPreprocessor.preprocess('      \n\
             var spread = { "aria-hidden" : "true" },            \n\

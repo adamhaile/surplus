@@ -98,10 +98,12 @@ var JSXDynamicProperty = (function () {
         this.loc = loc;
         this.isRef = this.name === JSXDynamicProperty.RefName;
         this.isFn = this.name === JSXDynamicProperty.FnName;
+        this.isStyle = this.name === JSXDynamicProperty.StyleName;
     }
     JSXDynamicProperty.RefName = "ref";
     JSXDynamicProperty.FnName = "fn";
-    JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + ")$");
+    JSXDynamicProperty.StyleName = "style";
+    JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + "|" + JSXDynamicProperty.StyleName + ")$");
     return JSXDynamicProperty;
 }());
 var JSXSpreadProperty = (function () {
@@ -664,10 +666,10 @@ var compile = function (ctl, opts) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty; }), fns = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isFn; }), refs = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isRef; }), classProp_1 = spreads_1.length === 0 && fns.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic_1 = fns.length > 0 || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || (p instanceof JSXDynamicProperty && p.isStyle); }), fns = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isFn; }), refs = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isRef; }), classProp_1 = spreads_1.length === 0 && fns.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic_1 = fns.length > 0 || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
                         p instanceof JSXStaticProperty ? buildStaticProperty(p, id_1) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, i, exprs_1[i]) :
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, i, exprs_1[i], dynamic_1, spreads_1) :
                                 buildSpread(p, id_1, exprs_1[i], dynamic_1, spreads_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = refs.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
                 addStatement(id_1 + " = " + refStmts + "Surplus.createElement('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
@@ -691,10 +693,11 @@ var compile = function (ctl, opts) {
             }
         }, buildStaticProperty = function (node, id) {
             return buildProperty(id, node.name, node.value);
-        }, buildDynamicProperty = function (node, id, n, expr) {
+        }, buildDynamicProperty = function (node, id, n, expr, dynamic, spreads) {
             return node.isRef ? buildReference(expr, id) :
                 node.isFn ? buildNodeFn(node, id, n, expr) :
-                    buildProperty(id, node.name, expr);
+                    node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
+                        buildProperty(id, node.name, expr);
         }, buildProperty = function (id, prop, expr) {
             return isAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
@@ -713,6 +716,17 @@ var compile = function (ctl, opts) {
         }, buildNodeFn = function (node, id, n, expr) {
             var state = addId(id, 'fn', n);
             return state + " = (" + expr + ")(" + id + ", " + state + ");";
+        }, buildStyle = function (node, id, expr, dynamic, spreads) {
+            return !dynamic ? buildStaticStyle(node, id, expr) :
+                spreads.length === 1 ? buildSingleStyle(node, id, expr) :
+                    buildMultiStyle(node, id, expr, spreads);
+        }, buildStaticStyle = function (node, id, expr) {
+            return "Surplus.staticStyle(" + id + ", " + expr + ");";
+        }, buildSingleStyle = function (node, id, expr) {
+            return "__spread.applyStyle(" + id + ", " + expr + ");";
+        }, buildMultiStyle = function (node, id, expr, spreads) {
+            var n = spreads.indexOf(node), final = n === spreads.length - 1;
+            return "__spread.applyStyle(" + id + ", " + expr + ", " + n + ", " + final + ");";
         }, buildChild = function (node, parent, n) {
             return node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :

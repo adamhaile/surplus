@@ -178,18 +178,33 @@ function createTextNode(text, parent) {
     return node;
 }
 
-function staticSpread(node, props) {
-    var propName;
-    for (var rawName in props)
-        if (props.hasOwnProperty(rawName)) {
-            propName = translateJSXPropertyName(rawName);
-            setField(node, propName, props[rawName]);
+var assign = 'assign' in Object ? Object.assign :
+    function assign(a, b) {
+        var props = Object.keys(b);
+        for (var i = 0, len = props.length; i < len; i++) {
+            var name = props[i];
+            a[name] = b[name];
         }
+    };
+function staticSpread(node, obj) {
+    var props = Object.keys(obj);
+    for (var i = 0, len = props.length; i < len; i++) {
+        var rawName = props[i];
+        if (rawName === 'style') {
+            assign(node.style, obj.style);
+        }
+        else {
+            var propName = translateJSXPropertyName(rawName);
+            setField(node, propName, obj[rawName]);
+        }
+    }
 }
+
 var SingleSpreadState = (function () {
     function SingleSpreadState(namedProps) {
         this.namedProps = namedProps;
         this.oldProps = null;
+        this.oldStyles = null;
     }
     SingleSpreadState.prototype.apply = function (node, props) {
         var oldProps = this.oldProps, newProps = Object.keys(props), newLen = newProps.length, i = 0;
@@ -216,6 +231,34 @@ var SingleSpreadState = (function () {
         }
         this.oldProps = newProps;
     };
+    SingleSpreadState.prototype.applyStyle = function (node, style) {
+        var oldStyles = this.oldStyles, newStyles = Object.keys(style), newLen = newStyles.length, i = 0;
+        if (oldStyles === null) {
+            for (; i < newLen; i++) {
+                setStyle(node, newStyles[i], style);
+            }
+        }
+        else {
+            var oldLen = oldStyles.length, len = oldLen < newLen ? oldLen : newLen;
+            for (; i < len; i++) {
+                var propName = newStyles[i], oldPropName = oldStyles[i];
+                if (oldPropName !== propName && !style.hasOwnProperty(oldPropName)) {
+                    clearStyle(node, oldPropName);
+                }
+                setStyle(node, propName, style);
+            }
+            for (; i < newLen; i++) {
+                setStyle(node, newStyles[i], style);
+            }
+            for (; i < oldLen; i++) {
+                oldPropName = oldStyles[i];
+                if (!style.hasOwnProperty(oldPropName)) {
+                    clearStyle(node, oldPropName);
+                }
+            }
+        }
+        this.oldStyles = newStyles;
+    };
     SingleSpreadState.prototype.check = function (node, rawName, props) {
         if (!props.hasOwnProperty(rawName)) {
             var propName = translateJSXPropertyName(rawName);
@@ -225,8 +268,14 @@ var SingleSpreadState = (function () {
         }
     };
     SingleSpreadState.prototype.setField = function (node, rawName, props) {
-        var propName = translateJSXPropertyName(rawName);
-        setField(node, propName, props[rawName]);
+        var value = props[rawName];
+        if (rawName === 'style') {
+            this.applyStyle(node, value);
+        }
+        else {
+            var propName = translateJSXPropertyName(rawName);
+            setField(node, propName, value);
+        }
     };
     return SingleSpreadState;
 }());
@@ -237,12 +286,15 @@ var MultiSpreadState = (function () {
         this.propAges = {};
         this.oldProps = [];
         this.checkProps = [];
+        this.styleAges = {};
+        this.oldStyles = null;
+        this.checkStyles = null;
     }
     MultiSpreadState.prototype.apply = function (node, props, n, last) {
         var oldProps = this.oldProps[n], newProps = Object.keys(props), newLen = newProps.length, i = 0;
         if (oldProps === undefined) {
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props);
+                this.setField(node, newProps[i], props, n, last);
             }
         }
         else {
@@ -252,10 +304,10 @@ var MultiSpreadState = (function () {
                 if (oldPropName !== propName) {
                     this.check(oldPropName, props);
                 }
-                this.setField(node, propName, props);
+                this.setField(node, propName, props, n, last);
             }
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props);
+                this.setField(node, newProps[i], props, n, last);
             }
             for (; i < oldLen; i++) {
                 this.check(oldProps[i], props);
@@ -272,6 +324,56 @@ var MultiSpreadState = (function () {
             this.current++;
         }
     };
+    MultiSpreadState.prototype.applyStyle = function (node, style, n, last) {
+        var oldStyles = this.oldStyles && this.oldStyles[n], newStyles = Object.keys(style), styleAges = this.styleAges, current = this.current, styleAges = this.styleAges, checkStyles = this.checkStyles, newLen = newStyles.length, i = 0;
+        if (!oldStyles) {
+            for (; i < newLen; i++) {
+                setStyle(node, newStyles[i], style);
+            }
+        }
+        else {
+            var oldLen = oldStyles.length, len = oldLen < newLen ? oldLen : newLen;
+            for (; i < len; i++) {
+                var propName = newStyles[i], oldPropName = oldStyles[i];
+                if (oldPropName !== propName && !style.hasOwnProperty(oldPropName)) {
+                    if (checkStyles === null)
+                        checkStyles = this.checkStyles = [oldPropName];
+                    else
+                        checkStyles.push(oldPropName);
+                }
+                styleAges[propName] = current;
+                setStyle(node, propName, style);
+            }
+            for (; i < newLen; i++) {
+                propName = newStyles[i];
+                styleAges[propName] = current;
+                setStyle(node, propName, style);
+            }
+            for (; i < oldLen; i++) {
+                oldPropName = oldStyles[i];
+                if (!style.hasOwnProperty(oldPropName)) {
+                    if (checkStyles === null)
+                        checkStyles = this.checkStyles = [oldPropName];
+                    else
+                        checkStyles.push(oldPropName);
+                }
+            }
+        }
+        if (this.oldStyles === null)
+            this.oldStyles = [];
+        this.oldStyles[n] = newStyles;
+        if (last) {
+            if (checkStyles !== null) {
+                for (i = 0, len = checkStyles.length; i < len; i++) {
+                    propName = checkStyles.pop();
+                    if (styleAges[propName] !== current) {
+                        clearStyle(node, propName);
+                    }
+                }
+            }
+            this.current++;
+        }
+    };
     MultiSpreadState.prototype.check = function (rawName, props) {
         if (!props.hasOwnProperty(rawName)) {
             var propName = translateJSXPropertyName(rawName);
@@ -280,28 +382,38 @@ var MultiSpreadState = (function () {
             }
         }
     };
-    MultiSpreadState.prototype.setField = function (node, rawName, props) {
-        var value = props[rawName], propName = translateJSXPropertyName(rawName);
-        this.propAges[propName] = this.current;
-        setField(node, propName, value);
+    MultiSpreadState.prototype.setField = function (node, rawName, props, n, last) {
+        var value = props[rawName];
+        if (rawName === 'style') {
+            this.applyStyle(node, value, n, last);
+        }
+        else {
+            var propName = translateJSXPropertyName(rawName);
+            this.propAges[propName] = this.current;
+            setField(node, propName, value);
+        }
     };
     return MultiSpreadState;
 }());
 function setField(node, name, value) {
-    if (isAttribute(name)) {
-        node.setAttribute(name, value);
-    }
-    else {
+    if (name in node)
         node[name] = value;
-    }
+    else if (value === false || value === null || value === undefined)
+        node.removeAttribute(name);
+    else
+        node.setAttribute(name, value);
 }
 function clearField(node, name) {
-    if (isAttribute(name)) {
-        node.removeAttribute(name);
-    }
-    else {
+    if (name in node)
         node[name] = defaultValue(node.tagName, name);
-    }
+    else
+        node.removeAttribute(name);
+}
+function setStyle(node, name, style) {
+    node.style[name] = style[name];
+}
+function clearStyle(node, name) {
+    node.style[name] = '';
 }
 var defaultValues = {};
 function defaultValue(tag, name) {
@@ -309,14 +421,10 @@ function defaultValue(tag, name) {
     return emptyNode[name];
 }
 var jsxEventProperty = /^on[A-Z]/;
-var attribute = /-/;
 function translateJSXPropertyName(name) {
     return jsxEventProperty.test(name)
         ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase())
         : name;
-}
-function isAttribute(prop) {
-    return attribute.test(prop); // TODO: better heuristic for attributes than name contains a hyphen
 }
 
 exports.insert = insert$$1;

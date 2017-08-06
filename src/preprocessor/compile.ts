@@ -170,7 +170,7 @@ const compile = (ctl : Program, opts : Params) => {
                     const
                         id         = addId(parent, tag, n),
                         exprs      = properties.map(p => p instanceof JSXStaticProperty ? '' : compileSegments(p.code)), 
-                        spreads    = properties.filter(p => p instanceof JSXSpreadProperty) as JSXSpreadProperty[],
+                        spreads    = properties.filter(p => p instanceof JSXSpreadProperty || (p instanceof JSXDynamicProperty && p.isStyle)),
                         fns        = properties.filter(p => p instanceof JSXDynamicProperty && p.isFn) as JSXDynamicProperty[],
                         refs       = properties.filter(p => p instanceof JSXDynamicProperty && p.isRef) as JSXDynamicProperty[],
                         classProp  = spreads.length === 0 && fns.length === 0 && properties.filter(p => p instanceof JSXStaticProperty && p.name === 'className')[0] as JSXStaticProperty || null,
@@ -178,7 +178,7 @@ const compile = (ctl : Program, opts : Params) => {
                         stmts      = properties.map((p, i) => 
                             p === classProp                 ? '' :
                             p instanceof JSXStaticProperty  ? buildStaticProperty(p, id) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id, i, exprs[i]) :
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id, i, exprs[i], dynamic, spreads) :
                             buildSpread(p, id, exprs[i], dynamic, spreads)
                         ).filter(s => s !== ''),
                         refStmts   = refs.map(r => compileSegments(r.code) + ' = ').join('');
@@ -207,16 +207,17 @@ const compile = (ctl : Program, opts : Params) => {
             },
             buildStaticProperty = (node : JSXStaticProperty, id : string) =>
                 buildProperty(id, node.name, node.value),
-            buildDynamicProperty = (node : JSXDynamicProperty, id : string, n : number, expr : string) =>
+            buildDynamicProperty = (node : JSXDynamicProperty, id : string, n : number, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
                 node.isRef ? buildReference(expr, id) :
                 node.isFn ? buildNodeFn(node, id, n, expr) :
+                node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
                 buildProperty(id, node.name, expr),
             buildProperty = (id : string, prop : string, expr : string) =>
                 isAttribute(prop)
                 ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
             buildReference = (ref : string, id : string) => '',
-            buildSpread = (node : JSXSpreadProperty, id : string, expr : string, dynamic : boolean, spreads : JSXSpreadProperty[]) =>
+            buildSpread = (node : JSXSpreadProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
                 !dynamic             ? buildStaticSpread(node, id, expr) :
                 spreads.length === 1 ? buildSingleSpread(node, id, expr) :
                 buildMultiSpread(node, id, expr, spreads),
@@ -224,7 +225,7 @@ const compile = (ctl : Program, opts : Params) => {
                 `Surplus.staticSpread(${id}, ${expr});`,
             buildSingleSpread = (node : JSXSpreadProperty, id : string, expr : string) =>
                 `__spread.apply(${id}, ${expr});`,
-            buildMultiSpread = (node : JSXSpreadProperty, id : string, expr : string, spreads : JSXSpreadProperty[]) => {
+            buildMultiSpread = (node : JSXSpreadProperty, id : string, expr : string, spreads : JSXProperty[]) => {
                 var n = spreads.indexOf(node),
                     final = n === spreads.length - 1;
                 return `__spread.apply(${id}, ${expr}, ${n}, ${final});`;
@@ -232,6 +233,19 @@ const compile = (ctl : Program, opts : Params) => {
             buildNodeFn = (node : JSXDynamicProperty, id : string, n : number, expr : string) => {
                 const state = addId(id, 'fn', n);
                 return `${state} = (${expr})(${id}, ${state});`;
+            },
+            buildStyle = (node : JSXDynamicProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
+                !dynamic             ? buildStaticStyle(node, id, expr) :
+                spreads.length === 1 ? buildSingleStyle(node, id, expr) :
+                buildMultiStyle(node, id, expr, spreads),
+            buildStaticStyle = (node : JSXDynamicProperty, id : string, expr : string) =>
+                `Surplus.staticStyle(${id}, ${expr});`,
+            buildSingleStyle = (node : JSXDynamicProperty, id : string, expr : string) =>
+                `__spread.applyStyle(${id}, ${expr});`,
+            buildMultiStyle = (node : JSXDynamicProperty, id : string, expr : string, spreads : JSXProperty[]) => {
+                var n = spreads.indexOf(node),
+                    final = n === spreads.length - 1;
+                return `__spread.applyStyle(${id}, ${expr}, ${n}, ${final});`;
             },
             buildChild = (node : JSXContent, parent : string, n : number) =>
                 node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
