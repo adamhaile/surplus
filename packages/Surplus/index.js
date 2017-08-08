@@ -159,10 +159,19 @@ function insert$$1(range, value) {
     }
 }
 
+var svgNS = "http://www.w3.org/2000/svg";
 function createElement(tag, className, parent) {
     var el = document.createElement(tag);
     if (className)
         el.className = className;
+    if (parent)
+        parent.appendChild(el);
+    return el;
+}
+function createSvgElement(tag, className, parent) {
+    var el = document.createElementNS(svgNS, tag);
+    if (className)
+        el.setAttribute("class", className);
     if (parent)
         parent.appendChild(el);
     return el;
@@ -433,6 +442,7 @@ exports.SingleSpreadState = SingleSpreadState;
 exports.MultiSpreadState = MultiSpreadState;
 exports.S = S;
 exports.createElement = createElement;
+exports.createSvgElement = createSvgElement;
 exports.createComment = createComment;
 exports.createTextNode = createTextNode;
 

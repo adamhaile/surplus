@@ -161,9 +161,16 @@ const compile = (ctl : Program, opts : Params) => {
             const ids = [] as string[],
                 statements = [] as string[],
                 computations = [] as Computation[];
+            let svgPosition: { parent: string, depth: number, next: number } | null = null;
 
             const buildHtmlElement = (node : JSXElement, parent : string, n : number) => {
-                const { tag, properties, content, loc } = node;
+                const { tag, properties, content, loc } = node,
+                depth = parent.length == 0 ? 0 : parent == "__" ? 1 : parent.substr(2).split("_").length + 1;
+                if (tag === "svg") {
+                    svgPosition = { parent: parent, depth: depth, next: n + 1 }
+                } else if (svgPosition && (svgPosition.depth > depth || (svgPosition.parent === parent && svgPosition.next === n))) {
+                    svgPosition = null
+                }
                 if (!node.isHTML) {
                     buildInsertedSubComponent(node, parent, n);
                 } else {
@@ -183,7 +190,7 @@ const compile = (ctl : Program, opts : Params) => {
                         ).filter(s => s !== ''),
                         refStmts   = refs.map(r => compileSegments(r.code) + ' = ').join('');
 
-                    addStatement(`${id} = ${refStmts}Surplus.createElement('${tag}', ${classProp && classProp.value}, ${parent || null});`);
+                    addStatement(`${id} = ${refStmts}Surplus.${svgPosition === null ? 'createElement' : 'createSvgElement'}('${tag}', ${classProp && classProp.value}, ${parent || null});`);
                     
                     if (!dynamic) {
                         stmts.forEach(addStatement);
@@ -213,7 +220,7 @@ const compile = (ctl : Program, opts : Params) => {
                 node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
                 buildProperty(id, node.name, expr),
             buildProperty = (id : string, prop : string, expr : string) =>
-                isAttribute(prop)
+                svgPosition !== null || isAttribute(prop)
                 ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
             buildReference = (ref : string, id : string) => '',
