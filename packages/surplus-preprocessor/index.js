@@ -96,12 +96,14 @@ var JSXDynamicProperty = (function () {
         this.name = name;
         this.code = code;
         this.loc = loc;
-        this.isRef = this.name === JSXDynamicProperty.RefName;
-        this.isFn = this.name === JSXDynamicProperty.FnName;
+        this.isRef = JSXDynamicProperty.RefNameRx.test(this.name);
+        this.isFn = JSXDynamicProperty.FnNameRx.test(this.name);
         this.isStyle = this.name === JSXDynamicProperty.StyleName;
     }
-    JSXDynamicProperty.RefName = "ref";
-    JSXDynamicProperty.FnName = "fn";
+    JSXDynamicProperty.RefName = "ref\\d*";
+    JSXDynamicProperty.RefNameRx = new RegExp('^' + JSXDynamicProperty.RefName + "$");
+    JSXDynamicProperty.FnName = "fn\\d*";
+    JSXDynamicProperty.FnNameRx = new RegExp('^' + JSXDynamicProperty.FnName + "$");
     JSXDynamicProperty.StyleName = "style";
     JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + "|" + JSXDynamicProperty.StyleName + ")$");
     return JSXDynamicProperty;

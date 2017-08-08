@@ -47,11 +47,13 @@ export declare class JSXDynamicProperty {
     readonly code: EmbeddedCode;
     readonly loc: LOC;
     constructor(name: string, code: EmbeddedCode, loc: LOC);
-    static RefName: string;
+    private static RefName;
+    private static RefNameRx;
     isRef: boolean;
-    static FnName: string;
+    private static FnName;
+    private static FnNameRx;
     isFn: boolean;
-    static StyleName: string;
+    private static StyleName;
     isStyle: boolean;
     static SpecialPropName: RegExp;
 }

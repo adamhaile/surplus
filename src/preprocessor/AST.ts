@@ -69,11 +69,13 @@ export class JSXDynamicProperty {
         public readonly loc : LOC
     ) { }
 
-    static RefName = "ref";
-    isRef = this.name === JSXDynamicProperty.RefName;
-    static FnName = "fn";
-    isFn = this.name === JSXDynamicProperty.FnName;
-    static StyleName = "style";
+    private static RefName = "ref\\d*";
+    private static RefNameRx = new RegExp('^' + JSXDynamicProperty.RefName + "$");
+    isRef = JSXDynamicProperty.RefNameRx.test(this.name);
+    private static FnName = "fn\\d*";
+    private static FnNameRx = new RegExp('^' + JSXDynamicProperty.FnName + "$");
+    isFn = JSXDynamicProperty.FnNameRx.test(this.name);
+    private static StyleName = "style";
     isStyle = this.name === JSXDynamicProperty.StyleName;
     static SpecialPropName = new RegExp(`^(${JSXDynamicProperty.RefName}|${JSXDynamicProperty.FnName}|${JSXDynamicProperty.StyleName})$`);
 }

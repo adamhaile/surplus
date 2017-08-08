@@ -101,4 +101,18 @@ describe("JSX fn", function () {
             expect(a.id).toBe("bar");                           \n\
         '));
     });
+
+    it("can be aliased as fn1, fn2, etc.", function () {
+        eval(window.SurplusPreprocessor.preprocess('            \n\
+            var fn1   = el => el.id = "foo",                    \n\
+                fn2   = el => el.href = "http://bar/",          \n\
+                fn007 = el => el.name = "bond";                 \n\
+                                                                \n\
+            var a = <a fn1={fn1} fn2={fn2} fn007={fn007} />;    \n\
+                                                                \n\
+            expect(a.id).toBe("foo");                           \n\
+            expect(a.href).toBe("http://bar/");                 \n\
+            expect(a.name).toBe("bond");                        \n\
+        '));
+    });
 });
