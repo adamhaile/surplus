@@ -662,8 +662,15 @@ var compile = function (ctl, opts) {
         return expr;
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
+        var svgPosition = null;
         var buildHtmlElement = function (node, parent, n) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, depth = parent.length == 0 ? 0 : parent == "__" ? 1 : parent.substr(2).split("_").length + 1;
+            if (tag === "svg") {
+                svgPosition = { parent: parent, depth: depth, next: n + 1 };
+            }
+            else if (svgPosition && (svgPosition.depth > depth || (svgPosition.parent === parent && svgPosition.next === n))) {
+                svgPosition = null;
+            }
             if (!node.isHTML) {
                 buildInsertedSubComponent(node, parent, n);
             }
@@ -674,7 +681,7 @@ var compile = function (ctl, opts) {
                             p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, i, exprs_1[i], dynamic_1, spreads_1) :
                                 buildSpread(p, id_1, exprs_1[i], dynamic_1, spreads_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = refs.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
-                addStatement(id_1 + " = " + refStmts + "Surplus.createElement('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
+                addStatement(id_1 + " = " + refStmts + "Surplus." + (svgPosition === null ? 'createElement' : 'createSvgElement') + "('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
                 if (!dynamic_1) {
                     stmts.forEach(addStatement);
                 }
@@ -701,7 +708,7 @@ var compile = function (ctl, opts) {
                     node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
                         buildProperty(id, node.name, expr);
         }, buildProperty = function (id, prop, expr) {
-            return isAttribute(prop)
+            return svgPosition !== null || isAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
         }, buildReference = function (ref, id) { return ''; }, buildSpread = function (node, id, expr, dynamic, spreads) {
