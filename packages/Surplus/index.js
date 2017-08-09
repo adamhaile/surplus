@@ -195,7 +195,7 @@ var assign = 'assign' in Object ? Object.assign :
             a[name] = b[name];
         }
     };
-function staticSpread(node, obj) {
+function staticSpread(node, obj, svg) {
     var props = Object.keys(obj);
     for (var i = 0, len = props.length; i < len; i++) {
         var rawName = props[i];
@@ -204,7 +204,7 @@ function staticSpread(node, obj) {
         }
         else {
             var propName = translateJSXPropertyName(rawName);
-            setField(node, propName, obj[rawName]);
+            setField(node, propName, obj[rawName], svg);
         }
     }
 }
@@ -215,11 +215,11 @@ var SingleSpreadState = (function () {
         this.oldProps = null;
         this.oldStyles = null;
     }
-    SingleSpreadState.prototype.apply = function (node, props) {
+    SingleSpreadState.prototype.apply = function (node, props, svg) {
         var oldProps = this.oldProps, newProps = Object.keys(props), newLen = newProps.length, i = 0;
         if (oldProps === null) {
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props);
+                this.setField(node, newProps[i], props, svg);
             }
         }
         else {
@@ -227,15 +227,15 @@ var SingleSpreadState = (function () {
             for (; i < len; i++) {
                 var propName = newProps[i], oldPropName = oldProps[i];
                 if (oldPropName !== propName) {
-                    this.check(node, oldPropName, props);
+                    this.check(node, oldPropName, props, svg);
                 }
-                this.setField(node, propName, props);
+                this.setField(node, propName, props, svg);
             }
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props);
+                this.setField(node, newProps[i], props, svg);
             }
             for (; i < oldLen; i++) {
-                this.check(node, oldProps[i], props);
+                this.check(node, oldProps[i], props, svg);
             }
         }
         this.oldProps = newProps;
@@ -268,22 +268,22 @@ var SingleSpreadState = (function () {
         }
         this.oldStyles = newStyles;
     };
-    SingleSpreadState.prototype.check = function (node, rawName, props) {
+    SingleSpreadState.prototype.check = function (node, rawName, props, svg) {
         if (!props.hasOwnProperty(rawName)) {
             var propName = translateJSXPropertyName(rawName);
             if (!this.namedProps.hasOwnProperty(propName)) {
-                clearField(node, propName);
+                clearField(node, propName, svg);
             }
         }
     };
-    SingleSpreadState.prototype.setField = function (node, rawName, props) {
+    SingleSpreadState.prototype.setField = function (node, rawName, props, svg) {
         var value = props[rawName];
         if (rawName === 'style') {
             this.applyStyle(node, value);
         }
         else {
             var propName = translateJSXPropertyName(rawName);
-            setField(node, propName, value);
+            setField(node, propName, value, svg);
         }
     };
     return SingleSpreadState;
@@ -299,11 +299,11 @@ var MultiSpreadState = (function () {
         this.oldStyles = null;
         this.checkStyles = null;
     }
-    MultiSpreadState.prototype.apply = function (node, props, n, last) {
+    MultiSpreadState.prototype.apply = function (node, props, n, last, svg) {
         var oldProps = this.oldProps[n], newProps = Object.keys(props), newLen = newProps.length, i = 0;
         if (oldProps === undefined) {
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props, n, last);
+                this.setField(node, newProps[i], props, n, last, svg);
             }
         }
         else {
@@ -313,10 +313,10 @@ var MultiSpreadState = (function () {
                 if (oldPropName !== propName) {
                     this.check(oldPropName, props);
                 }
-                this.setField(node, propName, props, n, last);
+                this.setField(node, propName, props, n, last, svg);
             }
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props, n, last);
+                this.setField(node, newProps[i], props, n, last, svg);
             }
             for (; i < oldLen; i++) {
                 this.check(oldProps[i], props);
@@ -327,7 +327,7 @@ var MultiSpreadState = (function () {
             for (i = 0, len = this.checkProps.length; i < len; i++) {
                 propName = this.checkProps.pop();
                 if (this.propAges[propName] !== this.current) {
-                    clearField(node, propName);
+                    clearField(node, propName, svg);
                 }
             }
             this.current++;
@@ -391,7 +391,7 @@ var MultiSpreadState = (function () {
             }
         }
     };
-    MultiSpreadState.prototype.setField = function (node, rawName, props, n, last) {
+    MultiSpreadState.prototype.setField = function (node, rawName, props, n, last, svg) {
         var value = props[rawName];
         if (rawName === 'style') {
             this.applyStyle(node, value, n, last);
@@ -399,21 +399,21 @@ var MultiSpreadState = (function () {
         else {
             var propName = translateJSXPropertyName(rawName);
             this.propAges[propName] = this.current;
-            setField(node, propName, value);
+            setField(node, propName, value, svg);
         }
     };
     return MultiSpreadState;
 }());
-function setField(node, name, value) {
-    if (name in node)
+function setField(node, name, value, svg) {
+    if (name in node && !svg)
         node[name] = value;
     else if (value === false || value === null || value === undefined)
         node.removeAttribute(name);
     else
         node.setAttribute(name, value);
 }
-function clearField(node, name) {
-    if (name in node)
+function clearField(node, name, svg) {
+    if (name in node && !svg)
         node[name] = defaultValue(node.tagName, name);
     else
         node.removeAttribute(name);

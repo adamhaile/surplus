@@ -9,7 +9,7 @@ const assign = 'assign' in Object ? (Object as any).assign :
         }
     }
 
-export function staticSpread(node : HTMLElement, obj : PropObj) {
+export function staticSpread(node : HTMLElement, obj : PropObj, svg : boolean) {
     var props = Object.keys(obj);
     for (var i = 0, len = props.length; i < len; i++) {
         var rawName = props[i];
@@ -17,7 +17,7 @@ export function staticSpread(node : HTMLElement, obj : PropObj) {
             assign(node.style, obj.style);
         } else {
             var propName = translateJSXPropertyName(rawName);
-            setField(node, propName, obj[rawName]);
+            setField(node, propName, obj[rawName], svg);
         }
     }
 }
@@ -34,7 +34,7 @@ export class SingleSpreadState {
         public namedProps : { [ name : string ] : boolean }
     ) { }
 
-    apply(node : Element, props : PropObj) {
+    apply(node : Element, props : PropObj, svg : boolean) {
         var oldProps = this.oldProps,
             newProps = Object.keys(props),
             newLen   = newProps.length,
@@ -42,7 +42,7 @@ export class SingleSpreadState {
 
         if (oldProps === null) {
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props);
+                this.setField(node, newProps[i], props, svg);
             }
         } else {
             var oldLen = oldProps.length,
@@ -53,18 +53,18 @@ export class SingleSpreadState {
                     oldPropName = oldProps[i];
 
                 if (oldPropName !== propName) {
-                    this.check(node, oldPropName, props);
+                    this.check(node, oldPropName, props, svg);
                 }
 
-                this.setField(node, propName, props);
+                this.setField(node, propName, props, svg);
             }
             
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props);
+                this.setField(node, newProps[i], props, svg);
             }
             
             for (; i < oldLen; i++) {
-                this.check(node, oldProps[i], props);
+                this.check(node, oldProps[i], props, svg);
             }
         }
 
@@ -111,22 +111,22 @@ export class SingleSpreadState {
         this.oldStyles = newStyles;
     }
 
-    private check(node : Element, rawName : string, props : PropObj) {
+    private check(node : Element, rawName : string, props : PropObj, svg : boolean) {
         if (!props.hasOwnProperty(rawName)) {
             var propName = translateJSXPropertyName(rawName);
             if (!this.namedProps.hasOwnProperty(propName)) {
-                clearField(node, propName);
+                clearField(node, propName, svg);
             }
         }
     }
 
-    private setField(node : Element, rawName : string, props : PropObj) {
+    private setField(node : Element, rawName : string, props : PropObj, svg : boolean) {
         var value = props[rawName];
         if (rawName === 'style') {
             this.applyStyle(node, value);
         } else {
             var propName = translateJSXPropertyName(rawName);
-            setField(node, propName, value);
+            setField(node, propName, value, svg);
         }
     }
 }
@@ -144,7 +144,7 @@ export class MultiSpreadState {
         public namedProps : { [ name : string ] : boolean }
     ) { }
 
-    apply(node : Element, props : PropObj, n : number, last : boolean) {
+    apply(node : Element, props : PropObj, n : number, last : boolean, svg : boolean) {
         var oldProps = this.oldProps[n],
             newProps = Object.keys(props),
             newLen   = newProps.length,
@@ -152,7 +152,7 @@ export class MultiSpreadState {
 
         if (oldProps === undefined) {
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props, n, last);
+                this.setField(node, newProps[i], props, n, last, svg);
             }
         } else {
             var oldLen = oldProps.length,
@@ -166,11 +166,11 @@ export class MultiSpreadState {
                     this.check(oldPropName, props);
                 }
 
-                this.setField(node, propName, props, n, last);
+                this.setField(node, propName, props, n, last, svg);
             }
             
             for (; i < newLen; i++) {
-                this.setField(node, newProps[i], props, n, last);
+                this.setField(node, newProps[i], props, n, last, svg);
             }
 
             for (; i < oldLen; i++) {
@@ -184,7 +184,7 @@ export class MultiSpreadState {
             for (i = 0, len = this.checkProps.length; i < len; i++) {
                 propName = this.checkProps.pop()!;
                 if (this.propAges[propName] !== this.current) {
-                    clearField(node, propName);
+                    clearField(node, propName, svg);
                 }
             }
 
@@ -264,26 +264,26 @@ export class MultiSpreadState {
         }
     }
 
-    private setField(node : Element, rawName : string, props : PropObj, n : number, last : boolean) {
+    private setField(node : Element, rawName : string, props : PropObj, n : number, last : boolean, svg : boolean) {
         var value = props[rawName];
         if (rawName === 'style') {
             this.applyStyle(node, value, n, last);
         } else {
             var propName = translateJSXPropertyName(rawName);
             this.propAges[propName] = this.current;
-            setField(node, propName, value);
+            setField(node, propName, value, svg);
         }
     }
 }
 
-function setField(node : Element, name : string, value : any) {
-    if (name in node) (node as any)[name] = value;
+function setField(node : Element, name : string, value : any, svg : boolean) {
+    if (name in node && !svg) (node as any)[name] = value;
     else if (value === false || value === null || value === undefined) node.removeAttribute(name);
     else node.setAttribute(name, value);
 }
 
-function clearField(node : Element, name : string) {
-    if (name in node) (node as any)[name] = defaultValue(node.tagName, name);
+function clearField(node : Element, name : string, svg : boolean) {
+    if (name in node && !svg) (node as any)[name] = defaultValue(node.tagName, name);
     else node.removeAttribute(name);
 }
 

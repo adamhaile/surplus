@@ -535,6 +535,242 @@ function vlq(num) {
     return str;
 }
 
+// Reference information for the HTML and SVG DOM
+var HtmlTags = [
+    "a",
+    "abbr",
+    "acronym",
+    "address",
+    "applet",
+    "area",
+    "article",
+    "aside",
+    "audio",
+    "b",
+    "base",
+    "basefont",
+    "bdi",
+    "bdo",
+    "bgsound",
+    "big",
+    "blink",
+    "blockquote",
+    "body",
+    "br",
+    "button",
+    "canvas",
+    "caption",
+    "center",
+    "cite",
+    "code",
+    "col",
+    "colgroup",
+    "command",
+    "content",
+    "data",
+    "datalist",
+    "dd",
+    "del",
+    "details",
+    "dfn",
+    "dialog",
+    "dir",
+    "div",
+    "dl",
+    "dt",
+    "element",
+    "em",
+    "embed",
+    "fieldset",
+    "figcaption",
+    "figure",
+    "font",
+    "footer",
+    "form",
+    "frame",
+    "frameset",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "head",
+    "header",
+    "hgroup",
+    "hr",
+    "html",
+    "i",
+    "iframe",
+    "image",
+    "img",
+    "input",
+    "ins",
+    "isindex",
+    "kbd",
+    "keygen",
+    "label",
+    "legend",
+    "li",
+    "link",
+    "listing",
+    "main",
+    "map",
+    "mark",
+    "marquee",
+    "menu",
+    "menuitem",
+    "meta",
+    "meter",
+    "multicol",
+    "nav",
+    "nobr",
+    "noembed",
+    "noframes",
+    "noscript",
+    "object",
+    "ol",
+    "optgroup",
+    "option",
+    "output",
+    "p",
+    "param",
+    "picture",
+    "plaintext",
+    "pre",
+    "progress",
+    "q",
+    "rp",
+    "rt",
+    "rtc",
+    "ruby",
+    "s",
+    "samp",
+    "script",
+    "section",
+    "select",
+    "shadow",
+    "slot",
+    "small",
+    "source",
+    "spacer",
+    "span",
+    "strike",
+    "strong",
+    "style",
+    "sub",
+    "summary",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "template",
+    "textarea",
+    "tfoot",
+    "th",
+    "thead",
+    "time",
+    "title",
+    "tr",
+    "track",
+    "tt",
+    "u",
+    "ul",
+    "var",
+    "video",
+    "wbr",
+    "xmp"
+];
+var HtmlTagRx = new RegExp("^(" + HtmlTags.join("|") + ")$");
+var SvgTags = [
+    "a",
+    "altGlyph",
+    "altGlyphDef",
+    "altGlyphItem",
+    "animate",
+    "animateColor",
+    "animateMotion",
+    "animateTransform",
+    "circle",
+    "clipPath",
+    "color-profile",
+    "cursor",
+    "defs",
+    "desc",
+    "ellipse",
+    "feBlend",
+    "feColorMatrix",
+    "feComponentTransfer",
+    "feComposite",
+    "feConvolveMatrix",
+    "feDiffuseLighting",
+    "feDisplacementMap",
+    "feDistantLight",
+    "feFlood",
+    "feFuncA",
+    "feFuncB",
+    "feFuncG",
+    "feFuncR",
+    "feGaussianBlur",
+    "feImage",
+    "feMerge",
+    "feMergeNode",
+    "feMorphology",
+    "feOffset",
+    "fePointLight",
+    "feSpecularLighting",
+    "feSpotLight",
+    "feTile",
+    "feTurbulence",
+    "filter",
+    "font",
+    "font-face",
+    "font-face-format",
+    "font-face-name",
+    "font-face-src",
+    "font-face-uri",
+    "foreignObject",
+    "g",
+    "glyph",
+    "glyphRef",
+    "hkern",
+    "image",
+    "line",
+    "linearGradient",
+    "marker",
+    "mask",
+    "metadata",
+    "missing-glyph",
+    "mpath",
+    "path",
+    "pattern",
+    "polygon",
+    "polyline",
+    "radialGradient",
+    "rect",
+    "script",
+    "set",
+    "stop",
+    "style",
+    "svg",
+    "switch",
+    "symbol",
+    "text",
+    "textPath",
+    "title",
+    "tref",
+    "tspan",
+    "use",
+    "view",
+    "vkern"
+];
+var SvgTagRx = new RegExp("^(" + SvgTags.join("|") + ")$");
+var SvgOnlyTags = SvgTags.filter(function (t) { return !HtmlTagRx.test(t); });
+var SvgOnlyTagRx = new RegExp("^(" + SvgOnlyTags.join("|") + "$)");
+var SvgForeignTag = "foreignObject";
+var AttributeRx = /-/;
+var IsAttribute = function (prop) { return AttributeRx.test(prop); };
+
 var __assign$1 = (undefined && undefined.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
         s = arguments[i];
@@ -552,7 +788,6 @@ var rx$3 = {
     endsInParen: /\)\s*$/,
     nonIdChars: /[^a-zA-Z0-9]/,
     singleQuotes: /'/g,
-    attribute: /-/,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
 var DOMExpression = (function () {
@@ -662,30 +897,24 @@ var compile = function (ctl, opts) {
         return expr;
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
-        var svgPosition = null;
-        var buildHtmlElement = function (node, parent, n) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, depth = parent.length == 0 ? 0 : parent == "__" ? 1 : parent.substr(2).split("_").length + 1;
-            if (tag === "svg") {
-                svgPosition = { parent: parent, depth: depth, next: n + 1 };
-            }
-            else if (svgPosition && (svgPosition.depth > depth || (svgPosition.parent === parent && svgPosition.next === n))) {
-                svgPosition = null;
-            }
+        var buildHtmlElement = function (node, parent, n, svg) {
+            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
+            svg = svg || SvgOnlyTagRx.test(tag);
             if (!node.isHTML) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
                 var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || (p instanceof JSXDynamicProperty && p.isStyle); }), fns = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isFn; }), refs = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isRef; }), classProp_1 = spreads_1.length === 0 && fns.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic_1 = fns.length > 0 || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p instanceof JSXStaticProperty ? buildStaticProperty(p, id_1) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, i, exprs_1[i], dynamic_1, spreads_1) :
-                                buildSpread(p, id_1, exprs_1[i], dynamic_1, spreads_1);
-                }).filter(function (s) { return s !== ''; }), refStmts = refs.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
-                addStatement(id_1 + " = " + refStmts + "Surplus." + (svgPosition === null ? 'createElement' : 'createSvgElement') + "('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
+                        p instanceof JSXStaticProperty ? buildStaticProperty(p, id_1, svg) :
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, i, exprs_1[i], dynamic_1, spreads_1, svg) :
+                                buildSpread(p, id_1, exprs_1[i], dynamic_1, spreads_1, svg);
+                }).filter(function (s) { return s !== ''; }), refStmts = refs.map(function (r) { return compileSegments(r.code) + ' = '; }).join(''), childSvg_1 = svg && tag !== SvgForeignTag;
+                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
                 if (!dynamic_1) {
                     stmts.forEach(addStatement);
                 }
-                content.forEach(function (c, i) { return buildChild(c, id_1, i); });
+                content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
                 if (dynamic_1) {
                     if (spreads_1.length > 0) {
                         // create namedProps object and use it to initialize our spread state
@@ -700,28 +929,28 @@ var compile = function (ctl, opts) {
                     }
                 }
             }
-        }, buildStaticProperty = function (node, id) {
-            return buildProperty(id, node.name, node.value);
-        }, buildDynamicProperty = function (node, id, n, expr, dynamic, spreads) {
+        }, buildStaticProperty = function (node, id, svg) {
+            return buildProperty(id, node.name, node.value, svg);
+        }, buildDynamicProperty = function (node, id, n, expr, dynamic, spreads, svg) {
             return node.isRef ? buildReference(expr, id) :
                 node.isFn ? buildNodeFn(node, id, n, expr) :
                     node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
-                        buildProperty(id, node.name, expr);
-        }, buildProperty = function (id, prop, expr) {
-            return svgPosition !== null || isAttribute(prop)
+                        buildProperty(id, node.name, expr, svg);
+        }, buildProperty = function (id, prop, expr, svg) {
+            return svg || IsAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
-        }, buildReference = function (ref, id) { return ''; }, buildSpread = function (node, id, expr, dynamic, spreads) {
-            return !dynamic ? buildStaticSpread(node, id, expr) :
-                spreads.length === 1 ? buildSingleSpread(node, id, expr) :
-                    buildMultiSpread(node, id, expr, spreads);
-        }, buildStaticSpread = function (node, id, expr) {
-            return "Surplus.staticSpread(" + id + ", " + expr + ");";
-        }, buildSingleSpread = function (node, id, expr) {
-            return "__spread.apply(" + id + ", " + expr + ");";
-        }, buildMultiSpread = function (node, id, expr, spreads) {
+        }, buildReference = function (ref, id) { return ''; }, buildSpread = function (node, id, expr, dynamic, spreads, svg) {
+            return !dynamic ? buildStaticSpread(node, id, expr, svg) :
+                spreads.length === 1 ? buildSingleSpread(node, id, expr, svg) :
+                    buildMultiSpread(node, id, expr, spreads, svg);
+        }, buildStaticSpread = function (node, id, expr, svg) {
+            return "Surplus.staticSpread(" + id + ", " + expr + ", " + svg + ");";
+        }, buildSingleSpread = function (node, id, expr, svg) {
+            return "__spread.apply(" + id + ", " + expr + ", " + svg + ");";
+        }, buildMultiSpread = function (node, id, expr, spreads, svg) {
             var n = spreads.indexOf(node), final = n === spreads.length - 1;
-            return "__spread.apply(" + id + ", " + expr + ", " + n + ", " + final + ");";
+            return "__spread.apply(" + id + ", " + expr + ", " + n + ", " + final + ", " + svg + ");";
         }, buildNodeFn = function (node, id, n, expr) {
             var state = addId(id, 'fn', n);
             return state + " = (" + expr + ")(" + id + ", " + state + ");";
@@ -736,8 +965,8 @@ var compile = function (ctl, opts) {
         }, buildMultiStyle = function (node, id, expr, spreads) {
             var n = spreads.indexOf(node), final = n === spreads.length - 1;
             return "__spread.applyStyle(" + id + ", " + expr + ", " + n + ", " + final + ");";
-        }, buildChild = function (node, parent, n) {
-            return node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
+        }, buildChild = function (node, parent, n, svg) {
+            return node instanceof JSXElement ? buildHtmlElement(node, parent, n, svg) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :
                     node instanceof JSXText ? buildHtmlText(node, parent, n) :
                         buildHtmlInsert(node, parent, n);
@@ -761,7 +990,7 @@ var compile = function (ctl, opts) {
         }, addComputation = function (body, stateVar, seed, loc) {
             computations.push(new Computation(body, loc, stateVar, seed));
         };
-        buildHtmlElement(top, '', 0);
+        buildHtmlElement(top, '', 0, false);
         return new DOMExpression(ids, statements, computations);
     }, emitDOMExpression = function (code, indent) {
         var nl = indent.nl, nli = indent.nli, nlii = indent.nlii;
@@ -784,9 +1013,6 @@ var compile = function (ctl, opts) {
 };
 var noApparentSignals = function (code) {
     return !rx$3.hasParen.test(code) || (rx$3.loneFunction.test(code) && !rx$3.endsInParen.test(code));
-};
-var isAttribute = function (prop) {
-    return rx$3.attribute.test(prop);
 };
 var indent = function (previousCode) {
     var m = rx$3.indent.exec(previousCode), pad = m ? m[1] : '', nl = "\r\n" + pad, nli = nl + '    ', nlii = nli + '    ';

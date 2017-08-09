@@ -16,6 +16,7 @@ import {
 import { LOC } from './parse';
 import { locationMark } from './sourcemap';
 import { Params } from './preprocess';
+import { SvgOnlyTagRx, SvgForeignTag, IsAttribute } from './domRef';
 
 export { compile, codeStr };
 
@@ -28,7 +29,6 @@ const rx = {
     endsInParen : /\)\s*$/,
     nonIdChars  : /[^a-zA-Z0-9]/,
     singleQuotes: /'/g,
-    attribute   : /-/,
     indent      : /\n(?=[^\n]+$)([ \t]*)/
 };
 
@@ -161,16 +161,10 @@ const compile = (ctl : Program, opts : Params) => {
             const ids = [] as string[],
                 statements = [] as string[],
                 computations = [] as Computation[];
-            let svgPosition: { parent: string, depth: number, next: number } | null = null;
 
-            const buildHtmlElement = (node : JSXElement, parent : string, n : number) => {
-                const { tag, properties, content, loc } = node,
-                depth = parent.length == 0 ? 0 : parent == "__" ? 1 : parent.substr(2).split("_").length + 1;
-                if (tag === "svg") {
-                    svgPosition = { parent: parent, depth: depth, next: n + 1 }
-                } else if (svgPosition && (svgPosition.depth > depth || (svgPosition.parent === parent && svgPosition.next === n))) {
-                    svgPosition = null
-                }
+            const buildHtmlElement = (node : JSXElement, parent : string, n : number, svg : boolean) => {
+                const { tag, properties, content, loc } = node;
+                svg = svg || SvgOnlyTagRx.test(tag);
                 if (!node.isHTML) {
                     buildInsertedSubComponent(node, parent, n);
                 } else {
@@ -184,19 +178,20 @@ const compile = (ctl : Program, opts : Params) => {
                         dynamic    = fns.length > 0 || exprs.some(e => !noApparentSignals(e)),
                         stmts      = properties.map((p, i) => 
                             p === classProp                 ? '' :
-                            p instanceof JSXStaticProperty  ? buildStaticProperty(p, id) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id, i, exprs[i], dynamic, spreads) :
-                            buildSpread(p, id, exprs[i], dynamic, spreads)
+                            p instanceof JSXStaticProperty  ? buildStaticProperty(p, id, svg) :
+                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id, i, exprs[i], dynamic, spreads, svg) :
+                            buildSpread(p, id, exprs[i], dynamic, spreads, svg)
                         ).filter(s => s !== ''),
-                        refStmts   = refs.map(r => compileSegments(r.code) + ' = ').join('');
+                        refStmts   = refs.map(r => compileSegments(r.code) + ' = ').join(''),
+                        childSvg = svg && tag !== SvgForeignTag;
 
-                    addStatement(`${id} = ${refStmts}Surplus.${svgPosition === null ? 'createElement' : 'createSvgElement'}('${tag}', ${classProp && classProp.value}, ${parent || null});`);
+                    addStatement(`${id} = ${refStmts}Surplus.create${svg ? 'Svg' : ''}Element('${tag}', ${classProp && classProp.value}, ${parent || null});`);
                     
                     if (!dynamic) {
                         stmts.forEach(addStatement);
                     }
                     
-                    content.forEach((c, i) => buildChild(c, id, i));
+                    content.forEach((c, i) => buildChild(c, id, i, childSvg));
 
                     if (dynamic) {
                         if (spreads.length > 0) {
@@ -212,30 +207,30 @@ const compile = (ctl : Program, opts : Params) => {
                     }
                 }
             },
-            buildStaticProperty = (node : JSXStaticProperty, id : string) =>
-                buildProperty(id, node.name, node.value),
-            buildDynamicProperty = (node : JSXDynamicProperty, id : string, n : number, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
+            buildStaticProperty = (node : JSXStaticProperty, id : string, svg : boolean) =>
+                buildProperty(id, node.name, node.value, svg),
+            buildDynamicProperty = (node : JSXDynamicProperty, id : string, n : number, expr : string, dynamic : boolean, spreads : JSXProperty[], svg : boolean) =>
                 node.isRef ? buildReference(expr, id) :
                 node.isFn ? buildNodeFn(node, id, n, expr) :
                 node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
-                buildProperty(id, node.name, expr),
-            buildProperty = (id : string, prop : string, expr : string) =>
-                svgPosition !== null || isAttribute(prop)
+                buildProperty(id, node.name, expr, svg),
+            buildProperty = (id : string, prop : string, expr : string, svg : boolean) =>
+                svg || IsAttribute(prop)
                 ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
             buildReference = (ref : string, id : string) => '',
-            buildSpread = (node : JSXSpreadProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
-                !dynamic             ? buildStaticSpread(node, id, expr) :
-                spreads.length === 1 ? buildSingleSpread(node, id, expr) :
-                buildMultiSpread(node, id, expr, spreads),
-            buildStaticSpread = (node : JSXSpreadProperty, id : string, expr : string) =>
-                `Surplus.staticSpread(${id}, ${expr});`,
-            buildSingleSpread = (node : JSXSpreadProperty, id : string, expr : string) =>
-                `__spread.apply(${id}, ${expr});`,
-            buildMultiSpread = (node : JSXSpreadProperty, id : string, expr : string, spreads : JSXProperty[]) => {
+            buildSpread = (node : JSXSpreadProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[], svg : boolean) =>
+                !dynamic             ? buildStaticSpread(node, id, expr, svg) :
+                spreads.length === 1 ? buildSingleSpread(node, id, expr, svg) :
+                buildMultiSpread(node, id, expr, spreads, svg),
+            buildStaticSpread = (node : JSXSpreadProperty, id : string, expr : string, svg : boolean) =>
+                `Surplus.staticSpread(${id}, ${expr}, ${svg});`,
+            buildSingleSpread = (node : JSXSpreadProperty, id : string, expr : string, svg : boolean) =>
+                `__spread.apply(${id}, ${expr}, ${svg});`,
+            buildMultiSpread = (node : JSXSpreadProperty, id : string, expr : string, spreads : JSXProperty[], svg : boolean) => {
                 var n = spreads.indexOf(node),
                     final = n === spreads.length - 1;
-                return `__spread.apply(${id}, ${expr}, ${n}, ${final});`;
+                return `__spread.apply(${id}, ${expr}, ${n}, ${final}, ${svg});`;
             },
             buildNodeFn = (node : JSXDynamicProperty, id : string, n : number, expr : string) => {
                 const state = addId(id, 'fn', n);
@@ -254,8 +249,8 @@ const compile = (ctl : Program, opts : Params) => {
                     final = n === spreads.length - 1;
                 return `__spread.applyStyle(${id}, ${expr}, ${n}, ${final});`;
             },
-            buildChild = (node : JSXContent, parent : string, n : number) =>
-                node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
+            buildChild = (node : JSXContent, parent : string, n : number, svg : boolean) =>
+                node instanceof JSXElement ? buildHtmlElement(node, parent, n, svg) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :
                 node instanceof JSXText    ? buildHtmlText(node, parent, n) :
                 buildHtmlInsert(node, parent, n),
@@ -284,7 +279,7 @@ const compile = (ctl : Program, opts : Params) => {
                 computations.push(new Computation(body, loc, stateVar, seed));
             }
 
-            buildHtmlElement(top, '', 0);
+            buildHtmlElement(top, '', 0, false);
 
             return new DOMExpression(ids, statements, computations);
         },
@@ -315,8 +310,6 @@ const compile = (ctl : Program, opts : Params) => {
 const
     noApparentSignals = (code : string) =>
         !rx.hasParen.test(code) || (rx.loneFunction.test(code) && !rx.endsInParen.test(code)),
-    isAttribute = (prop : string) =>
-        rx.attribute.test(prop), // TODO: better heuristic for attributes than name contains a hyphen
     indent = (previousCode : string) : Indents => {
         const m  = rx.indent.exec(previousCode),
             pad  = m ? m[1] : '',

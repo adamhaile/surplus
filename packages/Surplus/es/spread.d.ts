@@ -1,7 +1,7 @@
 export declare type PropObj = {
     [name: string]: any;
 };
-export declare function staticSpread(node: HTMLElement, obj: PropObj): void;
+export declare function staticSpread(node: HTMLElement, obj: PropObj, svg: boolean): void;
 export declare function staticStyle(node: HTMLElement, style: PropObj): void;
 export declare class SingleSpreadState {
     namedProps: {
@@ -12,10 +12,10 @@ export declare class SingleSpreadState {
     constructor(namedProps: {
         [name: string]: boolean;
     });
-    apply(node: Element, props: PropObj): void;
+    apply(node: Element, props: PropObj, svg: boolean): void;
     applyStyle(node: Element, style: PropObj): void;
-    private check(node, rawName, props);
-    private setField(node, rawName, props);
+    private check(node, rawName, props, svg);
+    private setField(node, rawName, props, svg);
 }
 export declare class MultiSpreadState {
     namedProps: {
@@ -35,8 +35,8 @@ export declare class MultiSpreadState {
     constructor(namedProps: {
         [name: string]: boolean;
     });
-    apply(node: Element, props: PropObj, n: number, last: boolean): void;
+    apply(node: Element, props: PropObj, n: number, last: boolean, svg: boolean): void;
     applyStyle(node: Element, style: PropObj, n: number, last: boolean): void;
     private check(rawName, props);
-    private setField(node, rawName, props, n, last);
+    private setField(node, rawName, props, n, last, svg);
 }
