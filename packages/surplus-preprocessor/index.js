@@ -766,7 +766,7 @@ var SvgTags = [
 ];
 var SvgTagRx = new RegExp("^(" + SvgTags.join("|") + ")$");
 var SvgOnlyTags = SvgTags.filter(function (t) { return !HtmlTagRx.test(t); });
-var SvgOnlyTagRx = new RegExp("^(" + SvgOnlyTags.join("|") + "$)");
+var SvgOnlyTagRx = new RegExp("^(" + SvgOnlyTags.join("|") + ")$");
 var SvgForeignTag = "foreignObject";
 var AttributeRx = /-/;
 var IsAttribute = function (prop) { return AttributeRx.test(prop); };

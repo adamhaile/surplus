@@ -229,7 +229,7 @@ export const HtmlTags = [
     ],
     SvgTagRx      = new RegExp(`^(${SvgTags.join("|")})$`),
     SvgOnlyTags   = SvgTags.filter(t => !HtmlTagRx.test(t)),
-    SvgOnlyTagRx  = new RegExp(`^(${SvgOnlyTags.join("|")}$)`),
+    SvgOnlyTagRx  = new RegExp(`^(${SvgOnlyTags.join("|")})$`),
     SvgForeignTag = "foreignObject",
     AttributeRx   = /-/, // TODO: better heuristic for attributes than name contains a hyphen
     IsAttribute   = (prop : string) => AttributeRx.test(prop);

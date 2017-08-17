@@ -93,6 +93,16 @@ describe("SVG nodes", function () {
         eval(code);
     });
 
+    it("are distinguished from nodes with same prefix", function () {
+        var code = window.SurplusPreprocessor.preprocess(`
+            var dom = <textField>Foo</textField>;
+
+            expect(dom instanceof SVGElement).toBe(false);
+        `);
+
+        eval(code);
+    });
+
     it("can have dynamic attributes", function () {
         var code = window.SurplusPreprocessor.preprocess(`
             var cx = S.data("100"),

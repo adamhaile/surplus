@@ -224,5 +224,5 @@ export var HtmlTags = [
     "use",
     "view",
     "vkern"
-], SvgTagRx = new RegExp("^(" + SvgTags.join("|") + ")$"), SvgOnlyTags = SvgTags.filter(function (t) { return !HtmlTagRx.test(t); }), SvgOnlyTagRx = new RegExp("^(" + SvgOnlyTags.join("|") + "$)"), SvgForeignTag = "foreignObject", AttributeRx = /-/, // TODO: better heuristic for attributes than name contains a hyphen
+], SvgTagRx = new RegExp("^(" + SvgTags.join("|") + ")$"), SvgOnlyTags = SvgTags.filter(function (t) { return !HtmlTagRx.test(t); }), SvgOnlyTagRx = new RegExp("^(" + SvgOnlyTags.join("|") + ")$"), SvgForeignTag = "foreignObject", AttributeRx = /-/, // TODO: better heuristic for attributes than name contains a hyphen
 IsAttribute = function (prop) { return AttributeRx.test(prop); };
