@@ -188,6 +188,27 @@ declare global {
 		interface SurplusAtributes<T> {
 			ref?: T;
 			fn?: <U>(node : T, state? : U) => any;
+			fn0?: <U>(node : T, state? : U) => any;
+			fn1?: <U>(node : T, state? : U) => any;
+			fn2?: <U>(node : T, state? : U) => any;
+			fn3?: <U>(node : T, state? : U) => any;
+			fn4?: <U>(node : T, state? : U) => any;
+			fn5?: <U>(node : T, state? : U) => any;
+			fn6?: <U>(node : T, state? : U) => any;
+			fn7?: <U>(node : T, state? : U) => any;
+			fn8?: <U>(node : T, state? : U) => any;
+			fn9?: <U>(node : T, state? : U) => any;
+			fn10?: <U>(node : T, state? : U) => any;
+			fn11?: <U>(node : T, state? : U) => any;
+			fn12?: <U>(node : T, state? : U) => any;
+			fn13?: <U>(node : T, state? : U) => any;
+			fn14?: <U>(node : T, state? : U) => any;
+			fn15?: <U>(node : T, state? : U) => any;
+			fn16?: <U>(node : T, state? : U) => any;
+			fn17?: <U>(node : T, state? : U) => any;
+			fn18?: <U>(node : T, state? : U) => any;
+			fn19?: <U>(node : T, state? : U) => any;
+			fn20?: <U>(node : T, state? : U) => any;
 		}
 
 		interface DOMAttributes<T> extends SurplusAtributes<T> {
