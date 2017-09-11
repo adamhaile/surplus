@@ -1,9 +1,9 @@
 {
   "name": "surplus-preprocessor",
   "version": "0.4.3",
+  "description": "A javascript pre-processor that compiles Surplus JSX views",
   "module": "es/preprocessor.js",
   "types": "es/preprocessor.d.ts",
-  "description": "Javascript pre-processor that converts JSX syntax into inline DOM instructions",
   "keywords": [
     "javascript",
     "html",
@@ -13,5 +13,7 @@
     "templating"
   ],
   "author": "Adam Haile",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
 }
