@@ -65,7 +65,7 @@ export const HtmlTags = [
         "html",
         "i",
         "iframe",
-        "image",
+        //"image", 
         "img",
         "input",
         "ins",
