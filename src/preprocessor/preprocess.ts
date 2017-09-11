@@ -7,8 +7,7 @@ import * as sourcemap from './sourcemap';
 export interface Options {
     sourcemap?  : 'extract' | 'append' | null,
     sourcefile? : string,
-    targetfile? : string,
-    jsx?        : boolean
+    targetfile? : string
 }
 
 export interface Params {
@@ -17,13 +16,12 @@ export interface Params {
     targetfile : string
 }
 
-export function preprocess(str : string, opts : Options) {
+export function preprocess(str : string, opts? : Options) {
     opts = opts || {};
     const params = {
         sourcemap:  opts.sourcemap || null,
         sourcefile: opts.sourcefile || 'in.js',
-        targetfile: opts.targetfile || 'out.js',
-        jsx:        'jsx' in opts ? opts.jsx : true
+        targetfile: opts.targetfile || 'out.js'
     } as Params;
 
     const toks = tokenize(str, params),
