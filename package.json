@@ -1,15 +1,31 @@
 {
-  "name": "surplus-repo",
-  "version": "0.4.0",
-  "description": "Javascript pre-processor that converts JSX syntax into inline DOM instructions",
+  "name": "surplus",
+  "version": "0.5.0-beta1",
+  "description": "High-performance JSX web views for S.js applications",  
+  "keywords": [
+    "JSX",
+    "html",
+    "DOM",
+    "template"
+  ],
+  "module": "es/index.js",
+  "types": "index.d.ts",
   "scripts": {
     "test": "karma start",
-    "build": "tsc -p src/runtime/tsconfig.json && tsc -p src/preprocessor/tsconfig.json && rollup -c src/runtime/rollup.config.js && rollup -c src/preprocessor/rollup.config.js"
+    "build": "tsc -p src/runtime/tsconfig.json && tsc -p src/compiler/tsconfig.json && rollup -c src/runtime/rollup.config.js && rollup -c src/compiler/rollup.config.js"
   },
   "author": "Adam Haile",
+  "homepage": "https://github.com/adamhaile/surplus",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adamhaile/surplus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adamhaile/issues"
+  },
   "license": "MIT",
-  "dependencies": {
-    "s-js": "^0.4.3"
+  "peerDependencies": {
+    "s-js": "^0.4.4"
   },
   "devDependencies": {
     "jasmine": "^2.6.0",
@@ -17,6 +33,6 @@
     "karma-jasmine": "^1.1.0",
     "karma-chrome-launcher": "^2.1.1",
     "rollup": "^0.43.0",
-    "typescript": "^2.4.1"
+    "typescript": "^2.5.2"
   }
 }

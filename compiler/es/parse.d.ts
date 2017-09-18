@@ -1,5 +1,5 @@
 import * as AST from './AST';
-import { Params } from './preprocess';
+import { Params } from './compile';
 export interface LOC {
     line: number;
     col: number;

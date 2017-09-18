@@ -2,14 +2,13 @@ export interface Options {
     sourcemap?: 'extract' | 'append' | null;
     sourcefile?: string;
     targetfile?: string;
-    jsx?: boolean;
 }
 export interface Params {
     sourcemap: 'extract' | 'append' | null;
     sourcefile: string;
     targetfile: string;
 }
-export declare function preprocess(str: string, opts: Options): string | {
+export declare function compile(str: string, opts?: Options): string | {
     src: string;
     map: {
         version: number;

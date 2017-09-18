@@ -1,4 +1,4 @@
-import { Params } from './preprocess';
+import { Params } from './compile';
 import { LOC } from './parse';
 export declare function locationMark(loc: LOC): string;
 export declare function extractMap(src: string, original: string, opts: Params): {

@@ -1,4 +1,4 @@
-import { Params } from './preprocess';
+import { Params } from './compile';
 
 /// tokens:
 /// < (followed by \w)

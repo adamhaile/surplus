@@ -1,4 +1,4 @@
-import { S } from './Surplus';
+import { S } from './index';
 var DOCUMENT_FRAGMENT_NODE = 11, TEXT_NODE = 3;
 export function insert(range, value) {
     var parent = range.start.parentNode, test = range.start, good = null, t = typeof value;

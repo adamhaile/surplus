@@ -1,4 +1,4 @@
-export * from './es/Surplus';
+export * from './es/';
 
 // JSX type definitions for Surplus initially based on those for React v0.14
 // React definitions by: Asana <https://asana.com>, AssureSign <http://www.assuresign.com>, Microsoft <https://microsoft.com>, John Reilly <https://github.com/johnnyreilly/>

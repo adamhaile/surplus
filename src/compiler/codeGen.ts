@@ -15,10 +15,10 @@ import {
 } from './AST';
 import { LOC } from './parse';
 import { locationMark } from './sourcemap';
-import { Params } from './preprocess';
+import { Params } from './compile';
 import { SvgOnlyTagRx, SvgForeignTag, IsAttribute } from './domRef';
 
-export { compile, codeStr };
+export { codeGen, codeStr };
 
 // pre-compiled regular expressions
 const rx = {
@@ -60,7 +60,7 @@ class SubComponent {
     ) { }
 }
 
-const compile = (ctl : Program, opts : Params) => {
+const codeGen = (ctl : Program, opts : Params) => {
     const compileSegments = (node : Program | EmbeddedCode) => {
             return node.segments.reduce((res, s) => res + compileSegment(s, res), "");
         },

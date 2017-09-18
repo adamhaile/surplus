@@ -1,4 +1,4 @@
-import { Params } from './preprocess';
+import { Params } from './compile';
 import { LOC } from './parse';
 
 const rx = {

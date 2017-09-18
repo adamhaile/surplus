@@ -9,7 +9,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 import { EmbeddedCode, CodeText, JSXElement, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXSpreadProperty } from './AST';
 import { locationMark } from './sourcemap';
 import { SvgOnlyTagRx, SvgForeignTag, IsAttribute } from './domRef';
-export { compile, codeStr };
+export { codeGen, codeStr };
 // pre-compiled regular expressions
 var rx = {
     backslashes: /\\/g,
@@ -49,7 +49,7 @@ var SubComponent = (function () {
     }
     return SubComponent;
 }());
-var compile = function (ctl, opts) {
+var codeGen = function (ctl, opts) {
     var compileSegments = function (node) {
         return node.segments.reduce(function (res, s) { return res + compileSegment(s, res); }, "");
     }, compileSegment = function (node, previousCode) {

@@ -1,7 +1,7 @@
 // Cross-browser compatibility shims
 import { Program, JSXStaticProperty, JSXDynamicProperty, JSXSpreadProperty, JSXProperty, JSXElement, JSXText, Copy } from './AST';
-import { Params } from './preprocess';
-import { codeStr } from './compile';
+import { Params } from './compile';
+import { codeStr } from './codeGen';
 
 const rx = {
     ws              : /^\s*$/,

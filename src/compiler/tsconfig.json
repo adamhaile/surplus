@@ -3,7 +3,7 @@
         "target": "ES5",
         "module": "es2015",
         "strict": true,
-        "outDir": "../../packages/surplus-preprocessor/es",
+        "outDir": "../../compiler/es",
         "declaration": true
     },
     "include": [

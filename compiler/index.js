@@ -1,7 +1,7 @@
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
 	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(factory((global.SurplusPreprocessor = global.SurplusPreprocessor || {})));
+	(factory((global.SurplusCompiler = global.SurplusCompiler || {})));
 }(this, (function (exports) { 'use strict';
 
 /// tokens:
@@ -602,7 +602,7 @@ var HtmlTags = [
     "html",
     "i",
     "iframe",
-    "image",
+    //"image", 
     "img",
     "input",
     "ins",
@@ -818,7 +818,7 @@ var SubComponent = (function () {
     }
     return SubComponent;
 }());
-var compile = function (ctl, opts) {
+var codeGen = function (ctl, opts) {
     var compileSegments = function (node) {
         return node.segments.reduce(function (res, s) { return res + compileSegment(s, res); }, "");
     }, compileSegment = function (node, previousCode) {
@@ -1114,21 +1114,20 @@ function promoteInitialTextNodesToTextContentProperties(tx) {
         } });
 }
 
-function preprocess(str, opts) {
+function compile(str, opts) {
     opts = opts || {};
     var params = {
         sourcemap: opts.sourcemap || null,
         sourcefile: opts.sourcefile || 'in.js',
-        targetfile: opts.targetfile || 'out.js',
-        jsx: 'jsx' in opts ? opts.jsx : true
+        targetfile: opts.targetfile || 'out.js'
     };
-    var toks = tokenize(str, params), ast = parse(toks, params), ast2 = transform(ast, params), code = compile(ast2, params), out = params.sourcemap === 'extract' ? extractMap(code, str, params) :
+    var toks = tokenize(str, params), ast = parse(toks, params), ast2 = transform(ast, params), code = codeGen(ast2, params), out = params.sourcemap === 'extract' ? extractMap(code, str, params) :
         params.sourcemap === 'append' ? appendMap(code, str, params) :
             code;
     return out;
 }
 
-exports.preprocess = preprocess;
+exports.compile = compile;
 
 Object.defineProperty(exports, '__esModule', { value: true });
 

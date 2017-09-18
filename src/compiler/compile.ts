@@ -1,7 +1,7 @@
 import { tokenize } from './tokenize';
 import { parse } from './parse';
 import { transform } from './transform';
-import { compile } from './compile';
+import { codeGen } from './codeGen';
 import * as sourcemap from './sourcemap';
 
 export interface Options {
@@ -16,7 +16,7 @@ export interface Params {
     targetfile : string
 }
 
-export function preprocess(str : string, opts? : Options) {
+export function compile(str : string, opts? : Options) {
     opts = opts || {};
     const params = {
         sourcemap:  opts.sourcemap || null,
@@ -27,7 +27,7 @@ export function preprocess(str : string, opts? : Options) {
     const toks = tokenize(str, params),
         ast = parse(toks, params),
         ast2 = transform(ast, params),
-        code = compile(ast2, params),
+        code = codeGen(ast2, params),
         out = params.sourcemap === 'extract' ? sourcemap.extractMap(code, str, params) :
               params.sourcemap === 'append'  ? sourcemap.appendMap(code, str, params) :
               code;

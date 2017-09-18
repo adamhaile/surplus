@@ -8,7 +8,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 };
 // Cross-browser compatibility shims
 import { JSXStaticProperty, JSXDynamicProperty, JSXSpreadProperty, JSXElement, JSXText, Copy } from './AST';
-import { codeStr } from './compile';
+import { codeStr } from './codeGen';
 var rx = {
     ws: /^\s*$/,
     jsxEventProperty: /^on[A-Z]/

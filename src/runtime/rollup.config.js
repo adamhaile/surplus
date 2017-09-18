@@ -1,6 +1,6 @@
 export default {
-	entry: 'packages/Surplus/es/Surplus.js',
-	dest: 'packages/Surplus/index.js',
+	entry: 'es/index.js',
+	dest: 'index.js',
 	format: 'umd',
     moduleName: 'Surplus',
     exports: 'named',

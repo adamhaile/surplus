@@ -1,4 +1,4 @@
-import { S } from './Surplus';
+import { S } from './index';
 
 const DOCUMENT_FRAGMENT_NODE = 11,
     TEXT_NODE = 3;
