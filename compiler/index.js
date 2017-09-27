@@ -1058,7 +1058,7 @@ var tf = [
     // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
-    promoteInitialTextNodesToTextContentProperties,
+    promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 var transform = function (node, opt) { return tf.Program(node); };
@@ -1103,10 +1103,10 @@ function translateJSXPropertyNames(tx) {
 function translateJSXPropertyName(name) {
     return rx$2.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
-function promoteInitialTextNodesToTextContentProperties(tx) {
+function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
-            if (node.isHTML && content.length > 0 && content[0] instanceof JSXText) {
+            if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
                 var textContent = new JSXStaticProperty("textContent", codeStr(content[0].text));
                 node = new JSXElement(tag, properties.concat([textContent]), content.slice(1), loc);
             }

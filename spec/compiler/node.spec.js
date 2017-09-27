@@ -45,4 +45,19 @@ describe("HTML node literal", function () {
 
         eval(code);
     });
+    
+    it("preserves initial static text in presence of dynamic properties (issue #15)", () => {  
+        const code = window.SurplusCompiler.compile(`
+            const dv = (
+                <div fn={() => {}}>
+                    1<br />
+                    2<br />
+                </div>
+            );
+
+            expect(dv.outerHTML).toBe("<div>                    1<br>                    2<br></div>");
+        `);
+
+        eval(code);
+    });
 });

@@ -12,7 +12,7 @@ const tf = [
     // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
-    promoteInitialTextNodesToTextContentProperties,
+    promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce((tf, fn) => fn(tf), Copy);
 
@@ -78,12 +78,12 @@ function translateJSXPropertyName(name : string) {
     return rx.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
 
-function promoteInitialTextNodesToTextContentProperties(tx : Copy) : Copy {
+function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {
     return {
         ...tx,
         JSXElement(node) {
             const { tag, properties, content, loc } = node;
-            if (node.isHTML && content.length > 0 && content[0] instanceof JSXText) {
+            if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
                 var textContent = new JSXStaticProperty("textContent", codeStr((content[0] as JSXText).text));
                 node = new JSXElement(tag, [ ...properties, textContent ], content.slice(1), loc);
             }
