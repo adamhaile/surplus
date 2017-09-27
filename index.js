@@ -208,7 +208,9 @@ function staticSpread(node, obj, svg) {
         }
     }
 }
-
+function staticStyle(node, style) {
+    assign(node.style, style);
+}
 var SingleSpreadState = (function () {
     function SingleSpreadState(namedProps) {
         this.namedProps = namedProps;
@@ -438,6 +440,7 @@ function translateJSXPropertyName(name) {
 
 exports.insert = insert$$1;
 exports.staticSpread = staticSpread;
+exports.staticStyle = staticStyle;
 exports.SingleSpreadState = SingleSpreadState;
 exports.MultiSpreadState = MultiSpreadState;
 exports.S = S;
