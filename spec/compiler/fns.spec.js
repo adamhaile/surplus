@@ -4,7 +4,7 @@ describe("JSX fn", function () {
         test = argsSpy;
 
     it("is called with its args then the node", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             argsSpy.calls.reset(), nodeSpy.calls.reset();       \n\
                                                                 \n\
             var a = <a fn={test("foo", 2)} />;                  \n\
@@ -15,7 +15,7 @@ describe("JSX fn", function () {
     });
 
     it("can pass state back to itself", function () {
-        var code = window.SurplusPreprocessor.preprocess('            \n\
+        var code = window.SurplusCompiler.compile('            \n\
             var flag = S.data(true),                            \n\
                 mixin = (el, state) =>                          \n\
                     (flag(), el.id = (state || 0) + 1);         \n\
@@ -31,7 +31,7 @@ describe("JSX fn", function () {
     });
 
     it("can be repeated for multiple fns on the same node", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             var fn1 = el => el.id = "foo",                      \n\
                 fn2 = el => el.href = "http://bar/";            \n\
                 fn3 = el => el.name = "blech";                  \n\
@@ -45,7 +45,7 @@ describe("JSX fn", function () {
     });
 
     it("can set properties on the node", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             var mixin = el => el.id = "id";                     \n\
                                                                 \n\
             var a = <a fn={mixin} />;                           \n\
@@ -55,7 +55,7 @@ describe("JSX fn", function () {
     });
 
     it("properties set by mixins are overriden by later properties", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             var mixin = el => el.id = "foo";                    \n\
                                                                 \n\
             var a = <a fn={mixin} id="bar" />;                  \n\
@@ -65,7 +65,7 @@ describe("JSX fn", function () {
     });
 
     it("properties set by mixins are overriden by later mixins", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             var mixin1 = el => el.id = "foo",                   \n\
                 mixin2 = el => el.id = "bar";                   \n\
                                                                 \n\
@@ -76,7 +76,7 @@ describe("JSX fn", function () {
     });
 
     it("properties set by mixins are overriden by later properties, even if the mixin re-evaluates", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             var id = S.data("foo"),                             \n\
                 mixin = el => el.id = id();                     \n\
                                                                 \n\
@@ -89,7 +89,7 @@ describe("JSX fn", function () {
     });
 
     it("properties set by mixins are overriden by later mixins, even if the first re-evaluates", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             var id = S.data("foo"),                             \n\
                 mixin1 = el => el.id = id(),                    \n\
                 mixin2 = el => el.id = "bar";                   \n\
@@ -103,7 +103,7 @@ describe("JSX fn", function () {
     });
 
     it("can be aliased as fn1, fn2, etc.", function () {
-        eval(window.SurplusPreprocessor.preprocess('            \n\
+        eval(window.SurplusCompiler.compile('            \n\
             var fn1   = el => el.id = "foo",                    \n\
                 fn2   = el => el.href = "http://bar/",          \n\
                 fn007 = el => el.name = "bond";                 \n\

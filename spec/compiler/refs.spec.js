@@ -1,6 +1,6 @@
 describe("JSX ref", () => {
     it("sets a variable to the value of the indicated node", () => {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var ref = null,                                     \n\
                 a = <div ref={ref} />;                          \n\
                                                                 \n\
@@ -12,7 +12,7 @@ describe("JSX ref", () => {
     });
 
     it("can reference nested nodes", () => {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var ref = null,                                     \n\
                 a = <div><a ref={ref}></a></div>;               \n\
                                                                 \n\
@@ -25,7 +25,7 @@ describe("JSX ref", () => {
     });
 
     it("can be repeated for multiple references", () => {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var ref1 = null,                                    \n\
                 ref2 = null,                                    \n\
                 a = <div ref={ref1} ref={ref2} />;              \n\
@@ -40,7 +40,7 @@ describe("JSX ref", () => {
     });
 
     it("can reference top-level sub-components", () => {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var ref = null,                                     \n\
                 Sub = p => "sub",                               \n\
                 a = <Sub ref={ref} />;                          \n\
@@ -53,7 +53,7 @@ describe("JSX ref", () => {
     });
 
     it("can reference nested sub-components", () => {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var ref = null,                                     \n\
                 Sub = p => "sub",                               \n\
                 a = <div><Sub ref={ref} /></div>;               \n\
@@ -66,7 +66,7 @@ describe("JSX ref", () => {
     });
 
     it("are not passed as properties to nodes", () => {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var ref = null,                                     \n\
                 a = <div ref={ref} />;                          \n\
                                                                 \n\
@@ -78,7 +78,7 @@ describe("JSX ref", () => {
     });
 
     it("are not passed as properties to sub-components", () => {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var ref = null,                                     \n\
                 props = null,                                   \n\
                 Sub = p => (props = p, "sub"),                  \n\
@@ -92,7 +92,7 @@ describe("JSX ref", () => {
     });
 
     it("are set for any nodes before fns run", () => {
-        var code = window.SurplusPreprocessor.preprocess('                        \n\
+        var code = window.SurplusCompiler.compile('                        \n\
             var ref = null,                                                       \n\
                 refWhenParentFnCalled = null,                                     \n\
                 refWhenPriorSiblingFnCalled = null,                               \n\
@@ -118,7 +118,7 @@ describe("JSX ref", () => {
     });
 
     it("are not set in any children or prior siblings of sub-components", () => {
-        var code = window.SurplusPreprocessor.preprocess('                        \n\
+        var code = window.SurplusCompiler.compile('                        \n\
             var ref = null,                                                       \n\
                 refWhenParentFnCalled = null,                                     \n\
                 refWhenPriorSiblingFnCalled = null,                               \n\

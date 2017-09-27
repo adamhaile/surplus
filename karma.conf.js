@@ -19,7 +19,7 @@ module.exports = function(config) {
       'compiler/index.js',
       'index.js',
       'spec/runtime/*.js',
-      'spec/preprocessor/*.js',
+      'spec/compiler/*.js',
     ],
 
 

@@ -1,7 +1,7 @@
 describe("SVG nodes", function () {
 
     it("can be a top-level <svg> element", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var svg = 
                 <svg>
                     <circle cx="100" cy="100" r="50" fill="red"></circle>
@@ -15,7 +15,7 @@ describe("SVG nodes", function () {
     });
 
     it("can be a top-level SVG element other than <svg>", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var circle = <circle cx="100" cy="100" r="50" fill="red"></circle>;
 
             expect(circle instanceof SVGCircleElement).toBe(true);
@@ -25,7 +25,7 @@ describe("SVG nodes", function () {
     });
 
     it("can be an <svg> element that is the first child of an html element", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var div = 
                 <div>
                     <svg>
@@ -41,7 +41,7 @@ describe("SVG nodes", function () {
     });
 
     it("can be an <svg> element that is in the middle of other html elements", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var div = 
                 <div>
                     <h2>Svg test</h2>
@@ -59,7 +59,7 @@ describe("SVG nodes", function () {
     });
 
     it("can be an <svg> element that is the last child of an html element", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var div = 
                 <div>
                     <h2>Svg test</h2>
@@ -76,7 +76,7 @@ describe("SVG nodes", function () {
     });
 
     it("can have html elements inside <foreignObject> tags", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var svg = 
                 <svg>
                     <foreignObject>
@@ -94,7 +94,7 @@ describe("SVG nodes", function () {
     });
 
     it("are distinguished from nodes with same prefix", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var dom = <textField>Foo</textField>;
 
             expect(dom instanceof SVGElement).toBe(false);
@@ -104,7 +104,7 @@ describe("SVG nodes", function () {
     });
 
     it("can have dynamic attributes", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var cx = S.data("100"),
                 circle = <circle cx={cx()} cy="100" r="50" fill="red"></circle>;
 
@@ -117,7 +117,7 @@ describe("SVG nodes", function () {
     });
 
     it("can have spread attributes", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var cx = S.data("100"),
                 circle = <circle {...{ cx: cx() }} cy="100" r="50" fill="red"></circle>;
 
@@ -130,7 +130,7 @@ describe("SVG nodes", function () {
     });
 
     it("can have refs", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var ref = null,
                 circle = <circle ref={ref} cx="100" cy="100" r="50" fill="red"></circle>;
 
@@ -142,7 +142,7 @@ describe("SVG nodes", function () {
     });
 
     it("can have fns", function () {
-        var code = window.SurplusPreprocessor.preprocess(`
+        var code = window.SurplusCompiler.compile(`
             var fn = el => el.id = "foo",
                 circle = <circle fn={fn} cx="100" cy="100" r="50" fill="red"></circle>;
 

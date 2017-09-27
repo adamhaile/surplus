@@ -1,6 +1,6 @@
 describe("sourcemaps", function () {
     it("can be returned", function () {
-        var code = window.SurplusPreprocessor.preprocess('                     \n\
+        var code = window.SurplusCompiler.compile('                     \n\
             var div = <div className={"foo"}></div>,                           \n\
                 h1 = <h1>{"title"}</h1>,                                       \n\
                 ul  = <ul>                                                     \n\
@@ -14,7 +14,7 @@ describe("sourcemaps", function () {
     });
 
     it("can be appended", function () {
-        var code = window.SurplusPreprocessor.preprocess('                     \n\
+        var code = window.SurplusCompiler.compile('                     \n\
             //debugger;                                                          \n\
             var div = <div className={"foo"}></div>,                           \n\
                 h1 = <h1>{"title"}</h1>,                                       \n\
@@ -29,7 +29,7 @@ describe("sourcemaps", function () {
     });
 
     it("handle complex jsx", function () {
-        var code = window.SurplusPreprocessor.preprocess('                     \n\
+        var code = window.SurplusCompiler.compile('                     \n\
 //debugger; \n\
 var data = () => () => null,\n\
     onkey = () => () => null,\n\

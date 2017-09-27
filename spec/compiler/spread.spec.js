@@ -4,7 +4,7 @@ describe("JSX ...spreads", function () {
         test = argsSpy;
 
     it("add properties on the node", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var spread = { id : "id" },                         \n\
                 a = <a {...spread} />;                          \n\
                                                                 \n\
@@ -15,7 +15,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("add styles on the node", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var spread = { style : { width: "50%" } },          \n\
                 a = <a {...spread} />;                          \n\
                                                                 \n\
@@ -26,7 +26,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("add an attribute on the node when no property is available", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var spread = { "aria-hidden" : "true" },            \n\
                 a = <a {...spread} />;                          \n\
                                                                 \n\
@@ -37,7 +37,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("remove properties from the node when no longer present", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var flag = S.data(true),                            \n\
                 spread = { id : "id" },                         \n\
                 a = <a {...flag() ? spread : {}} />;            \n\
@@ -51,7 +51,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("do not remove properties from earlier sets when that property is no longer present", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var flag = S.data(true),                            \n\
                 spread = { id : "id2" },                        \n\
                 a = <a                                          \n\
@@ -68,7 +68,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("do not remove properties from earlier spreads when that property is no longer present", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var flag = S.data(true),                            \n\
                 spread1 = { id : "id1" },                       \n\
                 spread2 = { id : "id2" },                       \n\
@@ -86,7 +86,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("convert JSX property names to DOM names", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var func = () => null,                              \n\
                 spread = { onClick : func };                    \n\
                                                                 \n\
@@ -99,7 +99,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("properties set by spreads are overriden by later properties", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var spread = { id : "id" };                         \n\
                                                                 \n\
             var a = <a {...spread} id="bar" />;                 \n\
@@ -111,7 +111,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("properties set by spreads are overriden by later spreads", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var spread1 = { id : "foo" },                       \n\
                 spread2 = { id : "bar" };                       \n\
                                                                 \n\
@@ -124,7 +124,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("properties set by spreads are overriden by later properties, even if the spread re-evaluates", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var id = S.data("foo");                             \n\
                                                                 \n\
             var a = <a {...{ id: id() }} id="bar" />;           \n\
@@ -138,7 +138,7 @@ describe("JSX ...spreads", function () {
     });
 
     it("properties set by spreads are overriden by later spreads, even if the first re-evaluates", function () {
-        var code = window.SurplusPreprocessor.preprocess('      \n\
+        var code = window.SurplusCompiler.compile('      \n\
             var id = S.data("foo"),                             \n\
                 spread2 = { id: "bar" };                        \n\
                                                                 \n\

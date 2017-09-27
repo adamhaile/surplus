@@ -1,6 +1,6 @@
 describe("subcomponent", function () {
     it("is called with a property object", function () {
-        var code = window.SurplusPreprocessor.preprocess('              \n\
+        var code = window.SurplusCompiler.compile('              \n\
             var props = null,                                           \n\
                 SubComponent = p => props = p,                          \n\
                 sub = <SubComponent foo="2" bar={3}/>;                  \n\
@@ -11,7 +11,7 @@ describe("subcomponent", function () {
     });
 
     it("can have children", function () {
-        var code = window.SurplusPreprocessor.preprocess('                  \n\
+        var code = window.SurplusCompiler.compile('                  \n\
             var props = null,                                               \n\
                 SubComponent = p => props = p,                              \n\
                 sub =                                                       \n\
@@ -34,7 +34,7 @@ describe("subcomponent", function () {
     });
 
     it("can have a single text child", function () {
-        var code = window.SurplusPreprocessor.preprocess('                  \n\
+        var code = window.SurplusCompiler.compile('                  \n\
             var props = null,                                               \n\
                 SubComponent = p => (props = p, "sub"),                     \n\
                 sub = <SubComponent>some words</SubComponent>;              \n\
@@ -49,7 +49,7 @@ describe("subcomponent", function () {
     });
 
     it("can be children", function () {
-        var code = window.SurplusPreprocessor.preprocess('                  \n\
+        var code = window.SurplusCompiler.compile('                  \n\
             var SubComponent = p => <span>{p.text}</span>,                  \n\
                 div =                                                       \n\
                     <div>                                                   \n\
@@ -65,7 +65,7 @@ describe("subcomponent", function () {
     });
 
     it("can have spread and fn properties", function () {
-        var code = window.SurplusPreprocessor.preprocess('                        \n\
+        var code = window.SurplusCompiler.compile('                        \n\
             var props = null,                                                     \n\
                 SubComponent = p => props = p,                                    \n\
                 mixin = p => p.d = 6,                                             \n\
@@ -81,7 +81,7 @@ describe("subcomponent", function () {
     });
 
     it("is re-called when a property changes", function () {
-        var code = window.SurplusPreprocessor.preprocess('              \n\
+        var code = window.SurplusCompiler.compile('              \n\
             var props = null,                                           \n\
                 SubComponent = p => props = p,                          \n\
                 sub = <SubComponent foo="2" bar={3}/>;                  \n\
@@ -92,7 +92,7 @@ describe("subcomponent", function () {
     });
 
     it("can have dotted identifiers", function () {
-        var code = window.SurplusPreprocessor.preprocess('              \n\
+        var code = window.SurplusCompiler.compile('              \n\
             var props = null,                                           \n\
                 a = { b: { c: { sub: p => (props = p, "sub") } } },     \n\
                 sub = <a.b.c.sub foo="2" bar={3}/>;                     \n\
@@ -104,7 +104,7 @@ describe("subcomponent", function () {
     });
 
     it("can be children with dotted identifiers", function () {
-        var code = window.SurplusPreprocessor.preprocess('              \n\
+        var code = window.SurplusCompiler.compile('              \n\
             var props = null,                                           \n\
                 a = { b: { c: { sub: p => (props = p, "sub") } } },     \n\
                 div = <div><a.b.c.sub foo="2" bar={3}/></div>;          \n\

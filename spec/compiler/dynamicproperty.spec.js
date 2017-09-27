@@ -1,6 +1,6 @@
 describe("JSX dynamic property", function () {
     it("sets a property to the value of a javascript expression", function () {
-        var code = window.SurplusPreprocessor.preprocess('  \n\
+        var code = window.SurplusCompiler.compile('  \n\
             var val = "foo",                                \n\
                 input = <input value = { val } />;          \n\
                                                             \n\
@@ -10,7 +10,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("sets an attribute to the value of the javascript expression when no property is available", function () {
-        var code = window.SurplusPreprocessor.preprocess('          \n\
+        var code = window.SurplusCompiler.compile('          \n\
             var val = "true",                                       \n\
                 input = <input aria-hidden = { val } />;            \n\
                                                                     \n\
@@ -20,7 +20,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("can set multiple properties on the same node", function () {
-        var code = window.SurplusPreprocessor.preprocess('     \n\
+        var code = window.SurplusCompiler.compile('     \n\
             var val = "foo",                                   \n\
                 id = "id",                                     \n\
                 input = <input value = { val } id = { id } />; \n\
@@ -32,7 +32,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("later static properties take precedence,", function () {
-        var code = window.SurplusPreprocessor.preprocess('  \n\
+        var code = window.SurplusCompiler.compile('  \n\
             var id = S.data("a"),                           \n\
                 div = <div id={id()} id="b"></div>;         \n\
                                                             \n\
@@ -42,7 +42,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("later static properties take precedence, even if early ones are re-evaluated", function () {
-        var code = window.SurplusPreprocessor.preprocess('  \n\
+        var code = window.SurplusCompiler.compile('  \n\
             var id = S.data("a"),                           \n\
                 div = <div id={id()} id="b"></div>;         \n\
                                                             \n\
@@ -54,7 +54,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("later dynamic properties take precedence,", function () {
-        var code = window.SurplusPreprocessor.preprocess('  \n\
+        var code = window.SurplusCompiler.compile('  \n\
             var id1 = S.data("a"),                          \n\
                 id2 = S.data("b"),                          \n\
                 div = <div id={id1()} id={id2()}></div>;    \n\
@@ -65,7 +65,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("later dynamic properties take precedence, even if early ones are re-evaluated", function () {
-        var code = window.SurplusPreprocessor.preprocess('  \n\
+        var code = window.SurplusCompiler.compile('  \n\
             var id1 = S.data("a"),                          \n\
                 id2 = S.data("b"),                          \n\
                 div = <div id={id1()} id={id2()}></div>;    \n\
@@ -78,7 +78,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("can set sub-properties", function () {
-        var code = window.SurplusPreprocessor.preprocess('  \n\
+        var code = window.SurplusCompiler.compile('  \n\
             var width = S.data("50%"),                      \n\
                 input = <input style.width={width()} />;    \n\
                                                             \n\
@@ -90,7 +90,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("can set sub-properties with objects", function () {
-        var code = window.SurplusPreprocessor.preprocess('   \n\
+        var code = window.SurplusCompiler.compile('   \n\
             var width = S.data("50%"),                       \n\
                 input = <input style={{ width: width() }} />;\n\
                                                              \n\
@@ -102,7 +102,7 @@ describe("JSX dynamic property", function () {
     });
 
     it("can set sub-properties with objects multiple times", function () {
-        var code = window.SurplusPreprocessor.preprocess('       \n\
+        var code = window.SurplusCompiler.compile('       \n\
             var override = S.data(true),                         \n\
                 input = <input                                   \n\
                     style={{ width: "75%" }}                     \n\
