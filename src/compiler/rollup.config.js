@@ -1,8 +1,10 @@
 export default {
-	entry: 'compiler/es/index.js',
-	dest: 'compiler/index.js',
-	format: 'umd',
-    moduleName: 'SurplusCompiler',
+	input: 'compiler/es/index.js',
+	output: {
+        file: 'compiler/index.js',
+        format: 'umd'
+    },
+    name: 'SurplusCompiler',
     exports: 'named',
     onwarn: function (warning) {
         // TS emits some helpers with code that causes rollup to carp.  This disables that error.
