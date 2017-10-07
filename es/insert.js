@@ -34,7 +34,7 @@ export function insert(range, value) {
         }
         good = value;
     }
-    else if (value instanceof Array) {
+    else if (Array.isArray(value)) {
         insertArray(value);
     }
     else if (value instanceof Function) {

@@ -10,8 +10,8 @@ export interface Range {
 
 // ugh, typescript can't type recursive arrays, so unwrapping up to 3 levels deep
 export type InsertScalar = string | number | boolean | null | undefined | Node;
-export type InsertScalarOrArray = InsertScalar | InsertScalar[] | (InsertScalar | InsertScalar[])[] | (InsertScalar | (InsertScalar | InsertScalar[])[])[]
-export type InsertValue = InsertScalarOrArray | (() => InsertValue);
+export type InsertArray = InsertScalar[] | (InsertScalar | InsertScalar[])[] | (InsertScalar | (InsertScalar | InsertScalar[])[])[];
+export type InsertValue = InsertScalar | InsertArray | (() => InsertValue);
 
 export function insert(range : Range, value : InsertValue) {
     var parent = range.start.parentNode!, 
@@ -48,7 +48,7 @@ export function insert(range : Range, value : InsertValue) {
             range.start = value;
         }
         good = value;
-    } else if (value instanceof Array) {
+    } else if (Array.isArray(value)) {
         insertArray(value);
     } else if (value instanceof Function) {
         S(function () {
