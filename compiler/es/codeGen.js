@@ -21,7 +21,7 @@ var rx = {
     singleQuotes: /'/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
-var DOMExpression = (function () {
+var DOMExpression = /** @class */ (function () {
     function DOMExpression(ids, statements, computations) {
         this.ids = ids;
         this.statements = statements;
@@ -29,7 +29,7 @@ var DOMExpression = (function () {
     }
     return DOMExpression;
 }());
-var Computation = (function () {
+var Computation = /** @class */ (function () {
     function Computation(statements, loc, stateVar, seed) {
         this.statements = statements;
         this.loc = loc;
@@ -38,7 +38,7 @@ var Computation = (function () {
     }
     return Computation;
 }());
-var SubComponent = (function () {
+var SubComponent = /** @class */ (function () {
     function SubComponent(name, refs, fns, properties, children, loc) {
         this.name = name;
         this.refs = refs;
@@ -103,6 +103,7 @@ var codeGen = function (ctl, opts) {
         children = sub.children.length === 0 ? '[]' : '[' + nlii
             + sub.children.join(',' + nlii) + nli
             + ']', property0 = sub.properties.length === 0 ? null : sub.properties[0], propertiesWithChildren = property0 === null || typeof property0 === 'string'
+            // add children to first property object if we can, otherwise add an initial property object with just children
             ? [{ children: children }].concat(sub.properties) : [__assign({}, property0, { children: children })].concat(sub.properties.splice(1)), propertyExprs = propertiesWithChildren.map(function (obj) {
             return typeof obj === 'string' ? obj :
                 '{' + Object.keys(obj).map(function (p) { return "" + nli + p + ": " + obj[p]; }).join(',') + nl + '}';
@@ -145,7 +146,12 @@ var codeGen = function (ctl, opts) {
                 if (!dynamic_1) {
                     stmts.forEach(addStatement);
                 }
-                content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
+                if (content.length === 1 && content[0] instanceof JSXInsert) {
+                    buildJSXContent(content[0], id_1);
+                }
+                else {
+                    content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
+                }
                 if (dynamic_1) {
                     if (spreads_1.length > 0) {
                         // create namedProps object and use it to initialize our spread state
@@ -211,6 +217,12 @@ var codeGen = function (ctl, opts) {
             var id = addId(parent, 'insert', n), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
             addStatement(id + " = Surplus.createTextNode('', " + parent + ")");
             addComputation(["Surplus.insert(__range, " + ins + ");"], "__range", range, node.loc);
+        }, buildJSXContent = function (node, parent) {
+            var content = compileSegments(node.code), dynamic = !noApparentSignals(content), code = "Surplus.content(" + parent + ", " + content + ");";
+            if (dynamic)
+                addComputation([code], null, null, node.loc);
+            else
+                addStatement(code);
         }, addId = function (parent, tag, n) {
             tag = tag.replace(rx.nonIdChars, '_');
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);

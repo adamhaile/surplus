@@ -191,7 +191,11 @@ const codeGen = (ctl : Program, opts : Params) => {
                         stmts.forEach(addStatement);
                     }
                     
-                    content.forEach((c, i) => buildChild(c, id, i, childSvg));
+                    if (content.length === 1 && content[0] instanceof JSXInsert) {
+                        buildJSXContent(content[0] as JSXInsert, id);
+                    } else {
+                        content.forEach((c, i) => buildChild(c, id, i, childSvg));
+                    }
 
                     if (dynamic) {
                         if (spreads.length > 0) {
@@ -266,6 +270,13 @@ const codeGen = (ctl : Program, opts : Params) => {
                     range = `{ start: ${id}, end: ${id} }`;
                 addStatement(`${id} = Surplus.createTextNode('', ${parent})`);
                 addComputation([`Surplus.insert(__range, ${ins});`], "__range", range, node.loc);
+            },
+            buildJSXContent = (node : JSXInsert, parent : string) => {
+                const content = compileSegments(node.code),
+                    dynamic = !noApparentSignals(content),
+                    code = `Surplus.content(${parent}, ${content});`;
+                if (dynamic) addComputation([code], null, null, node.loc);
+                else addStatement(code);
             },
             addId = (parent : string, tag : string, n : number) => {
                 tag = tag.replace(rx.nonIdChars, '_');

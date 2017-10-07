@@ -1,11 +1,11 @@
-var Program = (function () {
+var Program = /** @class */ (function () {
     function Program(segments) {
         this.segments = segments;
     }
     return Program;
 }());
 export { Program };
-var CodeText = (function () {
+var CodeText = /** @class */ (function () {
     function CodeText(text, loc) {
         this.text = text;
         this.loc = loc;
@@ -13,14 +13,14 @@ var CodeText = (function () {
     return CodeText;
 }());
 export { CodeText };
-var EmbeddedCode = (function () {
+var EmbeddedCode = /** @class */ (function () {
     function EmbeddedCode(segments) {
         this.segments = segments;
     }
     return EmbeddedCode;
 }());
 export { EmbeddedCode };
-var JSXElement = (function () {
+var JSXElement = /** @class */ (function () {
     function JSXElement(tag, properties, content, loc) {
         this.tag = tag;
         this.properties = properties;
@@ -32,21 +32,21 @@ var JSXElement = (function () {
     return JSXElement;
 }());
 export { JSXElement };
-var JSXText = (function () {
+var JSXText = /** @class */ (function () {
     function JSXText(text) {
         this.text = text;
     }
     return JSXText;
 }());
 export { JSXText };
-var JSXComment = (function () {
+var JSXComment = /** @class */ (function () {
     function JSXComment(text) {
         this.text = text;
     }
     return JSXComment;
 }());
 export { JSXComment };
-var JSXInsert = (function () {
+var JSXInsert = /** @class */ (function () {
     function JSXInsert(code, loc) {
         this.code = code;
         this.loc = loc;
@@ -54,7 +54,7 @@ var JSXInsert = (function () {
     return JSXInsert;
 }());
 export { JSXInsert };
-var JSXStaticProperty = (function () {
+var JSXStaticProperty = /** @class */ (function () {
     function JSXStaticProperty(name, value) {
         this.name = name;
         this.value = value;
@@ -62,7 +62,7 @@ var JSXStaticProperty = (function () {
     return JSXStaticProperty;
 }());
 export { JSXStaticProperty };
-var JSXDynamicProperty = (function () {
+var JSXDynamicProperty = /** @class */ (function () {
     function JSXDynamicProperty(name, code, loc) {
         this.name = name;
         this.code = code;
@@ -80,7 +80,7 @@ var JSXDynamicProperty = (function () {
     return JSXDynamicProperty;
 }());
 export { JSXDynamicProperty };
-var JSXSpreadProperty = (function () {
+var JSXSpreadProperty = /** @class */ (function () {
     function JSXSpreadProperty(code, loc) {
         this.code = code;
         this.loc = loc;

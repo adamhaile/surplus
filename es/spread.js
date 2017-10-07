@@ -22,7 +22,7 @@ export function staticSpread(node, obj, svg) {
 export function staticStyle(node, style) {
     assign(node.style, style);
 }
-var SingleSpreadState = (function () {
+var SingleSpreadState = /** @class */ (function () {
     function SingleSpreadState(namedProps) {
         this.namedProps = namedProps;
         this.oldProps = null;
@@ -102,7 +102,7 @@ var SingleSpreadState = (function () {
     return SingleSpreadState;
 }());
 export { SingleSpreadState };
-var MultiSpreadState = (function () {
+var MultiSpreadState = /** @class */ (function () {
     function MultiSpreadState(namedProps) {
         this.namedProps = namedProps;
         this.current = 1;

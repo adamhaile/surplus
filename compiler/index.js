@@ -1,7 +1,7 @@
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
 	typeof define === 'function' && define.amd ? define(['exports'], factory) :
-	(factory((global.SurplusCompiler = global.SurplusCompiler || {})));
+	(factory((global.SurplusCompiler = {})));
 }(this, (function (exports) { 'use strict';
 
 /// tokens:
@@ -35,26 +35,26 @@ function tokenize(str, opts) {
     return toks || [];
 }
 
-var Program = (function () {
+var Program = /** @class */ (function () {
     function Program(segments) {
         this.segments = segments;
     }
     return Program;
 }());
-var CodeText = (function () {
+var CodeText = /** @class */ (function () {
     function CodeText(text, loc) {
         this.text = text;
         this.loc = loc;
     }
     return CodeText;
 }());
-var EmbeddedCode = (function () {
+var EmbeddedCode = /** @class */ (function () {
     function EmbeddedCode(segments) {
         this.segments = segments;
     }
     return EmbeddedCode;
 }());
-var JSXElement = (function () {
+var JSXElement = /** @class */ (function () {
     function JSXElement(tag, properties, content, loc) {
         this.tag = tag;
         this.properties = properties;
@@ -65,33 +65,33 @@ var JSXElement = (function () {
     JSXElement.domTag = /^[a-z][^\.]*$/;
     return JSXElement;
 }());
-var JSXText = (function () {
+var JSXText = /** @class */ (function () {
     function JSXText(text) {
         this.text = text;
     }
     return JSXText;
 }());
-var JSXComment = (function () {
+var JSXComment = /** @class */ (function () {
     function JSXComment(text) {
         this.text = text;
     }
     return JSXComment;
 }());
-var JSXInsert = (function () {
+var JSXInsert = /** @class */ (function () {
     function JSXInsert(code, loc) {
         this.code = code;
         this.loc = loc;
     }
     return JSXInsert;
 }());
-var JSXStaticProperty = (function () {
+var JSXStaticProperty = /** @class */ (function () {
     function JSXStaticProperty(name, value) {
         this.name = name;
         this.value = value;
     }
     return JSXStaticProperty;
 }());
-var JSXDynamicProperty = (function () {
+var JSXDynamicProperty = /** @class */ (function () {
     function JSXDynamicProperty(name, code, loc) {
         this.name = name;
         this.code = code;
@@ -108,7 +108,7 @@ var JSXDynamicProperty = (function () {
     JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + "|" + JSXDynamicProperty.StyleName + ")$");
     return JSXDynamicProperty;
 }());
-var JSXSpreadProperty = (function () {
+var JSXSpreadProperty = /** @class */ (function () {
     function JSXSpreadProperty(code, loc) {
         this.code = code;
         this.loc = loc;
@@ -282,7 +282,7 @@ function parse(TOKS, opts) {
     function jsxProperty() {
         if (!MATCH(rx$1.identifier))
             ERR("not at start of property declaration");
-        var loc = LOC(), name = SPLIT(rx$1.identifier), code;
+        var loc = LOC(), name = SPLIT(rx$1.identifier);
         SKIPWS(); // pass name
         if (IS('=')) {
             NEXT(); // pass '='
@@ -790,7 +790,7 @@ var rx$3 = {
     singleQuotes: /'/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
-var DOMExpression = (function () {
+var DOMExpression = /** @class */ (function () {
     function DOMExpression(ids, statements, computations) {
         this.ids = ids;
         this.statements = statements;
@@ -798,7 +798,7 @@ var DOMExpression = (function () {
     }
     return DOMExpression;
 }());
-var Computation = (function () {
+var Computation = /** @class */ (function () {
     function Computation(statements, loc, stateVar, seed) {
         this.statements = statements;
         this.loc = loc;
@@ -807,7 +807,7 @@ var Computation = (function () {
     }
     return Computation;
 }());
-var SubComponent = (function () {
+var SubComponent = /** @class */ (function () {
     function SubComponent(name, refs, fns, properties, children, loc) {
         this.name = name;
         this.refs = refs;
@@ -872,6 +872,7 @@ var codeGen = function (ctl, opts) {
         children = sub.children.length === 0 ? '[]' : '[' + nlii
             + sub.children.join(',' + nlii) + nli
             + ']', property0 = sub.properties.length === 0 ? null : sub.properties[0], propertiesWithChildren = property0 === null || typeof property0 === 'string'
+            // add children to first property object if we can, otherwise add an initial property object with just children
             ? [{ children: children }].concat(sub.properties) : [__assign$1({}, property0, { children: children })].concat(sub.properties.splice(1)), propertyExprs = propertiesWithChildren.map(function (obj) {
             return typeof obj === 'string' ? obj :
                 '{' + Object.keys(obj).map(function (p) { return "" + nli + p + ": " + obj[p]; }).join(',') + nl + '}';
@@ -914,7 +915,12 @@ var codeGen = function (ctl, opts) {
                 if (!dynamic_1) {
                     stmts.forEach(addStatement);
                 }
-                content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
+                if (content.length === 1 && content[0] instanceof JSXInsert) {
+                    buildJSXContent(content[0], id_1);
+                }
+                else {
+                    content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
+                }
                 if (dynamic_1) {
                     if (spreads_1.length > 0) {
                         // create namedProps object and use it to initialize our spread state
@@ -980,6 +986,12 @@ var codeGen = function (ctl, opts) {
             var id = addId(parent, 'insert', n), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
             addStatement(id + " = Surplus.createTextNode('', " + parent + ")");
             addComputation(["Surplus.insert(__range, " + ins + ");"], "__range", range, node.loc);
+        }, buildJSXContent = function (node, parent) {
+            var content = compileSegments(node.code), dynamic = !noApparentSignals(content), code = "Surplus.content(" + parent + ", " + content + ");";
+            if (dynamic)
+                addComputation([code], null, null, node.loc);
+            else
+                addStatement(code);
         }, addId = function (parent, tag, n) {
             tag = tag.replace(rx$3.nonIdChars, '_');
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
@@ -993,7 +1005,7 @@ var codeGen = function (ctl, opts) {
         buildHtmlElement(top, '', 0, false);
         return new DOMExpression(ids, statements, computations);
     }, emitDOMExpression = function (code, indent) {
-        var nl = indent.nl, nli = indent.nli, nlii = indent.nlii;
+        var nl = indent.nl, nli = indent.nli;
         return '(function () {' + nli
             + 'var ' + code.ids.join(', ') + ';' + nli
             + code.statements.join(nli) + nli
