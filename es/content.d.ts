@@ -1,2 +1,7 @@
 import { InsertValue } from './insert';
-export declare function content(parent: Element, value: InsertValue): void;
+export declare class Content {
+    readonly parent: Element;
+    private current;
+    constructor(parent: Element);
+    update(value: InsertValue): this;
+}

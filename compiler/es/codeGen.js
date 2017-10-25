@@ -218,11 +218,11 @@ var codeGen = function (ctl, opts) {
             addStatement(id + " = Surplus.createTextNode('', " + parent + ")");
             addComputation(["Surplus.insert(__range, " + ins + ");"], "__range", range, node.loc);
         }, buildJSXContent = function (node, parent) {
-            var content = compileSegments(node.code), dynamic = !noApparentSignals(content), code = "Surplus.content(" + parent + ", " + content + ");";
+            var content = compileSegments(node.code), dynamic = !noApparentSignals(content);
             if (dynamic)
-                addComputation([code], null, null, node.loc);
+                addComputation(["__content.update(" + content + ");"], '__content', "new Surplus.Content(" + parent + ")", node.loc);
             else
-                addStatement(code);
+                addStatement("new Surplus.Content(" + parent + ").update(" + content + ");");
         }, addId = function (parent, tag, n) {
             tag = tag.replace(rx.nonIdChars, '_');
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);

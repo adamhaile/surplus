@@ -1,9 +1,6 @@
 describe("Surplus.content", function () { 
     // <div>before<!-- insert -->after</div>
     var container = document.createElement("div");
-    container.appendChild(document.createTextNode("before"));
-    container.appendChild(document.createTextNode(""));
-    container.appendChild(document.createTextNode("after"));
 
     it("inserts nothing for null", function () {
         var res = content(null);
@@ -93,6 +90,7 @@ describe("Surplus.content", function () {
 
     it("can insert a changing array of nodes", function () {
         var parent = document.createElement("div"),
+            content = new Surplus.Content(parent),
             n1 = document.createElement("span"), 
             n2 = document.createElement("div"),
             n3 = document.createElement("span"),
@@ -146,9 +144,9 @@ describe("Surplus.content", function () {
         test([n4, n3, n2, n1]);
 
         function test(array) {
-            Surplus.content(parent, array);
+            content.update(array, false);
             expect(parent.innerHTML).toBe(expected(array));
-            Surplus.content(parent, orig);
+            content.update(orig, false);
             expect(parent.innerHTML).toBe(origExpected);
         }
 
@@ -168,7 +166,7 @@ describe("Surplus.content", function () {
     function content(val) {
         var parent = newParent();
 
-        Surplus.content(parent, val);
+        new Surplus.Content(parent).update(val, false);
 
         return parent;
     }
