@@ -47,7 +47,7 @@ node.className = "bar";
 ```
 For a longer discussion, see [why real DOM nodes?](#why-real-dom-nodes)
 
-Creating real DOM nodes removes the entire "middle layer" from Surplus: there are no components, no "lifecycle," no mount or diff/patch.  DOM nodes are values like any other, "components" are plain old functions that return DOM nodes.
+Creating real DOM nodes removes the entire &ldquo;middle layer&rdquo; from Surplus: there are no components, no &ldquo;lifecycle,&rdquo; no mount or diff/patch.  DOM nodes are values like any other, &ldquo;components&rdquo; are plain old functions that return DOM nodes.
 
 ### Automatic Updates
 
@@ -66,26 +66,26 @@ text("bar");
 
 ### JSX
 
-Surplus is not a React "work-alike," but it uses the JSX syntax popularized by React to define its views.  This has several advantages:
+Surplus is not a React &ldquo;work-alike,&rdquo; but it uses the JSX syntax popularized by React to define its views.  This has several advantages:
 
 1. JSX is declarative.  In a reactive system, it's important that we only need to know *what* our data is, not *how* or *when* we got here.
 2. JSX has well-established tooling: syntax highlighters, type checkers (Surplus has full Typescript support), linters, etc. all work with Surplus JSX.
-3. JSX mitigates the risk of adopting (or abandoning) Surplus.  Much Surplus JSX code already works as a React stateless functional component, and vice versa.  Surplus avoids arbitrary differences with React as much as possible.
+3. JSX mitigates some of the risk of adopting (or abandoning) Surplus.  Much Surplus JSX code already works as React stateless functional components, and vice versa.  Surplus avoids arbitrary differences with React when feasible.
 
 ### Performance
 Surplus apps generally rank at or near the top of most javascript benchmarks.  This has two reasons:
 
-1. Surplus' compiler does as much work as it can at compile time, so that the runtime code can focus on the truly dynamic operations.
+1. Surplus&rsquo; compiler does as much work as it can at compile time, so that the runtime code can focus on the truly dynamic operations.
 
-1. Targetting real DOM nodes removes the cost of the vdom "middle layer."  For instance, Surplus can compile property assignments down to direct JIT-friendly statements like `node.type = "text"`.
+1. Targetting real DOM nodes removes the cost of the vdom &ldquo;middle layer.&rdquo;  For instance, Surplus can compile property assignments down to direct JIT-friendly statements like `node.type = "text"`.
 
 ## Documentation
 
 ### Creating HTML Elements
 
 ```javascript
-var div       = <div></div>, // a HTMLDivElement
-    input     = <input/>;    // a HTMLInputElement
+var div       = <div></div>, // an HTMLDivElement
+    input     = <input/>;    // an HTMLInputElement
     // ... etc
 ```
 
@@ -146,7 +146,7 @@ var props = { type: "text" },
 
 Since Surplus creates DOM elements, the property names generally refer to DOM element properties, although there are a few special cases: 
 
-1. If Surplus can tell that the given name belongs to an attribute not a property, it will set an attribute instead.  Currently, the heuristic used to distinguish attributes from properties is "does it have a hyphen '-'."
+1. If Surplus can tell that the given name belongs to an attribute not a property, it will set the attribute instead.  Currently, the heuristic used to distinguish attributes from properties is &ldquo;does it have a hyphen.&rdquo;  So `<div aria-hidden="true">` will set the `aria-hidden` attribute.
 2. Some properties have aliases.  See below.
 4. The properties `ref` and `fn` are special.  See below.
 
@@ -178,7 +178,7 @@ input.type === "text";
 
 ### Special `ref` property
 
-A `ref` property specifies a variable to which the given node is assigned.  It is primarily used for obtaining a reference to child nodes.
+A `ref` property specifies a variable to which the given node is assigned.  This makes it easy to get a reference to internal nodes.
 
 ```javascript
 var input,
@@ -188,7 +188,7 @@ var input,
 input.type === "text";
 ```
 
-The `ref` property fulfills a very similar role to the `ref` property in React, except that since nodes are created immediately in Surplus, it does not take a function but a reference.
+The `ref` property fulfills a very similar role to the `ref` property in React, except that since nodes are created immediately in Surplus, it does not take a function but an assignable expression.
 
 ### Special `fn` property
 
@@ -231,15 +231,16 @@ With a dynamic child, the given expression is evaluated, and its result is inser
 - a DOM node -> the node
 - an array -> all items in array
 - a function -> the value from calling the function
-- anything else -> a text node containing the .toString() value of item
+- a string -> a text node
+- anything else -> convert to string via .toString() and insert that
 
 Like React, Surplus removes all-whitespace nodes, and text nodes are trimmed.
 
-### "Components" aka embedded function calls
+### Embedded function calls, aka &ldquo;Components&rdquo;
 
 JSX expressions with *upper-cased* tag names are syntactic sugar for embedded function calls.  
 
-```javascript
+```jsx
 <div>
     <Foo bar="1">Bleck</Foo>
 </div>;
@@ -254,19 +255,19 @@ The function is called with an object of the given properties, including any chi
 
 Like with any programming, it is good practice to break a complex DOM view into smaller, re-usable functions.  Upper-cased JSX expressions provide a convenient way to embed these functions into their containing views.
 
-The special `ref` and `fn` properties work with "components" the same way they do with nodes.  They operate on the return values of the function.
+The special `ref` and `fn` properties work with embedded function calls the same way they do with nodes.  They operate on the return value of the function.
 
 ### Differences from React
 
-For those who are already familiar with React JSX, here is a summary of the differences:
+Many React Stateless Functional Components can be dropped into Surplus with no or minimal changes.  Beyond that, here is a summary of the differences:
 
-1. The two big differences already stated above: Surplus makes real DOM elements, not virtual, and they update automatically.  This removes a huge swath of the React API: there are no components, no virtual elements, no lifecycle, no setState() and no diff/patch. 
+1. The two big differences already stated above: Surplus makes real DOM elements, not virtual, and they update automatically.  This removes most of the React API.  There are no components, no virtual elements, no lifecycle, no setState(), no componentWillReceiveProps(), no diff/patch, etc etc.
 
-2. The `ref` property takes a reference, not a function.
+2. The `ref` property takes an assignable reference, not a function.
 
 3. Events are native events, not React's synthetic events.
 
-4. Surplus is more liberal in the property names it accepts, like `onclick`/`onClick`, `className`/`class`, etc.
+4. Surplus is a little more liberal in the property names it accepts, like `onClick`/`onclick`, `className`/`class`, etc.
 
 ### Calling the surplus compiler
 
@@ -294,23 +295,27 @@ Virtual DOM is a powerful and proven approach to building a web framework.  Howe
 
 #### Virtual DOM solves a problem Surplus solves via [S.js](https://github.com/adamhaile/S)
 
-Virtual DOM is sometimes described as a strategy to make the DOM reactive, but this isn't exactly true.  The DOM is already reactive: browsers have sophisticated dirty marking and update scheduling algorithms to propagate changes made via the DOM IDL to the pixels on the screen.  That is what allows us to set a property like `input.value = "foo"` and maintain the abstraction that we're "setting a value directly," when in fact there are many layers and much deferred execution before that change hits the screen.
+Virtual DOM is sometimes described as a strategy to make the DOM reactive, but this isn't exactly true.  The DOM is already reactive: browsers have sophisticated dirty-marking and update-scheduling algorithms to propagate changes made via the DOM interface to the pixels on the screen.  That is what allows us to set a property like `input.value = "foo"` and maintain the abstraction that we're &ldquo;setting a value directly,&rdquo; when in fact there are many layers and much deferred execution before that change hits the screen.
 
-What isn't reactive is Javascript, and virtual DOM is better understood as a strategy for making Javascript more reactive.  Javascript lacks the automatic, differential-update capabilities of a reactive system.  Instead, virtual DOM libraries have apps build and re-build a specification for what the DOM should be, then use diffing and reconciling algorithms to update the real DOM.  Virtual DOM libraries thus build on one of Javascript's strengths -- powerful idioms for object creation -- to address one of its weaknesses -- reactivity.
+What isn't reactive is Javascript, and virtual DOM is better understood as a strategy for making Javascript more reactive.  Javascript lacks the automatic, differential-update capabilities of a reactive system.  Instead, virtual DOM libraries have apps build and re-build a specification for what the DOM should be, then use diffing and reconciling algorithms to update the real DOM.  Virtual DOM libraries thus build on one of Javascript's strengths &mdash; powerful idioms for object creation &mdash; to address one of its weaknesses &mdash; reactivity.
 
-Surplus is built on S, and it takes advantage of S's fine-grained dependency tracking and deterministic update scheduling.  Adding a virtual DOM layer on top of S would stack two reactive strategies with no additional gain.  Ideally, Surplus provides an abstraction much like the DOM: we manipulate the data with the expectation that the downstream layers will update naturally and transparently.
+Surplus is built on [S.js](https://github.com/adamhaile/S), and it takes advantage of S's fine-grained dependency tracking and deterministic update scheduling.  Adding a virtual DOM layer on top of S would stack two reactive strategies with no additional gain.  Ideally, Surplus provides an abstraction much like the DOM: we manipulate the data with the expectation that the downstream layers will update naturally and transparently.
 
 #### Virtual DOM has a cost, in performance, complexity and interop
 
 Performance: virtual DOM libraries throw away information about what has changed, then reconstruct it in the diff phase.  Some smart engineers have made diffing surprisingly fast, but the cost can never be zero.
 
-Complexity: the separation between a virtual and a real layer brings with it a host of abstractions, such as component 'lifecycle' and 'refs,' which are essentially hooks into the reconciler's work.  The standard programming model of values and functions gets mirrored with a whole layer of virtual values and function-like components.
+Complexity: the separation between a virtual and a real layer brings with it a host of abstractions, such as component &lsquo;lifecycle&rsquo; and &lsquo;refs,&rsquo; which are essentially hooks into the reconciler's work.  The standard programming model of values and functions gets mirrored with a whole abstraction layer of virtual values and function-like components.
 
-Interop: interop between different virtual DOM libraries, or between virtual values and your own code, is complicated by the fact that the common layer upon which they could operate, the DOM, is held within the library.  The library only allows access to the DOM at certain moments and through certain ports, like 'refs.'
+Interop: communication between different virtual DOM libraries, or between virtual values and your own code, is complicated by the fact that the common layer upon which they operate, the DOM, is held within the library.  The library only allows access to the DOM at certain moments and through certain ports, like &lsquo;refs.&rsquo;
 
-In comparison, S's automatic dependency graph tracks exactly which parts of the DOM need to be updated when data changes.  Surplus's "components" are just functions, and its values just DOM values.  Interop with them is obvious.
+In comparison, S's automatic dependency graph tracks exactly which parts of the DOM need to be updated when data changes.  Surplus takes the React claim that it's &ldquo;just Javascript&rdquo; one step further, in that Surplus &ldquo;components&rdquo; are just functions, and its views just DOM nodes.  Interop with them is obvious.
 
-Surplus does have its own tradeoffs, the largest of which is that automatic updates of the DOM require that the changing state be held in S data signals.  The second largest is that declarative reactive programming is unfamiliar to many programmers who are already well versed in a procedural "this happens then this happens then ..." model of program execution.
+Surplus does have its own tradeoffs, the largest of which is that automatic updates of the DOM require that the changing state be held in S data signals.  The second largest is that declarative reactive programming is unfamiliar to many programmers who are already well versed in a procedural &ldquo;this happens then this happens then ...&rdquo; model of program execution.  Finally, Surplus trades the performance cost of diffing with the performance cost of bookkeeping in the S dependency graph.
+
+### Do you have an example project?
+
+But of course: [TodoMVC in Surplus](https://github.com/adamhaile/surplus-todomvc), which you can run [here](https://adamhaile.github.io/surplus-todomvc).
 
 ### If Surplus doesn't have components, how can views have state?
 
@@ -322,7 +327,9 @@ const Counter = init => {
     return (
         <div>
             Count is: {count()}
-            <button onClick={() => count(count() + 1)}>Increment</button>
+            <button onClick={() => count(count() + 1)}>
+                Increment
+            </button>
         </div>
     );
 };
@@ -332,9 +339,17 @@ const Counter = init => {
 
 The Surplus compiler works on javascript, not TypeScript, so be sure to do the TypeScript compilation first, passing the JSX through via the `jsx: 'preserve'` option.  Then run Surplus on the output.
 
+### I'm using Surplus with Typescript, and I'm getting a runtime error &lsquo;Surplus is not defined&rsquo; even though I imported it?
+
+Typescript strips imports that aren't referenced in your code.  Since the references to Surplus haven't been made when Typescript runs (see question above) it removes the import.  The workaround is to add a reference to the symbol somewhere in your code.  I use right after the import:
+
+```javascript
+import * as Surplus from 'surplus'; Surplus; // <- stops TS from stripping import
+```
+
 ### Why isn't the Surplus compiler built on Babel?
 
-Mostly for historical reasons: Surplus was originally started about 4 years ago, before Babel had become the swiss army knife of JS extension.  Surplus therefore has its own hand-written compiler, a fairly classic tokenize-parse-transform-compile implementation.  Surplus may switch to Bable in the future.  The current compiler only parses the JSX expressions, not the JS code itself, which limits the optimizations available.  
+Mostly for historical reasons: Surplus was originally started about 4 years ago, before Babel had become the swiss army knife of JS extension.  Surplus therefore has its own hand-written compiler, a fairly classic tokenize-parse-transform-compile implementation.  Surplus may switch to Babel in the future.  The current compiler only parses the JSX expressions, not the JS code itself, which limits the optimizations available.  
 
 -----
 &copy; Adam Haile, 2017.  MIT License.
