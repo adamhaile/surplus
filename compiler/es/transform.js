@@ -35,8 +35,10 @@ function removeDuplicateProperties(tx) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, lastid = {};
             properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || (lastid[p.name] = i); });
             var uniqueProperties = properties.filter(function (p, i) {
+                // spreads and special properties can be repeated
                 return p instanceof JSXSpreadProperty
-                    || JSXDynamicProperty.SpecialPropName.test(p.name)
+                    || JSXDynamicProperty.SpecialPropNameRx.test(p.name)
+                    // otherwise just preserve the last one
                     || lastid[p.name] === i;
             });
             if (properties.length !== uniqueProperties.length) {

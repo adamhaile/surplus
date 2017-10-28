@@ -77,7 +77,8 @@ export class JSXDynamicProperty {
     isFn = JSXDynamicProperty.FnNameRx.test(this.name);
     private static StyleName = "style";
     isStyle = this.name === JSXDynamicProperty.StyleName;
-    static SpecialPropName = new RegExp(`^(${JSXDynamicProperty.RefName}|${JSXDynamicProperty.FnName}|${JSXDynamicProperty.StyleName})$`);
+    static SpecialPropNames = [ JSXDynamicProperty.RefName, JSXDynamicProperty.FnName, JSXDynamicProperty.StyleName ];
+    static SpecialPropNameRx = new RegExp(`^(${JSXDynamicProperty.SpecialPropNames.join('|')})$`);
 }
 
 export class JSXSpreadProperty {

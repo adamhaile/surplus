@@ -42,8 +42,10 @@ function removeDuplicateProperties(tx : Copy) : Copy {
             properties.forEach((p, i) => p instanceof JSXSpreadProperty || (lastid[p.name] = i));
 
             const uniqueProperties = properties.filter((p, i) => 
+                // spreads and special properties can be repeated
                 p instanceof JSXSpreadProperty 
-                || JSXDynamicProperty.SpecialPropName.test(p.name) 
+                || JSXDynamicProperty.SpecialPropNameRx.test(p.name) 
+                // otherwise just preserve the last one
                 || lastid[p.name] === i
             );
 

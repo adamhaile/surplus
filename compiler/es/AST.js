@@ -76,7 +76,8 @@ var JSXDynamicProperty = /** @class */ (function () {
     JSXDynamicProperty.FnName = "fn\\d*";
     JSXDynamicProperty.FnNameRx = new RegExp('^' + JSXDynamicProperty.FnName + "$");
     JSXDynamicProperty.StyleName = "style";
-    JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + "|" + JSXDynamicProperty.StyleName + ")$");
+    JSXDynamicProperty.SpecialPropNames = [JSXDynamicProperty.RefName, JSXDynamicProperty.FnName, JSXDynamicProperty.StyleName];
+    JSXDynamicProperty.SpecialPropNameRx = new RegExp("^(" + JSXDynamicProperty.SpecialPropNames.join('|') + ")$");
     return JSXDynamicProperty;
 }());
 export { JSXDynamicProperty };

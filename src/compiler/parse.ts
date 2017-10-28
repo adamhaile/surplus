@@ -166,7 +166,7 @@ export function parse(TOKS : string[], opts : Params) {
             SKIPWS();
 
             if (IS('"') || IS("'")) {
-                if (AST.JSXDynamicProperty.SpecialPropName.test(name)) ERR("cannot name a static property 'ref' or 'fn'", loc);
+                if (AST.JSXDynamicProperty.SpecialPropNameRx.test(name)) ERR(`cannot name a static property '${AST.JSXDynamicProperty.SpecialPropNames.join("' or '")}'`, loc);
                 return new AST.JSXStaticProperty(name, quotedString());
             } else if (IS('{')) {
                 return new AST.JSXDynamicProperty(name, embeddedCode(), loc);

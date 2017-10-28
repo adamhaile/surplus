@@ -55,7 +55,8 @@ export declare class JSXDynamicProperty {
     isFn: boolean;
     private static StyleName;
     isStyle: boolean;
-    static SpecialPropName: RegExp;
+    static SpecialPropNames: string[];
+    static SpecialPropNameRx: RegExp;
 }
 export declare class JSXSpreadProperty {
     readonly code: EmbeddedCode;

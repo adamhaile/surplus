@@ -105,7 +105,8 @@ var JSXDynamicProperty = /** @class */ (function () {
     JSXDynamicProperty.FnName = "fn\\d*";
     JSXDynamicProperty.FnNameRx = new RegExp('^' + JSXDynamicProperty.FnName + "$");
     JSXDynamicProperty.StyleName = "style";
-    JSXDynamicProperty.SpecialPropName = new RegExp("^(" + JSXDynamicProperty.RefName + "|" + JSXDynamicProperty.FnName + "|" + JSXDynamicProperty.StyleName + ")$");
+    JSXDynamicProperty.SpecialPropNames = [JSXDynamicProperty.RefName, JSXDynamicProperty.FnName, JSXDynamicProperty.StyleName];
+    JSXDynamicProperty.SpecialPropNameRx = new RegExp("^(" + JSXDynamicProperty.SpecialPropNames.join('|') + ")$");
     return JSXDynamicProperty;
 }());
 var JSXSpreadProperty = /** @class */ (function () {
@@ -288,8 +289,8 @@ function parse(TOKS, opts) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
-                if (JSXDynamicProperty.SpecialPropName.test(name))
-                    ERR("cannot name a static property 'ref' or 'fn'", loc);
+                if (JSXDynamicProperty.SpecialPropNameRx.test(name))
+                    ERR("cannot name a static property '" + JSXDynamicProperty.SpecialPropNames.join("' or '") + "'", loc);
                 return new JSXStaticProperty(name, quotedString());
             }
             else if (IS('{')) {
@@ -1088,8 +1089,10 @@ function removeDuplicateProperties(tx) {
             var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, lastid = {};
             properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || (lastid[p.name] = i); });
             var uniqueProperties = properties.filter(function (p, i) {
+                // spreads and special properties can be repeated
                 return p instanceof JSXSpreadProperty
-                    || JSXDynamicProperty.SpecialPropName.test(p.name)
+                    || JSXDynamicProperty.SpecialPropNameRx.test(p.name)
+                    // otherwise just preserve the last one
                     || lastid[p.name] === i;
             });
             if (properties.length !== uniqueProperties.length) {
