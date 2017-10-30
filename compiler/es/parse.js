@@ -3,7 +3,11 @@ import * as AST from './AST';
 var rx = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
-    leadingWs: /^\s+/
+    leadingWs: /^\s+/,
+    refProp: /^ref\d*$/,
+    fnProp: /^fn\d*$/,
+    styleProp: /^style$/,
+    badStaticProp: /^(ref\d*|fn\d*|style)$/
 };
 var parens = {
     "(": ")",
@@ -45,7 +49,7 @@ export function parse(TOKS, opts) {
     function jsxElement() {
         if (NOT('<'))
             ERR("not at start of html element");
-        var start = LOC(), tag = "", properties = [], content = [], hasContent = true;
+        var start = LOC(), tag = "", properties = [], references = [], functions = [], content = [], prop, hasContent = true;
         NEXT(); // pass '<'
         tag = SPLIT(rx.identifier);
         if (!tag)
@@ -54,7 +58,13 @@ export function parse(TOKS, opts) {
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
-                properties.push(jsxProperty());
+                prop = jsxProperty();
+                if (prop instanceof AST.JSXReference)
+                    references.push(prop);
+                else if (prop instanceof AST.JSXFunction)
+                    functions.push(prop);
+                else
+                    properties.push(prop);
             }
             else if (IS('{...')) {
                 properties.push(jsxSpreadProperty());
@@ -92,7 +102,7 @@ export function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return new AST.JSXElement(tag, properties, content, start);
+        return new AST.JSXElement(tag, properties, references, functions, content, start);
     }
     function jsxText() {
         var text = "";
@@ -127,12 +137,16 @@ export function parse(TOKS, opts) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
-                if (AST.JSXDynamicProperty.SpecialPropNameRx.test(name))
-                    ERR("cannot name a static property '" + AST.JSXDynamicProperty.SpecialPropNames.join("' or '") + "'", loc);
+                if (rx.badStaticProp.test(name))
+                    ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
                 return new AST.JSXStaticProperty(name, quotedString());
             }
             else if (IS('{')) {
-                return new AST.JSXDynamicProperty(name, embeddedCode(), loc);
+                code = embeddedCode();
+                return rx.refProp.test(name) ? new AST.JSXReference(code, loc) :
+                    rx.fnProp.test(name) ? new AST.JSXFunction(code, loc) :
+                        rx.styleProp.test(name) ? new AST.JSXStyleProperty(code, loc) :
+                            new AST.JSXDynamicProperty(name, code, loc);
             }
             else {
                 return ERR("unexepected value for JSX property");

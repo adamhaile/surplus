@@ -5,7 +5,11 @@ import { Params } from './compile';
 const rx = {
     identifier       : /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
-    leadingWs        : /^\s+/
+    leadingWs        : /^\s+/,
+    refProp          : /^ref\d*$/,
+    fnProp           : /^fn\d*$/,
+    styleProp        : /^style$/,
+    badStaticProp    : /^(ref\d*|fn\d*|style)$/
 };
 
 const parens : { [p : string] : string } = {
@@ -60,7 +64,10 @@ export function parse(TOKS : string[], opts : Params) {
         var start = LOC(),
             tag = "",
             properties = [] as AST.JSXProperty[],
+            references = [] as AST.JSXReference[],
+            functions = [] as AST.JSXFunction[],
             content = [] as AST.JSXContent[],
+            prop : AST.JSXProperty | AST.JSXReference | AST.JSXFunction,
             hasContent = true;
 
         NEXT(); // pass '<'
@@ -74,7 +81,10 @@ export function parse(TOKS : string[], opts : Params) {
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
-                properties.push(jsxProperty());
+                prop = jsxProperty();
+                if (prop instanceof AST.JSXReference) references.push(prop);
+                else if (prop instanceof AST.JSXFunction) functions.push(prop);
+                else properties.push(prop);
             } else if (IS('{...')) {
                 properties.push(jsxSpreadProperty());
             } else {
@@ -114,7 +124,7 @@ export function parse(TOKS : string[], opts : Params) {
             NEXT(); // pass '>'
         }
 
-        return new AST.JSXElement(tag, properties, content, start);
+        return new AST.JSXElement(tag, properties, references, functions, content, start);
     }
 
     function jsxText() {
@@ -166,10 +176,14 @@ export function parse(TOKS : string[], opts : Params) {
             SKIPWS();
 
             if (IS('"') || IS("'")) {
-                if (AST.JSXDynamicProperty.SpecialPropNameRx.test(name)) ERR(`cannot name a static property '${AST.JSXDynamicProperty.SpecialPropNames.join("' or '")}'`, loc);
+                if (rx.badStaticProp.test(name)) ERR(`cannot name a static property '${name}' as it has a special meaning as a dynamic property`, loc);
                 return new AST.JSXStaticProperty(name, quotedString());
             } else if (IS('{')) {
-                return new AST.JSXDynamicProperty(name, embeddedCode(), loc);
+                code = embeddedCode();
+                return rx.refProp.test(name) ? new AST.JSXReference(code, loc) :
+                    rx.fnProp.test(name) ? new AST.JSXFunction(code, loc) : 
+                    rx.styleProp.test(name) ? new AST.JSXStyleProperty(code, loc) :
+                    new AST.JSXDynamicProperty(name, code, loc);
             } else {
                 return ERR("unexepected value for JSX property");
             }
@@ -206,7 +220,7 @@ export function parse(TOKS : string[], opts : Params) {
         return new AST.EmbeddedCode(segments);
     }
 
-    function balancedParens(segments : AST.JSXContent[], text : string, loc : LOC) {
+    function balancedParens(segments : AST.CodeSegment[], text : string, loc : LOC) {
         var start = LOC(),
             end = PARENS();
 

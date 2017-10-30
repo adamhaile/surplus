@@ -6,7 +6,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
     }
     return t;
 };
-import { EmbeddedCode, CodeText, JSXElement, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXSpreadProperty } from './AST';
+import { EmbeddedCode, CodeText, JSXElement, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty } from './AST';
 import { locationMark } from './sourcemap';
 import { SvgOnlyTagRx, SvgForeignTag, IsAttribute } from './domRef';
 export { codeGen, codeStr };
@@ -59,33 +59,37 @@ var codeGen = function (ctl, opts) {
     }, compileHtmlElement = function (node, indent) {
         var code = !node.isHTML ?
             emitSubComponent(buildSubComponent(node), indent) :
-            (node.properties.length === 0 && node.content.length === 0) ?
+            (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
-                "Surplus.createElement('" + node.tag + "', null, null)" :
+                node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
+                    + ("Surplus.createElement('" + node.tag + "', null, null)") :
                 (node.properties.length === 1
                     && node.properties[0] instanceof JSXStaticProperty
                     && node.properties[0].name === "className"
+                    && node.functions.length === 1
                     && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
-                    "Surplus.createElement('" + node.tag + "', " + node.properties[0].value + ", null)" :
+                    node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
+                        + ("Surplus.createElement('" + node.tag + "', " + node.properties[0].value + ", null)") :
                     emitDOMExpression(buildDOMExpression(node), indent);
         return markLoc(code, node.loc, opts);
     }, buildSubComponent = function (node) {
-        var refs = [], fns = [], 
+        var refs = node.references.map(function (r) { return compileSegments(r.code); }), fns = node.functions.map(function (r) { return compileSegments(r.code); }), 
         // group successive properties into property objects, but spreads stand alone
         // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
         properties = node.properties.reduce(function (props, p) {
             var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
-            if (p instanceof JSXSpreadProperty)
+            if (p instanceof JSXSpreadProperty) {
                 props.push(value);
-            else if (p instanceof JSXDynamicProperty && p.isRef)
-                refs.push(value);
-            else if (p instanceof JSXDynamicProperty && p.isFn)
-                fns.push(value);
-            else if (lastSegment === null || typeof lastSegment === 'string')
+            }
+            else if (lastSegment === null
+                || typeof lastSegment === 'string'
+                || (p instanceof JSXStyleProperty && lastSegment["style"])) {
                 props.push((_a = {}, _a[p.name] = value, _a));
-            else
+            }
+            else {
                 lastSegment[p.name] = value;
+            }
             return props;
             var _a;
         }, []), children = node.content.map(function (c) {
@@ -130,21 +134,22 @@ var codeGen = function (ctl, opts) {
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n, svg) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
+            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             svg = svg || SvgOnlyTagRx.test(tag);
             if (!node.isHTML) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), exprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || (p instanceof JSXDynamicProperty && p.isStyle); }), fns = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isFn; }), refs = properties.filter(function (p) { return p instanceof JSXDynamicProperty && p.isRef; }), classProp_1 = spreads_1.length === 0 && fns.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, dynamic_1 = fns.length > 0 || exprs_1.some(function (e) { return !noApparentSignals(e); }), stmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), propExprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p instanceof JSXStaticProperty ? buildStaticProperty(p, id_1, svg) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id_1, i, exprs_1[i], dynamic_1, spreads_1, svg) :
-                                buildSpread(p, id_1, exprs_1[i], dynamic_1, spreads_1, svg);
-                }).filter(function (s) { return s !== ''; }), refStmts = refs.map(function (r) { return compileSegments(r.code) + ' = '; }).join(''), childSvg_1 = svg && tag !== SvgForeignTag;
+                        p instanceof JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg) :
+                            p instanceof JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg) :
+                                p instanceof JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
+                                    buildSpread(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1, svg);
+                }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join(''), childSvg_1 = svg && tag !== SvgForeignTag;
                 addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
-                if (!dynamic_1) {
-                    stmts.forEach(addStatement);
+                if (!propsDynamic_1) {
+                    propStmts.forEach(addStatement);
                 }
                 if (content.length === 1 && content[0] instanceof JSXInsert) {
                     buildJSXContent(content[0], id_1);
@@ -152,32 +157,26 @@ var codeGen = function (ctl, opts) {
                 else {
                     content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
                 }
-                if (dynamic_1) {
+                if (propsDynamic_1) {
                     if (spreads_1.length > 0) {
                         // create namedProps object and use it to initialize our spread state
                         var namedProps_1 = {};
                         properties.forEach(function (p) { return p instanceof JSXSpreadProperty || (namedProps_1[p.name] = true); });
                         var state = "new Surplus." + (spreads_1.length === 1 ? 'Single' : 'Multi') + "SpreadState(" + JSON.stringify(namedProps_1) + ")";
-                        stmts.push("__spread;");
-                        addComputation(stmts, "__spread", state, loc);
+                        propStmts.push("__spread;");
+                        addComputation(propStmts, "__spread", state, loc);
                     }
                     else {
-                        addComputation(stmts, null, null, loc);
+                        addComputation(propStmts, null, null, loc);
                     }
                 }
+                functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
-        }, buildStaticProperty = function (node, id, svg) {
-            return buildProperty(id, node.name, node.value, svg);
-        }, buildDynamicProperty = function (node, id, n, expr, dynamic, spreads, svg) {
-            return node.isRef ? buildReference(expr, id) :
-                node.isFn ? buildNodeFn(node, id, n, expr) :
-                    node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
-                        buildProperty(id, node.name, expr, svg);
         }, buildProperty = function (id, prop, expr, svg) {
             return svg || IsAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
-        }, buildReference = function (ref, id) { return ''; }, buildSpread = function (node, id, expr, dynamic, spreads, svg) {
+        }, buildSpread = function (node, id, expr, dynamic, spreads, svg) {
             return !dynamic ? buildStaticSpread(node, id, expr, svg) :
                 spreads.length === 1 ? buildSingleSpread(node, id, expr, svg) :
                     buildMultiSpread(node, id, expr, spreads, svg);
@@ -188,9 +187,9 @@ var codeGen = function (ctl, opts) {
         }, buildMultiSpread = function (node, id, expr, spreads, svg) {
             var n = spreads.indexOf(node), final = n === spreads.length - 1;
             return "__spread.apply(" + id + ", " + expr + ", " + n + ", " + final + ", " + svg + ");";
-        }, buildNodeFn = function (node, id, n, expr) {
-            var state = addId(id, 'fn', n);
-            return state + " = (" + expr + ")(" + id + ", " + state + ");";
+        }, buildNodeFn = function (node, id) {
+            var expr = compileSegments(node.code);
+            addComputation(["(" + expr + ")(" + id + ", __state);"], '__state', null, node.loc);
         }, buildStyle = function (node, id, expr, dynamic, spreads) {
             return !dynamic ? buildStaticStyle(node, id, expr) :
                 spreads.length === 1 ? buildSingleStyle(node, id, expr) :
@@ -249,7 +248,7 @@ var codeGen = function (ctl, opts) {
         var statements = comp.statements, loc = comp.loc, stateVar = comp.stateVar, seed = comp.seed;
         if (stateVar)
             statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
-        var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed ? ", " + seed : '') + ");";
+        var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed !== null ? ", " + seed : '') + ");";
         return markLoc(code, loc, opts);
     };
     return compileSegments(ctl);

@@ -1,5 +1,5 @@
 // Cross-browser compatibility shims
-import { Program, JSXStaticProperty, JSXDynamicProperty, JSXSpreadProperty, JSXProperty, JSXElement, JSXText, Copy } from './AST';
+import { Program, JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty, JSXProperty, JSXElement, JSXText, Copy } from './AST';
 import { Params } from './compile';
 import { codeStr } from './codeGen';
 
@@ -22,10 +22,10 @@ function removeWhitespaceTextNodes(tx : Copy) : Copy {
     return { 
         ...tx, 
         JSXElement(node) { 
-            const { tag, properties, content, loc } = node,
+            const { tag, properties, references, functions, content, loc } = node,
                 nonWhitespaceContent = content.filter(c => !(c instanceof JSXText && rx.ws.test(c.text)));
              if (nonWhitespaceContent.length !== content.length) {
-                node = new JSXElement(tag, properties, nonWhitespaceContent, loc);
+                node = new JSXElement(tag, properties, references, functions, nonWhitespaceContent, loc);
             }
             return tx.JSXElement.call(this, node);        
         }
@@ -36,21 +36,21 @@ function removeDuplicateProperties(tx : Copy) : Copy {
     return {
         ...tx,
         JSXElement(node) {
-            const { tag, properties, content, loc } = node,
+            const { tag, properties, references, functions, content, loc } = node,
                 lastid = {} as { [ name : string ] : number };
 
-            properties.forEach((p, i) => p instanceof JSXSpreadProperty || (lastid[p.name] = i));
+            properties.forEach((p, i) => p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty || (lastid[p.name] = i));
 
             const uniqueProperties = properties.filter((p, i) => 
-                // spreads and special properties can be repeated
+                // spreads and styles can be repeated
                 p instanceof JSXSpreadProperty 
-                || JSXDynamicProperty.SpecialPropNameRx.test(p.name) 
-                // otherwise just preserve the last one
+                || p instanceof JSXStyleProperty 
+                // but named properties can't
                 || lastid[p.name] === i
             );
 
             if (properties.length !== uniqueProperties.length) {
-                node = new JSXElement(tag, uniqueProperties, content, loc);
+                node = new JSXElement(tag, uniqueProperties, references, functions, content, loc);
             }
 
             return tx.JSXElement.call(this, node);
@@ -62,14 +62,14 @@ function translateJSXPropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
         JSXElement(node) {
-            const { tag, properties, content, loc } = node;
+            const { tag, properties, references, functions, content, loc } = node;
             if (node.isHTML) {
                 const nonJSXProperties = properties.map(p =>
                     p instanceof JSXDynamicProperty 
                     ? new JSXDynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc) 
                     : p
                 );
-                node = new JSXElement(tag, nonJSXProperties, content, loc);
+                node = new JSXElement(tag, nonJSXProperties, references, functions, content, loc);
             }
             return tx.JSXElement.call(this, node);
         } 
@@ -84,10 +84,10 @@ function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {
     return {
         ...tx,
         JSXElement(node) {
-            const { tag, properties, content, loc } = node;
+            const { tag, properties, references, functions, content, loc } = node;
             if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
                 var textContent = new JSXStaticProperty("textContent", codeStr((content[0] as JSXText).text));
-                node = new JSXElement(tag, [ ...properties, textContent ], content.slice(1), loc);
+                node = new JSXElement(tag, [ ...properties, textContent ], references, functions, [], loc);
             }
             return tx.JSXElement.call(this, node);
         }

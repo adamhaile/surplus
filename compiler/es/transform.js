@@ -7,7 +7,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
     return t;
 };
 // Cross-browser compatibility shims
-import { JSXStaticProperty, JSXDynamicProperty, JSXSpreadProperty, JSXElement, JSXText, Copy } from './AST';
+import { JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty, JSXElement, JSXText, Copy } from './AST';
 import { codeStr } from './codeGen';
 var rx = {
     ws: /^\s*$/,
@@ -23,40 +23,40 @@ var tf = [
 export var transform = function (node, opt) { return tf.Program(node); };
 function removeWhitespaceTextNodes(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof JSXText && rx.ws.test(c.text)); });
+            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof JSXText && rx.ws.test(c.text)); });
             if (nonWhitespaceContent.length !== content.length) {
-                node = new JSXElement(tag, properties, nonWhitespaceContent, loc);
+                node = new JSXElement(tag, properties, references, functions, nonWhitespaceContent, loc);
             }
             return tx.JSXElement.call(this, node);
         } });
 }
 function removeDuplicateProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc, lastid = {};
-            properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || (lastid[p.name] = i); });
+            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc, lastid = {};
+            properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty || (lastid[p.name] = i); });
             var uniqueProperties = properties.filter(function (p, i) {
-                // spreads and special properties can be repeated
+                // spreads and styles can be repeated
                 return p instanceof JSXSpreadProperty
-                    || JSXDynamicProperty.SpecialPropNameRx.test(p.name)
-                    // otherwise just preserve the last one
+                    || p instanceof JSXStyleProperty
+                    // but named properties can't
                     || lastid[p.name] === i;
             });
             if (properties.length !== uniqueProperties.length) {
-                node = new JSXElement(tag, uniqueProperties, content, loc);
+                node = new JSXElement(tag, uniqueProperties, references, functions, content, loc);
             }
             return tx.JSXElement.call(this, node);
         } });
 }
 function translateJSXPropertyNames(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
+            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             if (node.isHTML) {
                 var nonJSXProperties = properties.map(function (p) {
                     return p instanceof JSXDynamicProperty
                         ? new JSXDynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc)
                         : p;
                 });
-                node = new JSXElement(tag, nonJSXProperties, content, loc);
+                node = new JSXElement(tag, nonJSXProperties, references, functions, content, loc);
             }
             return tx.JSXElement.call(this, node);
         } });
@@ -66,10 +66,10 @@ function translateJSXPropertyName(name) {
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
-            var tag = node.tag, properties = node.properties, content = node.content, loc = node.loc;
+            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
                 var textContent = new JSXStaticProperty("textContent", codeStr(content[0].text));
-                node = new JSXElement(tag, properties.concat([textContent]), content.slice(1), loc);
+                node = new JSXElement(tag, properties.concat([textContent]), references, functions, [], loc);
             }
             return tx.JSXElement.call(this, node);
         } });

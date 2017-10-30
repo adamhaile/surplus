@@ -1,6 +1,11 @@
 import { LOC } from './parse';
 
+// 'kind' properties are to make sure that Typescript treats each of these as distinct classes
+// otherwise, two classes with same props, like the 4 with just code / loc, are treated
+// as interchangeable
+
 export class Program {
+    kind = 'program' as 'program';
     constructor(
         public segments : CodeSegment[]
     ) { }
@@ -9,6 +14,7 @@ export class Program {
 export type CodeSegment = CodeText | JSXElement;
 
 export class CodeText { 
+    kind = 'code' as 'code';
     constructor(
         public readonly text : string, 
         public readonly loc : LOC
@@ -16,18 +22,22 @@ export class CodeText {
 }
 
 export class EmbeddedCode {
+    kind = 'embeddedcode' as 'embeddedcode';
     constructor(
         public readonly segments : CodeSegment[]
     ) { }
 }
 
-export type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXSpreadProperty;
+export type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXStyleProperty | JSXSpreadProperty;
 export type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
 
 export class JSXElement {
+    kind = 'element' as 'element';
     constructor(
         public readonly tag : string, 
         public readonly properties : JSXProperty[], 
+        public readonly references : JSXReference[],
+        public readonly functions : JSXFunction[],
         public readonly content : JSXContent[],
         public readonly loc : LOC
     ) { }    
@@ -37,18 +47,21 @@ export class JSXElement {
 }
 
 export class JSXText {
+    kind = 'text' as 'text';
     constructor(
         public readonly text : string
     ) { }
 }
 
 export class JSXComment {
+    kind = 'comment' as 'comment';
     constructor(
         public readonly text : string
     ) { }
 }
 
 export class JSXInsert {
+    kind = 'insert' as 'insert';
     constructor(
         public readonly code : EmbeddedCode,
         public readonly loc : LOC
@@ -56,6 +69,7 @@ export class JSXInsert {
 }
 
 export class JSXStaticProperty {
+    kind = 'staticprop' as 'staticprop';
     constructor(
         public readonly name : string, 
         public readonly value : string
@@ -63,25 +77,41 @@ export class JSXStaticProperty {
 }
 
 export class JSXDynamicProperty {
+    kind = 'dynamicprop' as 'dynamicprop';
     constructor(
         public readonly name : string, 
         public readonly code : EmbeddedCode,
         public readonly loc : LOC
     ) { }
-
-    private static RefName = "ref\\d*";
-    private static RefNameRx = new RegExp('^' + JSXDynamicProperty.RefName + "$");
-    isRef = JSXDynamicProperty.RefNameRx.test(this.name);
-    private static FnName = "fn\\d*";
-    private static FnNameRx = new RegExp('^' + JSXDynamicProperty.FnName + "$");
-    isFn = JSXDynamicProperty.FnNameRx.test(this.name);
-    private static StyleName = "style";
-    isStyle = this.name === JSXDynamicProperty.StyleName;
-    static SpecialPropNames = [ JSXDynamicProperty.RefName, JSXDynamicProperty.FnName, JSXDynamicProperty.StyleName ];
-    static SpecialPropNameRx = new RegExp(`^(${JSXDynamicProperty.SpecialPropNames.join('|')})$`);
 }
 
 export class JSXSpreadProperty {
+    kind = 'spread' as 'spread';
+    constructor(
+        public readonly code : EmbeddedCode,
+        public readonly loc : LOC
+    ) { }
+}
+
+export class JSXStyleProperty {
+    kind = 'style' as 'style';
+    name = "style";
+    constructor(
+        public readonly code : EmbeddedCode,
+        public readonly loc : LOC
+    ) { }
+}
+
+export class JSXReference {
+    kind = 'reference' as 'reference';
+    constructor(
+        public readonly code : EmbeddedCode,
+        public readonly loc : LOC
+    ) { }
+}
+
+export class JSXFunction {
+    kind = 'function' as 'function';
     constructor(
         public readonly code : EmbeddedCode,
         public readonly loc : LOC
@@ -104,6 +134,8 @@ export const Copy = {
     JSXElement(node : JSXElement) : JSXElement {
         return new JSXElement(node.tag, 
             node.properties.map(p => this.JSXProperty(p)),
+            node.references.map(r => this.JSXReference(r)),
+            node.functions.map(f => this.JSXFunction(f)),
             node.content.map(c => this.JSXContent(c)),
             node.loc
         );
@@ -111,6 +143,7 @@ export const Copy = {
     JSXProperty(node : JSXProperty) {
         return node instanceof JSXStaticProperty  ? this.JSXStaticProperty(node) :
                node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
+               node instanceof JSXStyleProperty ? this.JSXStyleProperty(node) :
                this.JSXSpreadProperty(node);
     },
     JSXContent(node : JSXContent) {
@@ -131,6 +164,15 @@ export const Copy = {
     },
     JSXSpreadProperty(node : JSXSpreadProperty) {
         return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
+    },
+    JSXStyleProperty(node : JSXStyleProperty) {
+        return new JSXStyleProperty(this.EmbeddedCode(node.code), node.loc);
+    },
+    JSXReference(node : JSXReference) {
+        return new JSXReference(this.EmbeddedCode(node.code), node.loc);
+    },
+    JSXFunction(node : JSXFunction) {
+        return new JSXFunction(this.EmbeddedCode(node.code), node.loc);
     }
 };
 

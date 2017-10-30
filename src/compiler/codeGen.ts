@@ -9,6 +9,8 @@ import {
     JSXProperty,
     JSXStaticProperty, 
     JSXDynamicProperty,
+    JSXStyleProperty,
+    JSXFunction,
     JSXContent,
     JSXSpreadProperty,  
     CodeSegment
@@ -72,33 +74,41 @@ const codeGen = (ctl : Program, opts : Params) => {
             const code = 
                 !node.isHTML ?
                     emitSubComponent(buildSubComponent(node), indent) :
-                (node.properties.length === 0 && node.content.length === 0) ?
+                (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
-                    `Surplus.createElement('${node.tag}', null, null)` :
+                    node.references.map(r => compileSegments(r.code) + ' = ').join('')
+                    + `Surplus.createElement('${node.tag}', null, null)` :
                 (node.properties.length === 1 
                     && node.properties[0] instanceof JSXStaticProperty 
                     && (node.properties[0] as JSXStaticProperty).name === "className" 
+                    && node.functions.length === 1
                     && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
-                    `Surplus.createElement('${node.tag}', ${(node.properties[0] as JSXStaticProperty).value}, null)` :
+                    node.references.map(r => compileSegments(r.code) + ' = ').join('')
+                    + `Surplus.createElement('${node.tag}', ${(node.properties[0] as JSXStaticProperty).value}, null)` :
                 emitDOMExpression(buildDOMExpression(node), indent);
             return markLoc(code, node.loc, opts);
         },
         buildSubComponent = (node : JSXElement) => {
             const 
-                refs = [] as string[],
-                fns = [] as string[],
+                refs = node.references.map(r => compileSegments(r.code)),
+                fns = node.functions.map(r => compileSegments(r.code)),
                 // group successive properties into property objects, but spreads stand alone
                 // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
                 properties = node.properties.reduce((props : (string | { [name : string] : string })[], p) => {
                     const lastSegment = props.length > 0 ? props[props.length - 1] : null,
                         value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
                     
-                    if (p instanceof JSXSpreadProperty) props.push(value);
-                    else if (p instanceof JSXDynamicProperty && p.isRef) refs.push(value);
-                    else if (p instanceof JSXDynamicProperty && p.isFn) fns.push(value);
-                    else if (lastSegment === null || typeof lastSegment === 'string') props.push({ [p.name]: value });
-                    else lastSegment[p.name] = value;
+                    if (p instanceof JSXSpreadProperty) {
+                        props.push(value);
+                    } else if (lastSegment === null 
+                        || typeof lastSegment === 'string' 
+                        || (p instanceof JSXStyleProperty && lastSegment["style"])
+                    ) {
+                        props.push({ [p.name]: value });
+                    } else {
+                        lastSegment[p.name] = value;
+                    }
 
                     return props;
                 }, []),
@@ -163,32 +173,31 @@ const codeGen = (ctl : Program, opts : Params) => {
                 computations = [] as Computation[];
 
             const buildHtmlElement = (node : JSXElement, parent : string, n : number, svg : boolean) => {
-                const { tag, properties, content, loc } = node;
+                const { tag, properties, references, functions, content, loc } = node;
                 svg = svg || SvgOnlyTagRx.test(tag);
                 if (!node.isHTML) {
                     buildInsertedSubComponent(node, parent, n);
                 } else {
                     const
-                        id         = addId(parent, tag, n),
-                        exprs      = properties.map(p => p instanceof JSXStaticProperty ? '' : compileSegments(p.code)), 
-                        spreads    = properties.filter(p => p instanceof JSXSpreadProperty || (p instanceof JSXDynamicProperty && p.isStyle)),
-                        fns        = properties.filter(p => p instanceof JSXDynamicProperty && p.isFn) as JSXDynamicProperty[],
-                        refs       = properties.filter(p => p instanceof JSXDynamicProperty && p.isRef) as JSXDynamicProperty[],
-                        classProp  = spreads.length === 0 && fns.length === 0 && properties.filter(p => p instanceof JSXStaticProperty && p.name === 'className')[0] as JSXStaticProperty || null,
-                        dynamic    = fns.length > 0 || exprs.some(e => !noApparentSignals(e)),
-                        stmts      = properties.map((p, i) => 
+                        id           = addId(parent, tag, n),
+                        propExprs    = properties.map(p => p instanceof JSXStaticProperty ? '' : compileSegments(p.code)), 
+                        spreads      = properties.filter(p => p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty),
+                        classProp    = spreads.length === 0 && properties.filter(p => p instanceof JSXStaticProperty && p.name === 'className')[0] as JSXStaticProperty || null,
+                        propsDynamic = propExprs.some(e => !noApparentSignals(e)),
+                        propStmts    = properties.map((p, i) => 
                             p === classProp                 ? '' :
-                            p instanceof JSXStaticProperty  ? buildStaticProperty(p, id, svg) :
-                            p instanceof JSXDynamicProperty ? buildDynamicProperty(p, id, i, exprs[i], dynamic, spreads, svg) :
-                            buildSpread(p, id, exprs[i], dynamic, spreads, svg)
+                            p instanceof JSXStaticProperty  ? buildProperty(id, p.name, p.value, svg) :
+                            p instanceof JSXDynamicProperty ? buildProperty(id, p.name, propExprs[i], svg) :
+                            p instanceof JSXStyleProperty   ? buildStyle(p, id, propExprs[i], propsDynamic, spreads) :
+                            buildSpread(p, id, propExprs[i], propsDynamic, spreads, svg)
                         ).filter(s => s !== ''),
-                        refStmts   = refs.map(r => compileSegments(r.code) + ' = ').join(''),
-                        childSvg = svg && tag !== SvgForeignTag;
+                        refStmts     = references.map(r => compileSegments(r.code) + ' = ').join(''),
+                        childSvg     = svg && tag !== SvgForeignTag;
 
                     addStatement(`${id} = ${refStmts}Surplus.create${svg ? 'Svg' : ''}Element('${tag}', ${classProp && classProp.value}, ${parent || null});`);
                     
-                    if (!dynamic) {
-                        stmts.forEach(addStatement);
+                    if (!propsDynamic) {
+                        propStmts.forEach(addStatement);
                     }
                     
                     if (content.length === 1 && content[0] instanceof JSXInsert) {
@@ -197,32 +206,26 @@ const codeGen = (ctl : Program, opts : Params) => {
                         content.forEach((c, i) => buildChild(c, id, i, childSvg));
                     }
 
-                    if (dynamic) {
+                    if (propsDynamic) {
                         if (spreads.length > 0) {
                             // create namedProps object and use it to initialize our spread state
                             const namedProps = {} as { [ name : string ] : boolean };
                             properties.forEach(p => p instanceof JSXSpreadProperty || (namedProps[p.name] = true));
                             const state = `new Surplus.${spreads.length === 1 ? 'Single' : 'Multi'}SpreadState(${JSON.stringify(namedProps)})`;
-                            stmts.push("__spread;");
-                            addComputation(stmts, "__spread", state, loc);
+                            propStmts.push("__spread;");
+                            addComputation(propStmts, "__spread", state, loc);
                         } else {
-                            addComputation(stmts, null, null, loc);
+                            addComputation(propStmts, null, null, loc);
                         }
                     }
+
+                    functions.forEach(f => buildNodeFn(f, id));
                 }
             },
-            buildStaticProperty = (node : JSXStaticProperty, id : string, svg : boolean) =>
-                buildProperty(id, node.name, node.value, svg),
-            buildDynamicProperty = (node : JSXDynamicProperty, id : string, n : number, expr : string, dynamic : boolean, spreads : JSXProperty[], svg : boolean) =>
-                node.isRef ? buildReference(expr, id) :
-                node.isFn ? buildNodeFn(node, id, n, expr) :
-                node.isStyle ? buildStyle(node, id, expr, dynamic, spreads) :
-                buildProperty(id, node.name, expr, svg),
             buildProperty = (id : string, prop : string, expr : string, svg : boolean) =>
                 svg || IsAttribute(prop)
                 ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
-            buildReference = (ref : string, id : string) => '',
             buildSpread = (node : JSXSpreadProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[], svg : boolean) =>
                 !dynamic             ? buildStaticSpread(node, id, expr, svg) :
                 spreads.length === 1 ? buildSingleSpread(node, id, expr, svg) :
@@ -236,19 +239,19 @@ const codeGen = (ctl : Program, opts : Params) => {
                     final = n === spreads.length - 1;
                 return `__spread.apply(${id}, ${expr}, ${n}, ${final}, ${svg});`;
             },
-            buildNodeFn = (node : JSXDynamicProperty, id : string, n : number, expr : string) => {
-                const state = addId(id, 'fn', n);
-                return `${state} = (${expr})(${id}, ${state});`;
+            buildNodeFn = (node : JSXFunction, id : string) => {
+                var expr = compileSegments(node.code);
+                addComputation([`(${expr})(${id}, __state);`], '__state', null, node.loc);
             },
-            buildStyle = (node : JSXDynamicProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
+            buildStyle = (node : JSXStyleProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
                 !dynamic             ? buildStaticStyle(node, id, expr) :
                 spreads.length === 1 ? buildSingleStyle(node, id, expr) :
                 buildMultiStyle(node, id, expr, spreads),
-            buildStaticStyle = (node : JSXDynamicProperty, id : string, expr : string) =>
+            buildStaticStyle = (node : JSXStyleProperty, id : string, expr : string) =>
                 `Surplus.staticStyle(${id}, ${expr});`,
-            buildSingleStyle = (node : JSXDynamicProperty, id : string, expr : string) =>
+            buildSingleStyle = (node : JSXStyleProperty, id : string, expr : string) =>
                 `__spread.applyStyle(${id}, ${expr});`,
-            buildMultiStyle = (node : JSXDynamicProperty, id : string, expr : string, spreads : JSXProperty[]) => {
+            buildMultiStyle = (node : JSXStyleProperty, id : string, expr : string, spreads : JSXProperty[]) => {
                 var n = spreads.indexOf(node),
                     final = n === spreads.length - 1;
                 return `__spread.applyStyle(${id}, ${expr}, ${n}, ${final});`;
@@ -309,7 +312,7 @@ const codeGen = (ctl : Program, opts : Params) => {
             if (stateVar) statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
 
             const body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli),
-                code = `Surplus.S(function (${stateVar || ''}) {${body}}${seed ? `, ${seed}` : ''});`;
+                code = `Surplus.S(function (${stateVar || ''}) {${body}}${seed !== null ? `, ${seed}` : ''});`;
 
             return markLoc(code, loc, opts);
         };
