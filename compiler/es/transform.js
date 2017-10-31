@@ -9,16 +9,19 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 // Cross-browser compatibility shims
 import { JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty, JSXElement, JSXText, Copy } from './AST';
 import { codeStr } from './codeGen';
+import { HtmlEntites } from './domRef';
 var rx = {
     ws: /^\s*$/,
-    jsxEventProperty: /^on[A-Z]/
+    jsxEventProperty: /^on[A-Z]/,
+    htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g
 };
 var tf = [
     // active transforms, in order from first to last applied
     removeWhitespaceTextNodes,
     translateJSXPropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateProperties
+    removeDuplicateProperties,
+    translateHTMLEntitiesToUnicode
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 export var transform = function (node, opt) { return tf.Program(node); };
 function removeWhitespaceTextNodes(tx) {
@@ -68,9 +71,20 @@ function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
-                var textContent = new JSXStaticProperty("textContent", codeStr(content[0].text));
+                var text = this.JSXText(content[0]), textContent = new JSXStaticProperty("textContent", codeStr(text.text));
                 node = new JSXElement(tag, properties.concat([textContent]), references, functions, [], loc);
             }
             return tx.JSXElement.call(this, node);
+        } });
+}
+function translateHTMLEntitiesToUnicode(tx) {
+    return __assign({}, tx, { JSXText: function (node) {
+            var raw = node.text, unicode = raw.replace(rx.htmlEntity, function (entity, dec, hex, named) {
+                return dec ? String.fromCharCode(parseInt(dec, 10)) :
+                    hex ? String.fromCharCode(parseInt(hex, 16)) :
+                        HtmlEntites[named] ||
+                            entity;
+            });
+            return unicode === raw ? node : new JSXText(unicode);
         } });
 }
