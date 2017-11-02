@@ -27,11 +27,14 @@
 /// */
 /// misc (any string not containing one of the above)
 // pre-compiled regular expressions
-var rx = {
-    tokens: /<\/?(?=\w)|\/?>|<!--|-->|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|\/\/|\n|\/\*|\*\/|(?:[^<>@=\/@=()[\]{}"'\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?)+/g,
-};
+var tokensRx = /<\/?(?=\w)|\/?>|<!--|-->|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|\/\/|\n|\/\*|\*\/|(?:[^<>=\/()[\]{}"'\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?)+/g;
+//                |          |    |    |   +- =
+//                |          |    |    +- -->
+//                |          |    +- <!--
+//                |          +- /> or >
+//                +- < or </ followed by \w
 function tokenize(str, opts) {
-    var toks = str.match(rx.tokens);
+    var toks = str.match(tokensRx);
     return toks || [];
 }
 
@@ -202,7 +205,7 @@ var Copy = {
 };
 
 // pre-compiled regular expressions
-var rx$1 = {
+var rx = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
     leadingWs: /^\s+/,
@@ -253,13 +256,13 @@ function parse(TOKS, opts) {
             ERR("not at start of html element");
         var start = LOC(), tag = "", properties = [], references = [], functions = [], content = [], prop, hasContent = true;
         NEXT(); // pass '<'
-        tag = SPLIT(rx$1.identifier);
+        tag = SPLIT(rx.identifier);
         if (!tag)
             ERR("bad element name", start);
         SKIPWS();
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
-            if (MATCH(rx$1.identifier)) {
+            if (MATCH(rx.identifier)) {
                 prop = jsxProperty();
                 if (prop instanceof JSXReference)
                     references.push(prop);
@@ -298,7 +301,7 @@ function parse(TOKS, opts) {
             if (EOF)
                 ERR("element missing close tag", start);
             NEXT(); // pass '</'
-            if (tag !== SPLIT(rx$1.identifier))
+            if (tag !== SPLIT(rx.identifier))
                 ERR("mismatched open and close tags", start);
             if (NOT('>'))
                 ERR("malformed close tag");
@@ -331,23 +334,23 @@ function parse(TOKS, opts) {
         return new JSXInsert(embeddedCode(), loc);
     }
     function jsxProperty() {
-        if (!MATCH(rx$1.identifier))
+        if (!MATCH(rx.identifier))
             ERR("not at start of property declaration");
-        var loc = LOC(), name = SPLIT(rx$1.identifier), code;
+        var loc = LOC(), name = SPLIT(rx.identifier), code;
         SKIPWS(); // pass name
         if (IS('=')) {
             NEXT(); // pass '='
             SKIPWS();
             if (IS('"') || IS("'")) {
-                if (rx$1.badStaticProp.test(name))
+                if (rx.badStaticProp.test(name))
                     ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
                 return new JSXStaticProperty(name, quotedString());
             }
             else if (IS('{')) {
                 code = embeddedCode();
-                return rx$1.refProp.test(name) ? new JSXReference(code, loc) :
-                    rx$1.fnProp.test(name) ? new JSXFunction(code, loc) :
-                        rx$1.styleProp.test(name) ? new JSXStyleProperty(code, loc) :
+                return rx.refProp.test(name) ? new JSXReference(code, loc) :
+                    rx.fnProp.test(name) ? new JSXFunction(code, loc) :
+                        rx.styleProp.test(name) ? new JSXStyleProperty(code, loc) :
                             new JSXDynamicProperty(name, code, loc);
             }
             else {
@@ -418,7 +421,7 @@ function parse(TOKS, opts) {
             ERR("not in quoted string");
         var start = LOC(), quote, text;
         quote = text = TOK, NEXT();
-        while (!EOF && (NOT(quote) || rx$1.stringEscapedEnd.test(text))) {
+        while (!EOF && (NOT(quote) || rx.stringEscapedEnd.test(text))) {
             text += TOK, NEXT();
         }
         if (EOF)
@@ -485,8 +488,8 @@ function parse(TOKS, opts) {
         while (true) {
             if (IS('\n'))
                 NEXT();
-            else if (MATCHES(rx$1.leadingWs))
-                SPLIT(rx$1.leadingWs);
+            else if (MATCHES(rx.leadingWs))
+                SPLIT(rx.leadingWs);
             else
                 break;
         }
@@ -510,7 +513,7 @@ function parse(TOKS, opts) {
     }
 }
 
-var rx$4 = {
+var rx$3 = {
     locs: /(\n)|(\u0000(\d+),(\d+)\u0000)/g
 };
 var vlqFinalDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
@@ -520,7 +523,7 @@ function locationMark(loc) {
 }
 function extractMappings(embedded) {
     var line = [], lines = [], lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, lineStartPos = 0, lineMarksLength = 0;
-    var src = embedded.replace(rx$4.locs, function (_, nl, mark, sourceLine, sourceCol, offset) {
+    var src = embedded.replace(rx$3.locs, function (_, nl, mark, sourceLine, sourceCol, offset) {
         if (nl) {
             lines.push(line);
             line = [];
@@ -1091,7 +1094,7 @@ var __assign$1 = (undefined && undefined.__assign) || Object.assign || function(
     return t;
 };
 // pre-compiled regular expressions
-var rx$3 = {
+var rx$2 = {
     backslashes: /\\/g,
     newlines: /\r?\n/g,
     hasParen: /\(/,
@@ -1303,7 +1306,7 @@ var codeGen = function (ctl, opts) {
             else
                 addStatement("Surplus.content(" + parent + ", " + content + ", \"\");");
         }, addId = function (parent, tag, n) {
-            tag = tag.replace(rx$3.nonIdChars, '_');
+            tag = tag.replace(rx$2.nonIdChars, '_');
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);
             ids.push(id);
             return id;
@@ -1334,17 +1337,17 @@ var codeGen = function (ctl, opts) {
     return compileSegments(ctl);
 };
 var noApparentSignals = function (code) {
-    return !rx$3.hasParen.test(code) || (rx$3.loneFunction.test(code) && !rx$3.endsInParen.test(code));
+    return !rx$2.hasParen.test(code) || (rx$2.loneFunction.test(code) && !rx$2.endsInParen.test(code));
 };
 var indent = function (previousCode) {
-    var m = rx$3.indent.exec(previousCode), pad = m ? m[1] : '', nl = "\r\n" + pad, nli = nl + '    ', nlii = nli + '    ';
+    var m = rx$2.indent.exec(previousCode), pad = m ? m[1] : '', nl = "\r\n" + pad, nli = nl + '    ', nlii = nli + '    ';
     return { nl: nl, nli: nli, nlii: nlii };
 };
 var codeStr = function (str) {
     return '"' +
-        str.replace(rx$3.backslashes, "\\\\")
-            .replace(rx$3.doubleQuotes, "\\\"")
-            .replace(rx$3.newlines, "\\n") +
+        str.replace(rx$2.backslashes, "\\\\")
+            .replace(rx$2.doubleQuotes, "\\\"")
+            .replace(rx$2.newlines, "\\n") +
         '"';
 };
 var markLoc = function (str, loc, opts) {
@@ -1372,7 +1375,7 @@ var __assign = (undefined && undefined.__assign) || Object.assign || function(t)
     return t;
 };
 // Cross-browser compatibility shims
-var rx$2 = {
+var rx$1 = {
     allWs: /^\s*$/,
     hasNewline: /\n/,
     extraWs: /\s\s+/g,
@@ -1393,8 +1396,8 @@ function removeMultiLineWhitespaceTextNodes(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
             if (node.tag !== 'pre') {
                 var nonWhitespaceContent = node.content.filter(function (c) { return !(c instanceof JSXText
-                    && rx$2.allWs.test(c.text)
-                    && rx$2.hasNewline.test(c.text)); });
+                    && rx$1.allWs.test(c.text)
+                    && rx$1.hasNewline.test(c.text)); });
                 if (nonWhitespaceContent.length !== node.content.length) {
                     node = new JSXElement(node.tag, node.properties, node.references, node.functions, nonWhitespaceContent, node.loc);
                 }
@@ -1407,7 +1410,7 @@ function collapseExtraWhitespaceInTextNodes(tx) {
             if (node.tag !== 'pre') {
                 var lessWsContent = node.content.map(function (c) {
                     return c instanceof JSXText
-                        ? new JSXText(c.text.replace(rx$2.extraWs, ' '))
+                        ? new JSXText(c.text.replace(rx$1.extraWs, ' '))
                         : c;
                 });
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
@@ -1417,7 +1420,7 @@ function collapseExtraWhitespaceInTextNodes(tx) {
 }
 function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
     return __assign({}, tx, { JSXText: function (node) {
-            var raw = node.text, unicode = raw.replace(rx$2.htmlEntity, function (entity, dec, hex, named) {
+            var raw = node.text, unicode = raw.replace(rx$1.htmlEntity, function (entity, dec, hex, named) {
                 return dec ? String.fromCharCode(parseInt(dec, 10)) :
                     hex ? String.fromCharCode(parseInt(hex, 16)) :
                         HtmlEntites[named] ||
@@ -1460,7 +1463,7 @@ function translateJSXPropertyNames(tx) {
         } });
 }
 function translateJSXPropertyName(name) {
-    return rx$2.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
+    return rx$1.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
