@@ -18,7 +18,7 @@ var rx = {
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen: /\)\s*$/,
     nonIdChars: /[^a-zA-Z0-9]/,
-    singleQuotes: /'/g,
+    doubleQuotes: /"/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
 var DOMExpression = /** @class */ (function () {
@@ -259,11 +259,11 @@ var noApparentSignals = function (code) {
     var m = rx.indent.exec(previousCode), pad = m ? m[1] : '', nl = "\r\n" + pad, nli = nl + '    ', nlii = nli + '    ';
     return { nl: nl, nli: nli, nlii: nlii };
 }, codeStr = function (str) {
-    return "'" +
+    return '"' +
         str.replace(rx.backslashes, "\\\\")
-            .replace(rx.singleQuotes, "\\'")
-            .replace(rx.newlines, "\\\n") +
-        "'";
+            .replace(rx.doubleQuotes, "\\\"")
+            .replace(rx.newlines, "\\n") +
+        '"';
 };
 var markLoc = function (str, loc, opts) {
     return opts.sourcemap ? locationMark(loc) + str : str;

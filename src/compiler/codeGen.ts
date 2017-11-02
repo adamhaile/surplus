@@ -30,7 +30,7 @@ const rx = {
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen : /\)\s*$/,
     nonIdChars  : /[^a-zA-Z0-9]/,
-    singleQuotes: /'/g,
+    doubleQuotes: /"/g,
     indent      : /\n(?=[^\n]+$)([ \t]*)/
 };
 
@@ -333,11 +333,11 @@ const
         return { nl, nli, nlii };
     },
     codeStr = (str : string) =>
-        "'" + 
+        '"' + 
         str.replace(rx.backslashes, "\\\\")
-           .replace(rx.singleQuotes, "\\'")
-           .replace(rx.newlines, "\\\n") +
-        "'";
+           .replace(rx.doubleQuotes, "\\\"")
+           .replace(rx.newlines, "\\n") +
+        '"';
 
 interface Indents { nl : string, nli : string, nlii : string }
 
