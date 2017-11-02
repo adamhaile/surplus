@@ -1098,7 +1098,7 @@ var rx$3 = {
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen: /\)\s*$/,
     nonIdChars: /[^a-zA-Z0-9]/,
-    singleQuotes: /'/g,
+    doubleQuotes: /"/g,
     indent: /\n(?=[^\n]+$)([ \t]*)/
 };
 var DOMExpression = /** @class */ (function () {
@@ -1341,11 +1341,11 @@ var indent = function (previousCode) {
     return { nl: nl, nli: nli, nlii: nlii };
 };
 var codeStr = function (str) {
-    return "'" +
+    return '"' +
         str.replace(rx$3.backslashes, "\\\\")
-            .replace(rx$3.singleQuotes, "\\'")
-            .replace(rx$3.newlines, "\\\n") +
-        "'";
+            .replace(rx$3.doubleQuotes, "\\\"")
+            .replace(rx$3.newlines, "\\n") +
+        '"';
 };
 var markLoc = function (str, loc, opts) {
     return opts.sourcemap ? locationMark(loc) + str : str;
@@ -1373,26 +1373,59 @@ var __assign = (undefined && undefined.__assign) || Object.assign || function(t)
 };
 // Cross-browser compatibility shims
 var rx$2 = {
-    ws: /^\s*$/,
+    allWs: /^\s*$/,
+    hasNewline: /\n/,
+    extraWs: /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
     htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g
 };
 var tf = [
     // active transforms, in order from first to last applied
-    removeWhitespaceTextNodes,
+    removeMultiLineWhitespaceTextNodes,
+    collapseExtraWhitespaceInTextNodes,
+    translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateProperties,
-    translateHTMLEntitiesToUnicode
+    removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 var transform = function (node, opt) { return tf.Program(node); };
-function removeWhitespaceTextNodes(tx) {
+function removeMultiLineWhitespaceTextNodes(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
-            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof JSXText && rx$2.ws.test(c.text)); });
-            if (nonWhitespaceContent.length !== content.length) {
-                node = new JSXElement(tag, properties, references, functions, nonWhitespaceContent, loc);
+            if (node.tag !== 'pre') {
+                var nonWhitespaceContent = node.content.filter(function (c) { return !(c instanceof JSXText
+                    && rx$2.allWs.test(c.text)
+                    && rx$2.hasNewline.test(c.text)); });
+                if (nonWhitespaceContent.length !== node.content.length) {
+                    node = new JSXElement(node.tag, node.properties, node.references, node.functions, nonWhitespaceContent, node.loc);
+                }
             }
             return tx.JSXElement.call(this, node);
+        } });
+}
+function collapseExtraWhitespaceInTextNodes(tx) {
+    return __assign({}, tx, { JSXElement: function (node) {
+            if (node.tag !== 'pre') {
+                var lessWsContent = node.content.map(function (c) {
+                    return c instanceof JSXText
+                        ? new JSXText(c.text.replace(rx$2.extraWs, ' '))
+                        : c;
+                });
+                node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
+            }
+            return tx.JSXElement.call(this, node);
+        } });
+}
+function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
+    return __assign({}, tx, { JSXText: function (node) {
+            var raw = node.text, unicode = raw.replace(rx$2.htmlEntity, function (entity, dec, hex, named) {
+                return dec ? String.fromCharCode(parseInt(dec, 10)) :
+                    hex ? String.fromCharCode(parseInt(hex, 16)) :
+                        HtmlEntites[named] ||
+                            entity;
+            });
+            if (raw !== unicode)
+                node = new JSXText(unicode);
+            return tx.JSXText.call(this, node);
         } });
 }
 function removeDuplicateProperties(tx) {
@@ -1437,17 +1470,6 @@ function promoteTextOnlyContentsToTextContentProperties(tx) {
                 node = new JSXElement(tag, properties.concat([textContent]), references, functions, [], loc);
             }
             return tx.JSXElement.call(this, node);
-        } });
-}
-function translateHTMLEntitiesToUnicode(tx) {
-    return __assign({}, tx, { JSXText: function (node) {
-            var raw = node.text, unicode = raw.replace(rx$2.htmlEntity, function (entity, dec, hex, named) {
-                return dec ? String.fromCharCode(parseInt(dec, 10)) :
-                    hex ? String.fromCharCode(parseInt(hex, 16)) :
-                        HtmlEntites[named] ||
-                            entity;
-            });
-            return unicode === raw ? node : new JSXText(unicode);
         } });
 }
 

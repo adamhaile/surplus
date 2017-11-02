@@ -11,26 +11,59 @@ import { JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadPrope
 import { codeStr } from './codeGen';
 import { HtmlEntites } from './domRef';
 var rx = {
-    ws: /^\s*$/,
+    allWs: /^\s*$/,
+    hasNewline: /\n/,
+    extraWs: /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
     htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g
 };
 var tf = [
     // active transforms, in order from first to last applied
-    removeWhitespaceTextNodes,
+    removeMultiLineWhitespaceTextNodes,
+    collapseExtraWhitespaceInTextNodes,
+    translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateProperties,
-    translateHTMLEntitiesToUnicode
+    removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 export var transform = function (node, opt) { return tf.Program(node); };
-function removeWhitespaceTextNodes(tx) {
+function removeMultiLineWhitespaceTextNodes(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
-            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc, nonWhitespaceContent = content.filter(function (c) { return !(c instanceof JSXText && rx.ws.test(c.text)); });
-            if (nonWhitespaceContent.length !== content.length) {
-                node = new JSXElement(tag, properties, references, functions, nonWhitespaceContent, loc);
+            if (node.tag !== 'pre') {
+                var nonWhitespaceContent = node.content.filter(function (c) { return !(c instanceof JSXText
+                    && rx.allWs.test(c.text)
+                    && rx.hasNewline.test(c.text)); });
+                if (nonWhitespaceContent.length !== node.content.length) {
+                    node = new JSXElement(node.tag, node.properties, node.references, node.functions, nonWhitespaceContent, node.loc);
+                }
             }
             return tx.JSXElement.call(this, node);
+        } });
+}
+function collapseExtraWhitespaceInTextNodes(tx) {
+    return __assign({}, tx, { JSXElement: function (node) {
+            if (node.tag !== 'pre') {
+                var lessWsContent = node.content.map(function (c) {
+                    return c instanceof JSXText
+                        ? new JSXText(c.text.replace(rx.extraWs, ' '))
+                        : c;
+                });
+                node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
+            }
+            return tx.JSXElement.call(this, node);
+        } });
+}
+function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
+    return __assign({}, tx, { JSXText: function (node) {
+            var raw = node.text, unicode = raw.replace(rx.htmlEntity, function (entity, dec, hex, named) {
+                return dec ? String.fromCharCode(parseInt(dec, 10)) :
+                    hex ? String.fromCharCode(parseInt(hex, 16)) :
+                        HtmlEntites[named] ||
+                            entity;
+            });
+            if (raw !== unicode)
+                node = new JSXText(unicode);
+            return tx.JSXText.call(this, node);
         } });
 }
 function removeDuplicateProperties(tx) {
@@ -75,16 +108,5 @@ function promoteTextOnlyContentsToTextContentProperties(tx) {
                 node = new JSXElement(tag, properties.concat([textContent]), references, functions, [], loc);
             }
             return tx.JSXElement.call(this, node);
-        } });
-}
-function translateHTMLEntitiesToUnicode(tx) {
-    return __assign({}, tx, { JSXText: function (node) {
-            var raw = node.text, unicode = raw.replace(rx.htmlEntity, function (entity, dec, hex, named) {
-                return dec ? String.fromCharCode(parseInt(dec, 10)) :
-                    hex ? String.fromCharCode(parseInt(hex, 16)) :
-                        HtmlEntites[named] ||
-                            entity;
-            });
-            return unicode === raw ? node : new JSXText(unicode);
         } });
 }

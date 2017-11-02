@@ -10,13 +10,13 @@ describe("HTML Entites", function () {
                 mixed   = <span>&#160;&#x00A0;&nbsp;&#160;&nbsp;&#x00A0;&#160;</span>,
                 bogus   = <span>&bogus;</span>;
                                                    
-            expect(dec.textContent).toBe("\xa0");
-            expect(hex.textContent).toBe("\xa0");
-            expect(named.textContent).toBe("\xa0");
-            expect(adecb.textContent).toBe("a\xa0b");
-            expect(ahexb.textContent).toBe("a\xa0b");
-            expect(anamedb.textContent).toBe("a\xa0b");
-            expect(mixed.textContent).toBe("\xa0\xa0\xa0\xa0\xa0\xa0\xa0");
+            expect(dec.textContent).toBe("\\xa0");
+            expect(hex.textContent).toBe("\\xa0");
+            expect(named.textContent).toBe("\\xa0");
+            expect(adecb.textContent).toBe("a\\xa0b");
+            expect(ahexb.textContent).toBe("a\\xa0b");
+            expect(anamedb.textContent).toBe("a\\xa0b");
+            expect(mixed.textContent).toBe("\\xa0\\xa0\\xa0\\xa0\\xa0\\xa0\\xa0");
             expect(bogus.textContent).toBe("&bogus;");   
         `);
         eval(code);

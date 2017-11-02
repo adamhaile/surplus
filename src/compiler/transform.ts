@@ -5,34 +5,77 @@ import { codeStr } from './codeGen';
 import { HtmlEntites } from './domRef';
 
 const rx = {
-    ws              : /^\s*$/,
+    allWs           : /^\s*$/,
+    hasNewline      : /\n/,
+    extraWs         : /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
     htmlEntity      : /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g
 };
 
 const tf = [
     // active transforms, in order from first to last applied
-    removeWhitespaceTextNodes,
+    removeMultiLineWhitespaceTextNodes,
+    collapseExtraWhitespaceInTextNodes,
+    translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateProperties,
-    translateHTMLEntitiesToUnicode
+    removeDuplicateProperties
 ].reverse().reduce((tf, fn) => fn(tf), Copy);
 
 export const transform = (node : Program, opt : Params) => tf.Program(node);
 
-function removeWhitespaceTextNodes(tx : Copy) : Copy {
+function removeMultiLineWhitespaceTextNodes(tx : Copy) : Copy {
     return { 
         ...tx, 
         JSXElement(node) { 
-            const { tag, properties, references, functions, content, loc } = node,
-                nonWhitespaceContent = content.filter(c => !(c instanceof JSXText && rx.ws.test(c.text)));
-             if (nonWhitespaceContent.length !== content.length) {
-                node = new JSXElement(tag, properties, references, functions, nonWhitespaceContent, loc);
+            if (node.tag !== 'pre') {
+                const nonWhitespaceContent = node.content.filter(c => !(
+                    c instanceof JSXText 
+                    && rx.allWs.test(c.text) 
+                    && rx.hasNewline.test(c.text)
+                ));
+                if (nonWhitespaceContent.length !== node.content.length) {
+                    node = new JSXElement(node.tag, node.properties, node.references, node.functions, nonWhitespaceContent, node.loc);
+                }
             }
-            return tx.JSXElement.call(this, node);        
+            return tx.JSXElement.call(this, node);
         }
     };
+}
+
+function collapseExtraWhitespaceInTextNodes(tx : Copy) : Copy {
+    return {
+        ...tx,
+        JSXElement(node) {
+            if (node.tag !== 'pre') {
+                const lessWsContent = node.content.map(c => 
+                    c instanceof JSXText
+                    ? new JSXText(c.text.replace(rx.extraWs, ' '))
+                    : c
+                );
+                node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
+            }
+            return tx.JSXElement.call(this, node);
+        }
+    }
+}
+
+function translateHTMLEntitiesToUnicodeInTextNodes(tx : Copy) : Copy {
+    return {
+        ...tx,
+        JSXText(node) {
+            const 
+                raw = node.text,
+                unicode = raw.replace(rx.htmlEntity, (entity, dec, hex, named) =>
+                    dec ? String.fromCharCode(parseInt(dec, 10)) :
+                    hex ? String.fromCharCode(parseInt(hex, 16)) :
+                    HtmlEntites[named] ||
+                    entity
+                );
+            if (raw !== unicode) node = new JSXText(unicode);
+            return tx.JSXText.call(this, node);
+        }
+    }
 }
 
 function removeDuplicateProperties(tx : Copy) : Copy {
@@ -96,22 +139,4 @@ function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {
             return tx.JSXElement.call(this, node);
         }
     };
-}
-
-function translateHTMLEntitiesToUnicode(tx : Copy) : Copy {
-    return {
-        ...tx,
-        JSXText(node) {
-            const 
-                raw = node.text,
-                unicode = raw.replace(rx.htmlEntity, (entity, dec, hex, named) =>
-                    dec ? String.fromCharCode(parseInt(dec, 10)) :
-                    hex ? String.fromCharCode(parseInt(hex, 16)) :
-                    HtmlEntites[named] ||
-                    entity
-                );
-
-            return unicode === raw ? node : new JSXText(unicode);
-        }
-    }
 }
