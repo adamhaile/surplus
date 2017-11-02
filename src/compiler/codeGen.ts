@@ -277,8 +277,8 @@ const codeGen = (ctl : Program, opts : Params) => {
             buildJSXContent = (node : JSXInsert, parent : string) => {
                 const content = compileSegments(node.code),
                     dynamic = !noApparentSignals(content);
-                if (dynamic) addComputation([`__content.update(${content});`], '__content', `new Surplus.Content(${parent})`, node.loc);
-                else addStatement(`new Surplus.Content(${parent}).update(${content});`);
+                if (dynamic) addComputation([`Surplus.content(${parent}, ${content}, __current);`], '__current', "''", node.loc);
+                else addStatement(`Surplus.content(${parent}, ${content}, "");`);
             },
             addId = (parent : string, tag : string, n : number) => {
                 tag = tag.replace(rx.nonIdChars, '_');

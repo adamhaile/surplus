@@ -1299,9 +1299,9 @@ var codeGen = function (ctl, opts) {
         }, buildJSXContent = function (node, parent) {
             var content = compileSegments(node.code), dynamic = !noApparentSignals(content);
             if (dynamic)
-                addComputation(["__content.update(" + content + ");"], '__content', "new Surplus.Content(" + parent + ")", node.loc);
+                addComputation(["Surplus.content(" + parent + ", " + content + ", __current);"], '__current', "''", node.loc);
             else
-                addStatement("new Surplus.Content(" + parent + ").update(" + content + ");");
+                addStatement("Surplus.content(" + parent + ", " + content + ", \"\");");
         }, addId = function (parent, tag, n) {
             tag = tag.replace(rx$3.nonIdChars, '_');
             var id = parent === '' ? '__' : parent + (parent[parent.length - 1] === '_' ? '' : '_') + tag + (n + 1);

@@ -90,7 +90,7 @@ describe("Surplus.content", function () {
 
     it("can insert a changing array of nodes", function () {
         var parent = document.createElement("div"),
-            content = new Surplus.Content(parent),
+            current = "",
             n1 = document.createElement("span"), 
             n2 = document.createElement("div"),
             n3 = document.createElement("span"),
@@ -144,9 +144,9 @@ describe("Surplus.content", function () {
         test([n4, n3, n2, n1]);
 
         function test(array) {
-            content.update(array, false);
+            current = Surplus.content(parent, array, current);
             expect(parent.innerHTML).toBe(expected(array));
-            content.update(orig, false);
+            current = Surplus.content(parent, orig, current);
             expect(parent.innerHTML).toBe(origExpected);
         }
 
@@ -166,7 +166,7 @@ describe("Surplus.content", function () {
     function content(val) {
         var parent = newParent();
 
-        new Surplus.Content(parent).update(val, false);
+        Surplus.content(parent, val, "");
 
         return parent;
     }

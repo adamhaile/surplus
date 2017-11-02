@@ -159,84 +159,76 @@ function insert(range, value) {
     }
 }
 
-var Content = /** @class */ (function () {
-    function Content(parent) {
-        this.parent = parent;
-        this.current = "";
+function content(parent, value, current) {
+    var t = typeof value;
+    if (current === value) {
+        // nothing to do
     }
-    Content.prototype.update = function (value) {
-        var parent = this.parent, current = this.current, t = typeof value;
-        if (current === value) {
-            // nothing to do
-        }
-        else if (t === 'string') {
-            this.current = parent.textContent = value;
-        }
-        else if (t === 'number' || t === 'boolean') {
-            value = value.toString();
-            this.current = parent.textContent = value;
-        }
-        else if (value == null) {
-            clear(parent);
-            this.current = "";
-        }
-        else if (t === 'function') {
-            var self = this;
-            S(function () {
-                self.update(value());
-            });
-        }
-        else if (value instanceof Node) {
-            if (Array.isArray(current)) {
-                if (current.length === 0) {
-                    parent.appendChild(value);
-                }
-                else if (current.length === 1) {
-                    parent.replaceChild(value, current[0]);
-                }
-                else {
-                    clear(parent);
-                    parent.appendChild(value);
-                }
-            }
-            else if (current === "") {
+    else if (t === 'string') {
+        current = parent.textContent = value;
+    }
+    else if (t === 'number' || t === 'boolean') {
+        value = value.toString();
+        current = parent.textContent = value;
+    }
+    else if (value == null) {
+        clear(parent);
+        current = "";
+    }
+    else if (t === 'function') {
+        S(function () {
+            current = content(parent, value(), current);
+        });
+    }
+    else if (value instanceof Node) {
+        if (Array.isArray(current)) {
+            if (current.length === 0) {
                 parent.appendChild(value);
             }
-            else {
-                parent.replaceChild(value, parent.firstChild);
+            else if (current.length === 1) {
+                parent.replaceChild(value, current[0]);
             }
-            this.current = value;
-        }
-        else if (Array.isArray(value)) {
-            var array = normalizeIncomingArray([], value);
-            if (array.length === 0) {
+            else {
                 clear(parent);
+                parent.appendChild(value);
             }
-            else {
-                if (Array.isArray(current)) {
-                    if (current.length === 0) {
-                        appendNodes(parent, array, 0, array.length);
-                    }
-                    else {
-                        reconcileArrays(parent, current, array);
-                    }
-                }
-                else if (current === "") {
+        }
+        else if (current === "") {
+            parent.appendChild(value);
+        }
+        else {
+            parent.replaceChild(value, parent.firstChild);
+        }
+        current = value;
+    }
+    else if (Array.isArray(value)) {
+        var array = normalizeIncomingArray([], value);
+        if (array.length === 0) {
+            clear(parent);
+        }
+        else {
+            if (Array.isArray(current)) {
+                if (current.length === 0) {
                     appendNodes(parent, array, 0, array.length);
                 }
                 else {
-                    reconcileArrays(parent, [parent.firstChild], array);
+                    reconcileArrays(parent, current, array);
                 }
             }
-            this.current = array;
+            else if (current === "") {
+                appendNodes(parent, array, 0, array.length);
+            }
+            else {
+                reconcileArrays(parent, [parent.firstChild], array);
+            }
         }
-        else {
-            throw new Error("content must be Node, stringable, or array of same");
-        }
-        return this;
-    };
-    return Content;
-}());
+        current = array;
+    }
+    else {
+        throw new Error("content must be Node, stringable, or array of same");
+    }
+    return current;
+}
 var NOMATCH = -1;
 var NOINSERT = -2;
 var RECONCILE_ARRAY_BATCH = 0;
@@ -837,7 +829,7 @@ function translateJSXPropertyName(name) {
 }
 
 exports.insert = insert;
-exports.Content = Content;
+exports.content = content;
 exports.staticSpread = staticSpread;
 exports.staticStyle = staticStyle;
 exports.SingleSpreadState = SingleSpreadState;

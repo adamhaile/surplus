@@ -1,91 +1,63 @@
 import { S } from './index';
 import { InsertValue, InsertScalar, InsertArray } from './insert';
 
-// inline ES6 Map type definition, as we generally want to target ES5, but with Map
-interface Map<K, V> {
-    clear(): void;
-    delete(key: K): boolean;
-    forEach(callbackfn: (value: V, key: K, map: Map<K, V>) => void, thisArg?: any): void;
-    get(key: K): V | undefined;
-    has(key: K): boolean;
-    set(key: K, value: V): this;
-    readonly size: number;
-}
 
-interface MapConstructor {
-    new (): Map<any, any>;
-    new <K, V>(entries?: [K, V][]): Map<K, V>;
-    readonly prototype: Map<any, any>;
-}
-declare var Map: MapConstructor;
+export function content(parent : HTMLElement, value : InsertValue, current : string | Node | Node[]) : string | Node | Node[] {
+    var t = typeof value;
 
-export class Content {
-    private current = "" as string | Node | Node[];
-
-    constructor(
-        public readonly parent : Element
-    ) {}
-
-    update(value : InsertValue) {
-        var parent  = this.parent,
-            current = this.current,
-            t       = typeof value;
-
-        if (current === value) {
-            // nothing to do
-        } else if (t === 'string') {
-            this.current = parent.textContent = value as string;
-        } else if (t === 'number' || t === 'boolean') {
-            value = value!.toString();
-            this.current = parent.textContent = value;
-        } else if (value == null) { // matches both null and undefined
+    if (current === value) {
+        // nothing to do
+    } else if (t === 'string') {
+        current = parent.textContent = value as string;
+    } else if (t === 'number' || t === 'boolean') {
+        value = value!.toString();
+        current = parent.textContent = value;
+    } else if (value == null) { // matches both null and undefined
+        clear(parent);
+        current = "";
+    } else if (t === 'function') {
+        S(function () {
+            current = content(parent, (value as Function)(), current);
+        });
+    } else if (value instanceof Node) {
+        if (Array.isArray(current)) {
+            if (current.length === 0) {
+                parent.appendChild(value);
+            } else if (current.length === 1) {
+                parent.replaceChild(value, current[0]);
+            } else {
+                clear(parent);
+                parent.appendChild(value);
+            }
+        } else if (current === "") {
+            parent.appendChild(value);
+        } else {
+            parent.replaceChild(value, parent.firstChild!);
+        }
+        current = value;
+    } else if (Array.isArray(value)) {
+        var array = normalizeIncomingArray([], value);
+        if (array.length === 0) {
             clear(parent);
-            this.current = "";
-        } else if (t === 'function') {
-            var self = this;
-            S(function () {
-                self.update((value as Function)());
-            });
-        } else if (value instanceof Node) {
+        } else {
             if (Array.isArray(current)) {
                 if (current.length === 0) {
-                    parent.appendChild(value);
-                } else if (current.length === 1) {
-                    parent.replaceChild(value, current[0]);
-                } else {
-                    clear(parent);
-                    parent.appendChild(value);
-                }
-            } else if (current === "") {
-                parent.appendChild(value);
-            } else {
-                parent.replaceChild(value, parent.firstChild!);
-            }
-            this.current = value;
-        } else if (Array.isArray(value)) {
-            var array = normalizeIncomingArray([], value);
-            if (array.length === 0) {
-                clear(parent);
-            } else {
-                if (Array.isArray(current)) {
-                    if (current.length === 0) {
-                        appendNodes(parent, array, 0, array.length);
-                    } else {
-                        reconcileArrays(parent, current, array);
-                    }
-                } else if (current === "") {
                     appendNodes(parent, array, 0, array.length);
                 } else {
-                    reconcileArrays(parent, [parent.firstChild!], array);
+                    reconcileArrays(parent, current, array);
                 }
+            } else if (current === "") {
+                appendNodes(parent, array, 0, array.length);
+            } else {
+                reconcileArrays(parent, [parent.firstChild!], array);
             }
-            this.current = array as Node[];
-        } else {
-            throw new Error("content must be Node, stringable, or array of same");
         }
-
-        return this;
+        current = array as Node[];
+    } else {
+        throw new Error("content must be Node, stringable, or array of same");
     }
+
+    return current;
 }
 
 var NOMATCH = -1,
@@ -102,7 +74,7 @@ const RECONCILE_ARRAY_BITS = 16,
 // this code isn't identical, since we're diffing real dom nodes to nodes-or-strings, 
 // but the core methodology of trimming ends and reversals, matching nodes, then using
 // the longest increasing subsequence to minimize DOM ops is inspired by ivi.
-function reconcileArrays(parent : Element, ns : Node[], us : (string | Node)[]) {
+function reconcileArrays(parent : HTMLElement, ns : Node[], us : (string | Node)[]) {
     var ulen = us.length,
         // n = nodes, u = updates
         // ranges defined by min and max indices
