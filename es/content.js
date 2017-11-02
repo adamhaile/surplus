@@ -5,11 +5,11 @@ export function content(parent, value, current) {
         // nothing to do
     }
     else if (t === 'string') {
-        current = parent.textContent = value;
+        current = parent.innerText = value;
     }
     else if (t === 'number' || t === 'boolean') {
         value = value.toString();
-        current = parent.textContent = value;
+        current = parent.innerText = value;
     }
     else if (value == null) {
         clear(parent);
