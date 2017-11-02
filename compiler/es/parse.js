@@ -13,7 +13,8 @@ var parens = {
     "(": ")",
     "[": "]",
     "{": "}",
-    "{...": "}"
+    "{...": "}",
+    "${": "}"
 };
 ;
 export function parse(TOKS, opts) {
@@ -31,6 +32,9 @@ export function parse(TOKS, opts) {
             }
             else if (IS('"') || IS("'")) {
                 text += quotedString();
+            }
+            else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
             }
             else if (IS('//')) {
                 text += codeSingleLineComment();
@@ -184,6 +188,9 @@ export function parse(TOKS, opts) {
             if (IS("'") || IS('"')) {
                 text += quotedString();
             }
+            else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
+            }
             else if (IS('//')) {
                 text += codeSingleLineComment();
             }
@@ -208,6 +215,24 @@ export function parse(TOKS, opts) {
         }
         if (EOF)
             ERR("unterminated parentheses", start);
+        text += TOK, NEXT();
+        return text;
+    }
+    function templateLiteral(segments, text, loc) {
+        if (NOT('`'))
+            ERR("not in template literal");
+        var start = LOC();
+        text += TOK, NEXT();
+        while (!EOF && NOT('`')) {
+            if (IS('${')) {
+                text = balancedParens(segments, text, loc);
+            }
+            else {
+                text += TOK, NEXT();
+            }
+        }
+        if (EOF)
+            ERR("unterminated template literal", start);
         text += TOK, NEXT();
         return text;
     }

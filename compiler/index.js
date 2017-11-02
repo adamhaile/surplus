@@ -21,13 +21,15 @@
 /// }
 /// "
 /// '
+/// `
+/// ${
 /// //
 /// \n
 /// /*
 /// */
 /// misc (any string not containing one of the above)
 // pre-compiled regular expressions
-var tokensRx = /<\/?(?=\w)|\/?>|<!--|-->|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|\/\/|\n|\/\*|\*\/|(?:[^<>=\/()[\]{}"'\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?)+/g;
+var tokensRx = /<\/?(?=\w)|\/?>|<!--|-->|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|`|\$\{|\/\/|\n|\/\*|\*\/|(?:[^<>=\/()[\]{}"'`$\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?|\$(?!\{))+/g;
 //                |          |    |    |   +- =
 //                |          |    |    +- -->
 //                |          |    +- <!--
@@ -218,7 +220,8 @@ var parens = {
     "(": ")",
     "[": "]",
     "{": "}",
-    "{...": "}"
+    "{...": "}",
+    "${": "}"
 };
 
 function parse(TOKS, opts) {
@@ -236,6 +239,9 @@ function parse(TOKS, opts) {
             }
             else if (IS('"') || IS("'")) {
                 text += quotedString();
+            }
+            else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
             }
             else if (IS('//')) {
                 text += codeSingleLineComment();
@@ -389,6 +395,9 @@ function parse(TOKS, opts) {
             if (IS("'") || IS('"')) {
                 text += quotedString();
             }
+            else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
+            }
             else if (IS('//')) {
                 text += codeSingleLineComment();
             }
@@ -413,6 +422,24 @@ function parse(TOKS, opts) {
         }
         if (EOF)
             ERR("unterminated parentheses", start);
+        text += TOK, NEXT();
+        return text;
+    }
+    function templateLiteral(segments, text, loc) {
+        if (NOT('`'))
+            ERR("not in template literal");
+        var start = LOC();
+        text += TOK, NEXT();
+        while (!EOF && NOT('`')) {
+            if (IS('${')) {
+                text = balancedParens(segments, text, loc);
+            }
+            else {
+                text += TOK, NEXT();
+            }
+        }
+        if (EOF)
+            ERR("unterminated template literal", start);
         text += TOK, NEXT();
         return text;
     }

@@ -16,7 +16,8 @@ const parens : { [p : string] : string } = {
     "("   : ")",
     "["   : "]",
     "{"   : "}",
-    "{...": "}"
+    "{...": "}",
+    "${"  : "}"
 };
 
 export interface LOC { line: number, col: number, pos: number };
@@ -44,6 +45,8 @@ export function parse(TOKS : string[], opts : Params) {
                 loc = LOC();
             } else if (IS('"') || IS("'")) {
                 text += quotedString();
+            } else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
             } else if (IS('//')) {
                 text += codeSingleLineComment();
             } else if (IS('/*')) {
@@ -231,6 +234,8 @@ export function parse(TOKS : string[], opts : Params) {
         while (!EOF && NOT(end)) {
             if (IS("'") || IS('"')) {
                 text += quotedString();
+            } else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
             } else if (IS('//')) {
                 text += codeSingleLineComment();
             } else if (IS('/*')) {
@@ -250,6 +255,28 @@ export function parse(TOKS : string[], opts : Params) {
         }
 
         if (EOF) ERR("unterminated parentheses", start);
+
+        text += TOK, NEXT();
+
+        return text;
+    }
+
+    function templateLiteral(segments : AST.CodeSegment[], text : string, loc : LOC) {
+        if (NOT('`')) ERR("not in template literal");
+
+        var start = LOC();
+
+        text += TOK, NEXT();
+
+        while (!EOF && NOT('`')) {
+            if (IS('${')) {
+                text = balancedParens(segments, text, loc);
+            } else {
+                text += TOK, NEXT();
+            }
+        }
+
+        if (EOF) ERR("unterminated template literal", start);
 
         text += TOK, NEXT();
 
