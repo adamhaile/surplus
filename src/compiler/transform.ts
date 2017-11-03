@@ -5,8 +5,7 @@ import { codeStr } from './codeGen';
 import { HtmlEntites } from './domRef';
 
 const rx = {
-    allWs           : /^\s*$/,
-    hasNewline      : /\n/,
+    trimmableWS     : /^\s*?\n\s*|\s*?\n\s*$/g,
     extraWs         : /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
     htmlEntity      : /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g
@@ -14,8 +13,9 @@ const rx = {
 
 const tf = [
     // active transforms, in order from first to last applied
-    removeMultiLineWhitespaceTextNodes,
+    trimTextNodes,
     collapseExtraWhitespaceInTextNodes,
+    removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
@@ -24,19 +24,18 @@ const tf = [
 
 export const transform = (node : Program, opt : Params) => tf.Program(node);
 
-function removeMultiLineWhitespaceTextNodes(tx : Copy) : Copy {
+function trimTextNodes(tx : Copy) : Copy {
     return { 
         ...tx, 
         JSXElement(node) { 
             if (node.tag !== 'pre') {
-                const nonWhitespaceContent = node.content.filter(c => !(
-                    c instanceof JSXText 
-                    && rx.allWs.test(c.text) 
-                    && rx.hasNewline.test(c.text)
-                ));
-                if (nonWhitespaceContent.length !== node.content.length) {
-                    node = new JSXElement(node.tag, node.properties, node.references, node.functions, nonWhitespaceContent, node.loc);
-                }
+                // trim start and end whitespace in text nodes
+                let content = node.content.map(c =>
+                    c.kind === 'text' 
+                    ? new JSXText(c.text.replace(rx.trimmableWS, '')) 
+                    : c
+                );
+                node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
             }
             return tx.JSXElement.call(this, node);
         }
@@ -55,6 +54,17 @@ function collapseExtraWhitespaceInTextNodes(tx : Copy) : Copy {
                 );
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
             }
+            return tx.JSXElement.call(this, node);
+        }
+    }
+}
+
+function removeEmptyTextNodes(tx : Copy) : Copy {
+    return {
+        ...tx,
+        JSXElement(node) {
+            let content = node.content.filter(c => c.kind !== 'text' || c.text !== '');
+            node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
             return tx.JSXElement.call(this, node);
         }
     }

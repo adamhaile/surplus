@@ -54,7 +54,7 @@ describe("whitespace", function () {
 
             expect(node.childNodes.length).toBe(3);
             expect(node.childNodes[0].data).toBe(" a ");
-            expect(node.childNodes[2].data).toBe(" b ");
+            expect(node.childNodes[2].data).toBe("b");
         `);
         eval(code);
     });

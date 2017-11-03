@@ -55,7 +55,7 @@ describe("HTML node literal", function () {
                 </div>
             );
 
-            expect(dv.outerHTML).toBe("<div> 1<br> 2<br></div>");
+            expect(dv.outerHTML).toBe("<div>1<br>2<br></div>");
         `);
 
         eval(code);
