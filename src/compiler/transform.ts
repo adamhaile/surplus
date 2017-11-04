@@ -18,6 +18,7 @@ const tf = [
     removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
+    translateHTMLPropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce((tf, fn) => fn(tf), Copy);
@@ -134,6 +135,29 @@ function translateJSXPropertyNames(tx : Copy) : Copy {
 
 function translateJSXPropertyName(name : string) {
     return rx.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
+}
+
+function translateHTMLPropertyNames(tx : Copy) : Copy {
+    return { 
+        ...tx, 
+        JSXElement(node) {
+            if (node.isHTML) {
+                const nonHTMLProperties = node.properties.map(p =>
+                    p instanceof JSXDynamicProperty 
+                    ? new JSXDynamicProperty(translateHTMLPropertyName(p.name), p.code, p.loc) :
+                    p instanceof JSXStaticProperty
+                    ? new JSXStaticProperty(translateHTMLPropertyName(p.name), p.value) :
+                    p
+                );
+                node = new JSXElement(node.tag, nonHTMLProperties, node.references, node.functions, node.content, node.loc);
+            }
+            return tx.JSXElement.call(this, node);
+        } 
+    };
+}
+
+function translateHTMLPropertyName(name : string) {
+    return name === "class" ? "className" : name === "for" ? "htmlFor" : name;
 }
 
 function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {

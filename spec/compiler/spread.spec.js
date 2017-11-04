@@ -4,150 +4,163 @@ describe("JSX ...spreads", function () {
         test = argsSpy;
 
     it("add properties on the node", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var spread = { id : "id" },                         \n\
-                a = <a {...spread} />;                          \n\
-                                                                \n\
-            expect(a.id).toBe("id");                            \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var spread = { id : "id" },
+                a = <a {...spread} />;
+
+            expect(a.id).toBe("id");
+        `);
 
         eval(code);
     });
 
     it("add styles on the node", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var spread = { style : { width: "50%" } },          \n\
-                a = <a {...spread} />;                          \n\
-                                                                \n\
-            expect(a.style.width).toBe("50%");                  \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var spread = { style : { width: "50%" } },
+                a = <a {...spread} />;
+
+            expect(a.style.width).toBe("50%");
+        `);
 
         eval(code);
     });
 
     it("add an attribute on the node when no property is available", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var spread = { "aria-hidden" : "true" },            \n\
-                a = <a {...spread} />;                          \n\
-                                                                \n\
-            expect(a.getAttribute("aria-hidden")).toBe("true"); \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var spread = { "aria-hidden" : "true" },
+                a = <a {...spread} />;
+
+            expect(a.getAttribute("aria-hidden")).toBe("true");
+        `);
 
         eval(code);
     });
 
     it("remove properties from the node when no longer present", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var flag = S.data(true),                            \n\
-                spread = { id : "id" },                         \n\
-                a = <a {...flag() ? spread : {}} />;            \n\
-                                                                \n\
-            expect(a.id).toBe("id");                            \n\
-            flag(false);                                        \n\
-            expect(a.id).toBe("");                              \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var flag = S.data(true),
+                spread = { id : "id" },
+                a = <a {...flag() ? spread : {}} />;
+
+            expect(a.id).toBe("id");
+            flag(false);
+            expect(a.id).toBe("");
+        `);
 
         eval(code);
     });
 
     it("do not remove properties from earlier sets when that property is no longer present", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var flag = S.data(true),                            \n\
-                spread = { id : "id2" },                        \n\
-                a = <a                                          \n\
-                        id="id1"                                \n\
-                        {...flag() ? spread : {}}               \n\
-                    />;                                         \n\
-                                                                \n\
-            expect(a.id).toBe("id2");                           \n\
-            flag(false);                                        \n\
-            expect(a.id).toBe("id1");                           \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var flag = S.data(true),
+                spread = { id : "id2" },
+                a = <a
+                        id="id1"
+                        {...flag() ? spread : {}}
+                    />;
+
+            expect(a.id).toBe("id2");
+            flag(false);
+            expect(a.id).toBe("id1");
+        `);
 
         eval(code);
     });
 
     it("do not remove properties from earlier spreads when that property is no longer present", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var flag = S.data(true),                            \n\
-                spread1 = { id : "id1" },                       \n\
-                spread2 = { id : "id2" },                       \n\
-                a = <a                                          \n\
-                        {...flag() ? {} : spread1}              \n\
-                        {...flag() ? spread2 : {}}              \n\
-                    />;                                         \n\
-                                                                \n\
-            expect(a.id).toBe("id2");                           \n\
-            flag(false);                                        \n\
-            expect(a.id).toBe("id1");                           \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var flag = S.data(true),
+                spread1 = { id : "id1" },
+                spread2 = { id : "id2" },
+                a = <a
+                        {...flag() ? {} : spread1}
+                        {...flag() ? spread2 : {}}
+                    />;
+
+            expect(a.id).toBe("id2");
+            flag(false);
+            expect(a.id).toBe("id1");
+        `);
 
         eval(code);
     });
 
     it("convert JSX property names to DOM names", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var func = () => null,                              \n\
-                spread = { onClick : func };                    \n\
-                                                                \n\
-            var a = <a {...spread} />;                          \n\
-                                                                \n\
-            expect(a.onclick).toBe(func);                       \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var func = () => null,
+                spread = { onClick : func };
+
+            var a = <a {...spread} />;
+
+            expect(a.onclick).toBe(func);
+        `);
+
+        eval(code);
+    });
+
+    it("convert HTML property names to DOM names", function () {
+        var code = window.SurplusCompiler.compile(`
+            var spread = { "class": "foo", "for" : "bar" };
+
+            var label = <label {...spread} />;
+
+            expect(label.className).toBe("foo");
+            expect(label.htmlFor).toBe("bar");
+        `);
 
         eval(code);
     });
 
     it("properties set by spreads are overriden by later properties", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var spread = { id : "id" };                         \n\
-                                                                \n\
-            var a = <a {...spread} id="bar" />;                 \n\
-                                                                \n\
-            expect(a.id).toBe("bar");                           \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var spread = { id : "id" };
+
+            var a = <a {...spread} id="bar" />;
+
+            expect(a.id).toBe("bar");
+        `);
 
         eval(code);
     });
 
     it("properties set by spreads are overriden by later spreads", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var spread1 = { id : "foo" },                       \n\
-                spread2 = { id : "bar" };                       \n\
-                                                                \n\
-            var a = <a {...spread1} {...spread2} />;            \n\
-                                                                \n\
-            expect(a.id).toBe("bar");                           \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var spread1 = { id : "foo" },
+                spread2 = { id : "bar" };
+
+            var a = <a {...spread1} {...spread2} />;
+
+            expect(a.id).toBe("bar");
+        `);
 
         eval(code);
     });
 
     it("properties set by spreads are overriden by later properties, even if the spread re-evaluates", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var id = S.data("foo");                             \n\
-                                                                \n\
-            var a = <a {...{ id: id() }} id="bar" />;           \n\
-                                                                \n\
-            expect(a.id).toBe("bar");                           \n\
-            id("bleck");                                        \n\
-            expect(a.id).toBe("bar");                           \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var id = S.data("foo");
+
+            var a = <a {...{ id: id() }} id="bar" />;
+
+            expect(a.id).toBe("bar");
+            id("bleck");
+            expect(a.id).toBe("bar");
+        `);
 
         eval(code);
     });
 
     it("properties set by spreads are overriden by later spreads, even if the first re-evaluates", function () {
-        var code = window.SurplusCompiler.compile('      \n\
-            var id = S.data("foo"),                             \n\
-                spread2 = { id: "bar" };                        \n\
-                                                                \n\
-            var a = <a {...{ id: id() }} {...spread2} />;       \n\
-                                                                \n\
-            expect(a.id).toBe("bar");                           \n\
-            id("bleck");                                        \n\
-            expect(a.id).toBe("bar");                           \n\
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var id = S.data("foo"),
+                spread2 = { id: "bar" };
+
+            var a = <a {...{ id: id() }} {...spread2} />;
+
+            expect(a.id).toBe("bar");
+            id("bleck");
+            expect(a.id).toBe("bar");
+        `);
 
         eval(code);
     });

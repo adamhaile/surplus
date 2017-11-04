@@ -1415,6 +1415,7 @@ var tf = [
     removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
+    translateHTMLPropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
@@ -1499,6 +1500,24 @@ function translateJSXPropertyNames(tx) {
 }
 function translateJSXPropertyName(name) {
     return rx$1.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
+}
+function translateHTMLPropertyNames(tx) {
+    return __assign({}, tx, { JSXElement: function (node) {
+            if (node.isHTML) {
+                var nonHTMLProperties = node.properties.map(function (p) {
+                    return p instanceof JSXDynamicProperty
+                        ? new JSXDynamicProperty(translateHTMLPropertyName(p.name), p.code, p.loc) :
+                        p instanceof JSXStaticProperty
+                            ? new JSXStaticProperty(translateHTMLPropertyName(p.name), p.value) :
+                            p;
+                });
+                node = new JSXElement(node.tag, nonHTMLProperties, node.references, node.functions, node.content, node.loc);
+            }
+            return tx.JSXElement.call(this, node);
+        } });
+}
+function translateHTMLPropertyName(name) {
+    return name === "class" ? "className" : name === "for" ? "htmlFor" : name;
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {

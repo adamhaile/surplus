@@ -1,60 +1,78 @@
 describe("JSX static property", function () {
     it("sets a property on the given node", function () {
-        eval(window.SurplusCompiler.compile('               \n\
-            var input = <input value="foo" />;              \n\
-                                                            \n\
-            expect(input.value).toBe("foo");                \n\
-        '));
+        eval(window.SurplusCompiler.compile(`
+            var input = <input value="foo" />;
+
+            expect(input.value).toBe("foo");
+        `));
     });
 
-    it("sets an attribute on the given node when no property is available", function () {
-        eval(window.SurplusCompiler.compile('                       \n\
-            var input = <input aria-hidden="true" />;               \n\
-                                                                    \n\
-            expect(input.getAttribute("aria-hidden")).toBe("true"); \n\
-        '));
+    it("sets an attribute on the given node when the name is a known attribute", function () {
+        eval(window.SurplusCompiler.compile(`
+            var input = <input aria-hidden="true" />;
+
+            expect(input.getAttribute("aria-hidden")).toBe("true");
+        `));
     });
 
     it("can be valueless", function () {
-        eval(window.SurplusCompiler.compile('                       \n\
-            var input = <input type="checkbox" checked />;          \n\
-                                                                    \n\
-            expect(input.checked).toBe(true);                       \n\
-        '));
+        eval(window.SurplusCompiler.compile(`
+            var input = <input type="checkbox" checked />;
+
+            expect(input.checked).toBe(true);
+        `));
     });
 
     it("can set multiple properties on the same node", function () {
-        eval(window.SurplusCompiler.compile('               \n\
-            var input = <input value="foo" id="id" />;      \n\
-                                                            \n\
-            expect(input.value).toBe("foo");                \n\
-            expect(input.id).toBe("id");                    \n\
-        '));
+        eval(window.SurplusCompiler.compile(`
+            var input = <input value="foo" id="id" />;
+
+            expect(input.value).toBe("foo");
+            expect(input.id).toBe("id");
+        `));
+    });
+    
+    it("can use JSX property names as aliases for DOM properties", function () {
+        eval(window.SurplusCompiler.compile(`
+            var fn = () => {},
+                input = <input onClick={fn} />;
+
+            expect(input.onclick).toBe(fn);
+        `));
+    });
+
+    it("can use HTML attribute names when different from DOM property names", function () {
+        eval(window.SurplusCompiler.compile(`
+            var label = <label class="foo" for="bar" />;
+
+            expect(label.className).toBe("foo");
+            expect(label.htmlFor).toBe("bar");
+        `));
     });
 
     it("can set sub-properties", function () {
-        eval(window.SurplusCompiler.compile('               \n\
-            var input = <input style.width="50%" />;        \n\
-                                                            \n\
-            expect(input.style.width).toBe("50%");          \n\
-        '));
+        eval(window.SurplusCompiler.compile(`
+            var input = <input style.width="50%" />;
+
+            expect(input.style.width).toBe("50%");
+        `));
     });
 
 
     it("can set style sub-properties", function () {
-        eval(window.SurplusCompiler.compile('               \n\
-            var input = <input style={{ width: "50%" }} />; \n\
-                                                            \n\
-            expect(input.style.width).toBe("50%");          \n\
-        '));
+        eval(window.SurplusCompiler.compile(`
+            var input = <input style={{ width: "50%" }} />;
+
+            expect(input.style.width).toBe("50%");
+        `));
     });
 
     it("later properties take precedence", function () {
-        eval(window.SurplusCompiler.compile('               \n\
-            var div = <div id="a" id="b"></div>;            \n\
-                                                            \n\
-            expect(div.id).toBe("b");                       \n\
-        '));
+        eval(window.SurplusCompiler.compile(`
+            var div = <div id="a" id="b"></div>;
+
+            expect(div.id).toBe("b");
+        `));
     });
 
     it("throws if named 'ref' or 'fn'", function () {

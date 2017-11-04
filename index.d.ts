@@ -397,6 +397,7 @@ declare global {
 			checked?: boolean;
 			classID?: string;
 			className?: string;
+			class?: string;
 			cols?: number;
 			colSpan?: number;
 			content?: string;
@@ -428,6 +429,7 @@ declare global {
 			href?: string;
 			hrefLang?: string;
 			htmlFor?: string;
+			for?: string;
 			httpEquiv?: string;
 			id?: string;
 			innerText?: string | number;
