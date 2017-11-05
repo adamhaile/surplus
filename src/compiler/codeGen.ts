@@ -153,7 +153,7 @@ const codeGen = (ctl : Program, opts : Params) => {
             // build computation for fns
             if (sub.fns.length > 0) {
                 const 
-                    vars = sub.fns.length === 1 ? null : sub.fns.map((fn, i) => `__state{i}`),
+                    vars = sub.fns.length === 1 ? null : sub.fns.map((fn, i) => `__state${i}`),
                     comp = sub.fns.length === 1 
                         ? new Computation([`(${sub.fns[0]})(__, __state);`], sub.loc, '__state', null)
                         : new Computation(sub.fns.map((fn, i) => `__state${i} = (${fn})(__, __state${i});`), sub.loc, null, null);
@@ -189,7 +189,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                             p instanceof JSXStaticProperty  ? buildProperty(id, p.name, p.value, svg) :
                             p instanceof JSXDynamicProperty ? buildProperty(id, p.name, propExprs[i], svg) :
                             p instanceof JSXStyleProperty   ? buildStyle(p, id, propExprs[i], propsDynamic, spreads) :
-                            buildSpread(p, id, propExprs[i], propsDynamic, spreads, svg)
+                            buildSpread(id, propExprs[i], svg)
                         ).filter(s => s !== ''),
                         refStmts     = references.map(r => compileSegments(r.code) + ' = ').join(''),
                         childSvg     = svg && tag !== SvgForeignTag;
@@ -207,16 +207,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                     }
 
                     if (propsDynamic) {
-                        if (spreads.length > 0) {
-                            // create namedProps object and use it to initialize our spread state
-                            const namedProps = {} as { [ name : string ] : boolean };
-                            properties.forEach(p => p instanceof JSXSpreadProperty || (namedProps[p.name] = true));
-                            const state = `new Surplus.${spreads.length === 1 ? 'Single' : 'Multi'}SpreadState(${JSON.stringify(namedProps)})`;
-                            propStmts.push("__spread;");
-                            addComputation(propStmts, "__spread", state, loc);
-                        } else {
-                            addComputation(propStmts, null, null, loc);
-                        }
+                        addComputation(propStmts, null, null, loc);
                     }
 
                     functions.forEach(f => buildNodeFn(f, id));
@@ -226,48 +217,26 @@ const codeGen = (ctl : Program, opts : Params) => {
                 svg || IsAttribute(prop)
                 ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
-            buildSpread = (node : JSXSpreadProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[], svg : boolean) =>
-                !dynamic             ? buildStaticSpread(node, id, expr, svg) :
-                spreads.length === 1 ? buildSingleSpread(node, id, expr, svg) :
-                buildMultiSpread(node, id, expr, spreads, svg),
-            buildStaticSpread = (node : JSXSpreadProperty, id : string, expr : string, svg : boolean) =>
-                `Surplus.staticSpread(${id}, ${expr}, ${svg});`,
-            buildSingleSpread = (node : JSXSpreadProperty, id : string, expr : string, svg : boolean) =>
-                `__spread.apply(${id}, ${expr}, ${svg});`,
-            buildMultiSpread = (node : JSXSpreadProperty, id : string, expr : string, spreads : JSXProperty[], svg : boolean) => {
-                var n = spreads.indexOf(node),
-                    final = n === spreads.length - 1;
-                return `__spread.apply(${id}, ${expr}, ${n}, ${final}, ${svg});`;
-            },
+            buildSpread = (id : string, expr : string, svg : boolean) =>
+                `Surplus.spread(${id}, ${expr}, ${svg});`,
             buildNodeFn = (node : JSXFunction, id : string) => {
                 var expr = compileSegments(node.code);
                 addComputation([`(${expr})(${id}, __state);`], '__state', null, node.loc);
             },
             buildStyle = (node : JSXStyleProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
-                !dynamic             ? buildStaticStyle(node, id, expr) :
-                spreads.length === 1 ? buildSingleStyle(node, id, expr) :
-                buildMultiStyle(node, id, expr, spreads),
-            buildStaticStyle = (node : JSXStyleProperty, id : string, expr : string) =>
-                `Surplus.staticStyle(${id}, ${expr});`,
-            buildSingleStyle = (node : JSXStyleProperty, id : string, expr : string) =>
-                `__spread.applyStyle(${id}, ${expr});`,
-            buildMultiStyle = (node : JSXStyleProperty, id : string, expr : string, spreads : JSXProperty[]) => {
-                var n = spreads.indexOf(node),
-                    final = n === spreads.length - 1;
-                return `__spread.applyStyle(${id}, ${expr}, ${n}, ${final});`;
-            },
+                `Surplus.assign(${id}.style, ${expr});`,
             buildChild = (node : JSXContent, parent : string, n : number, svg : boolean) =>
                 node instanceof JSXElement ? buildHtmlElement(node, parent, n, svg) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :
-                node instanceof JSXText    ? buildHtmlText(node, parent, n) :
-                buildHtmlInsert(node, parent, n),
+                node instanceof JSXText    ? buildJSXText(node, parent, n) :
+                buildJSXInsert(node, parent, n),
             buildInsertedSubComponent = (node : JSXElement, parent : string, n : number) => 
-                buildHtmlInsert(new JSXInsert(new EmbeddedCode([node]), node.loc), parent, n),
+                buildJSXInsert(new JSXInsert(new EmbeddedCode([node]), node.loc), parent, n),
             buildHtmlComment = (node : JSXComment, parent : string) =>
                 addStatement(`Surplus.createComment(${codeStr(node.text)}, ${parent})`),
-            buildHtmlText = (node : JSXText, parent : string, n : number) =>
+            buildJSXText = (node : JSXText, parent : string, n : number) =>
                 addStatement(`Surplus.createTextNode(${codeStr(node.text)}, ${parent})`),
-            buildHtmlInsert = (node : JSXInsert, parent : string, n : number) => {
+            buildJSXInsert = (node : JSXInsert, parent : string, n : number) => {
                 const id = addId(parent, 'insert', n),
                     ins = compileSegments(node.code),
                     range = `{ start: ${id}, end: ${id} }`;

@@ -36,6 +36,7 @@ describe("JSX ...spreads", function () {
         eval(code);
     });
 
+    /* removing ... removals for now.  cost in complexity and performance doesn't outweigh benefit
     it("remove properties from the node when no longer present", function () {
         var code = window.SurplusCompiler.compile(`
             var flag = S.data(true),
@@ -49,6 +50,7 @@ describe("JSX ...spreads", function () {
 
         eval(code);
     });
+    */
 
     it("do not remove properties from earlier sets when that property is no longer present", function () {
         var code = window.SurplusCompiler.compile(`

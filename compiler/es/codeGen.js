@@ -145,7 +145,7 @@ var codeGen = function (ctl, opts) {
                         p instanceof JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg) :
                             p instanceof JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg) :
                                 p instanceof JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
-                                    buildSpread(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1, svg);
+                                    buildSpread(id_1, propExprs_1[i], svg);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join(''), childSvg_1 = svg && tag !== SvgForeignTag;
                 addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
                 if (!propsDynamic_1) {
@@ -158,17 +158,7 @@ var codeGen = function (ctl, opts) {
                     content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
                 }
                 if (propsDynamic_1) {
-                    if (spreads_1.length > 0) {
-                        // create namedProps object and use it to initialize our spread state
-                        var namedProps_1 = {};
-                        properties.forEach(function (p) { return p instanceof JSXSpreadProperty || (namedProps_1[p.name] = true); });
-                        var state = "new Surplus." + (spreads_1.length === 1 ? 'Single' : 'Multi') + "SpreadState(" + JSON.stringify(namedProps_1) + ")";
-                        propStmts.push("__spread;");
-                        addComputation(propStmts, "__spread", state, loc);
-                    }
-                    else {
-                        addComputation(propStmts, null, null, loc);
-                    }
+                    addComputation(propStmts, null, null, loc);
                 }
                 functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
@@ -176,43 +166,25 @@ var codeGen = function (ctl, opts) {
             return svg || IsAttribute(prop)
                 ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
-        }, buildSpread = function (node, id, expr, dynamic, spreads, svg) {
-            return !dynamic ? buildStaticSpread(node, id, expr, svg) :
-                spreads.length === 1 ? buildSingleSpread(node, id, expr, svg) :
-                    buildMultiSpread(node, id, expr, spreads, svg);
-        }, buildStaticSpread = function (node, id, expr, svg) {
-            return "Surplus.staticSpread(" + id + ", " + expr + ", " + svg + ");";
-        }, buildSingleSpread = function (node, id, expr, svg) {
-            return "__spread.apply(" + id + ", " + expr + ", " + svg + ");";
-        }, buildMultiSpread = function (node, id, expr, spreads, svg) {
-            var n = spreads.indexOf(node), final = n === spreads.length - 1;
-            return "__spread.apply(" + id + ", " + expr + ", " + n + ", " + final + ", " + svg + ");";
+        }, buildSpread = function (id, expr, svg) {
+            return "Surplus.spread(" + id + ", " + expr + ", " + svg + ");";
         }, buildNodeFn = function (node, id) {
             var expr = compileSegments(node.code);
             addComputation(["(" + expr + ")(" + id + ", __state);"], '__state', null, node.loc);
         }, buildStyle = function (node, id, expr, dynamic, spreads) {
-            return !dynamic ? buildStaticStyle(node, id, expr) :
-                spreads.length === 1 ? buildSingleStyle(node, id, expr) :
-                    buildMultiStyle(node, id, expr, spreads);
-        }, buildStaticStyle = function (node, id, expr) {
-            return "Surplus.staticStyle(" + id + ", " + expr + ");";
-        }, buildSingleStyle = function (node, id, expr) {
-            return "__spread.applyStyle(" + id + ", " + expr + ");";
-        }, buildMultiStyle = function (node, id, expr, spreads) {
-            var n = spreads.indexOf(node), final = n === spreads.length - 1;
-            return "__spread.applyStyle(" + id + ", " + expr + ", " + n + ", " + final + ");";
+            return "Surplus.assign(" + id + ".style, " + expr + ");";
         }, buildChild = function (node, parent, n, svg) {
             return node instanceof JSXElement ? buildHtmlElement(node, parent, n, svg) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :
-                    node instanceof JSXText ? buildHtmlText(node, parent, n) :
-                        buildHtmlInsert(node, parent, n);
+                    node instanceof JSXText ? buildJSXText(node, parent, n) :
+                        buildJSXInsert(node, parent, n);
         }, buildInsertedSubComponent = function (node, parent, n) {
-            return buildHtmlInsert(new JSXInsert(new EmbeddedCode([node]), node.loc), parent, n);
+            return buildJSXInsert(new JSXInsert(new EmbeddedCode([node]), node.loc), parent, n);
         }, buildHtmlComment = function (node, parent) {
             return addStatement("Surplus.createComment(" + codeStr(node.text) + ", " + parent + ")");
-        }, buildHtmlText = function (node, parent, n) {
+        }, buildJSXText = function (node, parent, n) {
             return addStatement("Surplus.createTextNode(" + codeStr(node.text) + ", " + parent + ")");
-        }, buildHtmlInsert = function (node, parent, n) {
+        }, buildJSXInsert = function (node, parent, n) {
             var id = addId(parent, 'insert', n), ins = compileSegments(node.code), range = "{ start: " + id + ", end: " + id + " }";
             addStatement(id + " = Surplus.createTextNode('', " + parent + ")");
             addComputation(["Surplus.insert(__range, " + ins + ");"], "__range", range, node.loc);
