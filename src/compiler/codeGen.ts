@@ -150,19 +150,15 @@ const codeGen = (ctl : Program, opts : Params) => {
                 expr = sub.refs.map(r => r + " = ").join("") + expr;
             }
 
-            // build computation for fns
+            // build computations for fns
             if (sub.fns.length > 0) {
-                const 
-                    vars = sub.fns.length === 1 ? null : sub.fns.map((fn, i) => `__state${i}`),
-                    comp = sub.fns.length === 1 
-                        ? new Computation([`(${sub.fns[0]})(__, __state);`], sub.loc, '__state', null)
-                        : new Computation(sub.fns.map((fn, i) => `__state${i} = (${fn})(__, __state${i});`), sub.loc, null, null);
+                const comps = sub.fns.map(fn => new Computation([`(${fn})(__, __state);`], sub.loc, '__state', null));
                 
-                expr = '(function (__) { ' + nli +
-                    (vars ? `var ${vars.join(', ')};` + nli : '') +
-                    emitComputation(comp, indent) + nli +
-                    'return __;' + nl +
-                `})(${expr})`;
+                expr = `(function (__) {${
+                    nli}var __ = ${expr};${
+                    nli}${comps.map(comp => emitComputation(comp, indent) + nli)}${
+                    nli}return __;${
+                nl}})()`;
             }
             
             return expr;

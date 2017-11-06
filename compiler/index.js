@@ -1229,16 +1229,10 @@ var codeGen = function (ctl, opts) {
         if (sub.refs.length > 0) {
             expr = sub.refs.map(function (r) { return r + " = "; }).join("") + expr;
         }
-        // build computation for fns
+        // build computations for fns
         if (sub.fns.length > 0) {
-            var vars = sub.fns.length === 1 ? null : sub.fns.map(function (fn, i) { return "__state" + i; }), comp = sub.fns.length === 1
-                ? new Computation(["(" + sub.fns[0] + ")(__, __state);"], sub.loc, '__state', null)
-                : new Computation(sub.fns.map(function (fn, i) { return "__state" + i + " = (" + fn + ")(__, __state" + i + ");"; }), sub.loc, null, null);
-            expr = '(function (__) { ' + nli +
-                (vars ? "var " + vars.join(', ') + ";" + nli : '') +
-                emitComputation(comp, indent) + nli +
-                'return __;' + nl +
-                ("})(" + expr + ")");
+            var comps = sub.fns.map(function (fn) { return new Computation(["(" + fn + ")(__, __state);"], sub.loc, '__state', null); });
+            expr = "(function (__) {" + nli + "var __ = " + expr + ";" + nli + comps.map(function (comp) { return emitComputation(comp, indent) + nli; }) + nli + "return __;" + nl + "})()";
         }
         return expr;
     }, buildDOMExpression = function (top) {
