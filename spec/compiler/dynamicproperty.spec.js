@@ -89,6 +89,18 @@ describe("JSX dynamic property", function () {
         eval(code);
     });
 
+    it("can set style sub-properties with a dash instead of a dot", function () {
+        var code = window.SurplusCompiler.compile('  \n\
+            var width = S.data("50%"),                      \n\
+                input = <input style-width={width()} />;    \n\
+                                                            \n\
+            expect(input.style.width).toBe("50%");          \n\
+            width("75%");                                   \n\
+            expect(input.style.width).toBe("75%");          \n\
+        ');
+        eval(code);
+    });
+
     it("can set sub-properties with objects", function () {
         var code = window.SurplusCompiler.compile('   \n\
             var width = S.data("50%"),                       \n\

@@ -19,6 +19,7 @@ const tf = [
     translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
     translateHTMLPropertyNames,
+    translateDeepStylePropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce((tf, fn) => fn(tf), Copy);
@@ -158,6 +159,25 @@ function translateHTMLPropertyNames(tx : Copy) : Copy {
 
 function translateHTMLPropertyName(name : string) {
     return name === "class" ? "className" : name === "for" ? "htmlFor" : name;
+}
+
+function translateDeepStylePropertyNames(tx : Copy) : Copy {
+    return { 
+        ...tx, 
+        JSXElement(node) {
+            if (node.isHTML) {
+                const nonJSXProperties = node.properties.map(p =>
+                    p instanceof JSXDynamicProperty && p.name.substr(0, 6) === 'style-' ?
+                        new JSXDynamicProperty('style.' + p.name.substr(6), p.code, p.loc) :
+                    p instanceof JSXStaticProperty && p.name.substr(0, 6) === 'style-' ?
+                        new JSXStaticProperty('style.' + p.name.substr(6), p.value) :
+                    p
+                );
+                node = new JSXElement(node.tag, nonJSXProperties, node.references, node.functions, node.content, node.loc);
+            }
+            return tx.JSXElement.call(this, node);
+        } 
+    };
 }
 
 function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {

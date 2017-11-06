@@ -1231,7 +1231,7 @@ var codeGen = function (ctl, opts) {
         }
         // build computation for fns
         if (sub.fns.length > 0) {
-            var vars = sub.fns.length === 1 ? null : sub.fns.map(function (fn, i) { return "__state{i}"; }), comp = sub.fns.length === 1
+            var vars = sub.fns.length === 1 ? null : sub.fns.map(function (fn, i) { return "__state" + i; }), comp = sub.fns.length === 1
                 ? new Computation(["(" + sub.fns[0] + ")(__, __state);"], sub.loc, '__state', null)
                 : new Computation(sub.fns.map(function (fn, i) { return "__state" + i + " = (" + fn + ")(__, __state" + i + ");"; }), sub.loc, null, null);
             expr = '(function (__) { ' + nli +
@@ -1388,6 +1388,7 @@ var tf = [
     translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
     translateHTMLPropertyNames,
+    translateDeepStylePropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
@@ -1490,6 +1491,21 @@ function translateHTMLPropertyNames(tx) {
 }
 function translateHTMLPropertyName(name) {
     return name === "class" ? "className" : name === "for" ? "htmlFor" : name;
+}
+function translateDeepStylePropertyNames(tx) {
+    return __assign({}, tx, { JSXElement: function (node) {
+            if (node.isHTML) {
+                var nonJSXProperties = node.properties.map(function (p) {
+                    return p instanceof JSXDynamicProperty && p.name.substr(0, 6) === 'style-' ?
+                        new JSXDynamicProperty('style.' + p.name.substr(6), p.code, p.loc) :
+                        p instanceof JSXStaticProperty && p.name.substr(0, 6) === 'style-' ?
+                            new JSXStaticProperty('style.' + p.name.substr(6), p.value) :
+                            p;
+                });
+                node = new JSXElement(node.tag, nonJSXProperties, node.references, node.functions, node.content, node.loc);
+            }
+            return tx.JSXElement.call(this, node);
+        } });
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node) {
