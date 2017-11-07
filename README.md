@@ -10,7 +10,7 @@ Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S
 ## Installation
 
 ```sh
-> npm install --save surplus
+> npm install --save surplus s-js
 ```
 
 Like React, Surplus has two parts, a compiler and a runtime.
