@@ -192,7 +192,7 @@ The `ref` property fulfills a very similar role to the `ref` property in React, 
 
 ### Special `fn` property
 
-A `fn` property specifies a function to be applied to a node.  It is useful for encapsulating a bit of reusable behavior or settings.
+A `fn` property specifies a function to be applied to a node.  It is useful for encapsulating a bit of reusable behavior or properties.
 
 ```javascript
 import { data } from 'surplus-fn-data'; // two-way data binding utility
@@ -203,7 +203,13 @@ input.value === "foo";
 input.value === "bar";
 ```
 
-The `fn` property may be specified multiple times for a node, and each will be applied in the given order.  Surplus provides aliases `fn1`, `fn2`, etc., in case your linter complains about the repeated properties.
+The function may take an optional second parameter, which will contain any value returned by the previous invocation, aka a &lsquo;reducing&rsquo; pattern.  In typescript, the full signature looks like:
+
+```typescript
+type SurplusFn = <N, T>(node : N, state : T | undefined) => T
+```
+
+The `fn` property may be specified multiple times for a node.  Surplus provides aliases `fn1`, `fn2`, etc., in case your linter complains about the repeated properties.
 
 ### Creating Child Elements
 
@@ -256,6 +262,22 @@ The function is called with an object of the given properties, including any chi
 Like with any programming, it is good practice to break a complex DOM view into smaller, re-usable functions.  Upper-cased JSX expressions provide a convenient way to embed these functions into their containing views.
 
 The special `ref` and `fn` properties work with embedded function calls the same way they do with nodes.  They operate on the return value of the function.
+
+### Update Granularity &mdash; S computations
+
+Surplus detects which parts of your view may change and constructs S computations to keep them up-to-date.
+
+1. Each element with dynamic properties or spreads gets a computation responsible for setting all properties for that node.
+
+2. Each `fn={...}` declaration gets its own computation.  This allows the `fn` to have internal state, if appropriate.
+
+3. Each dynamic children expression `{ ... }` gets a computation.  This includes embedded component calls, since they are an insert of the call's result.
+
+### Surplus.* functions &mdash; not for public use
+
+The surplus module has several functions which provide runtime support for the code emitted by the compiler.  These functions *can and will change*, even in minor point releases.  You have been warned :).
+
+A corrolary of this is that the runtime only supports code compiled by the same version of the compiler.  Switching to a new version of Surplus requires re-compiling your JSX code.
 
 ### Differences from React
 
