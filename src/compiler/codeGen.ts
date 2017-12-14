@@ -137,7 +137,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                     : [{ ...property0, children: children }, ...sub.properties.splice(1)],
                 propertyExprs = propertiesWithChildren.map(obj =>
                     typeof obj === 'string' ? obj :
-                    '{' + Object.keys(obj).map(p => `${nli}${p}: ${obj[p]}`).join(',') + nl + '}'
+                    '{' + Object.keys(obj).map(p => `${nli}${codeStr(p)}: ${obj[p]}`).join(',') + nl + '}'
                 ),
                 properties = propertyExprs.length === 1 ? propertyExprs[0] :
                     `Object.assign(${propertyExprs.join(', ')})`;

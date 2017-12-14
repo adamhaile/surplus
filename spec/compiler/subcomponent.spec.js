@@ -90,7 +90,7 @@ describe("subcomponent", function () {
         `);
         eval(code);
     });
-
+    
     it("can have dotted identifiers", function () {
         var code = window.SurplusCompiler.compile(`
             var props = null,
@@ -103,6 +103,17 @@ describe("subcomponent", function () {
         eval(code);
     });
 
+    it("can have dashed attributes", function () {
+        var code = window.SurplusCompiler.compile(`
+            var props = null,
+                SubComponent = p => props = p,
+                sub = <SubComponent foo-bar={3}/>;
+
+            expect(props).toEqual({ "foo-bar": 3, children: [] });
+        `);
+        eval(code);
+    });
+        
     it("can be children with dotted identifiers", function () {
         var code = window.SurplusCompiler.compile(`
             var props = null,

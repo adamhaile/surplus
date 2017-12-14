@@ -110,7 +110,7 @@ var codeGen = function (ctl, opts) {
             // add children to first property object if we can, otherwise add an initial property object with just children
             ? [{ children: children }].concat(sub.properties) : [__assign({}, property0, { children: children })].concat(sub.properties.splice(1)), propertyExprs = propertiesWithChildren.map(function (obj) {
             return typeof obj === 'string' ? obj :
-                '{' + Object.keys(obj).map(function (p) { return "" + nli + p + ": " + obj[p]; }).join(',') + nl + '}';
+                '{' + Object.keys(obj).map(function (p) { return "" + nli + codeStr(p) + ": " + obj[p]; }).join(',') + nl + '}';
         }), properties = propertyExprs.length === 1 ? propertyExprs[0] :
             "Object.assign(" + propertyExprs.join(', ') + ")";
         // main call to sub-component
