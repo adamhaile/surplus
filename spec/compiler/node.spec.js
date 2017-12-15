@@ -37,11 +37,11 @@ describe("HTML node literal", function () {
     });
 
     it("preserves static attributes", function () {
-        var code = window.SurplusCompiler.compile('      \
-            var a = <a href="#" target="top"></a>;              \
-                                                                \
-            expect(a.getAttribute("href")).toBe("#");           \
-        ');
+        var code = window.SurplusCompiler.compile(`
+            var a = <a href="#" target="top"></a>;
+            
+            expect(a.getAttribute("href")).toBe("#");
+        `);
 
         eval(code);
     });
