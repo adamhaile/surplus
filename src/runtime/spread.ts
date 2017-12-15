@@ -15,7 +15,7 @@ export function spread(node : HTMLElement, obj : PropObj, svg : boolean) {
         if (rawName === 'style') {
             assign(node.style, obj.style);
         } else {
-            var propName = translateJSXPropertyName(rawName);
+            var propName = translateJSXPropertyName(rawName, svg);
             setField(node, propName, obj[rawName], svg);
         }
     }
@@ -29,8 +29,8 @@ function setField(node : Element, name : string, value : any, svg : boolean) {
 
 var jsxEventProperty = /^on[A-Z]/; 
 
-function translateJSXPropertyName(name : string) {
-    return jsxEventProperty.test(name) 
-    ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) 
-    : name;
+function translateJSXPropertyName(name : string, svg : boolean) {
+    return jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) :
+    svg ? (name === 'className' ? 'class' : name === 'htmlFor' ? 'for' : name) :
+    name;
 }

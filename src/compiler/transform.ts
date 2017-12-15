@@ -29,7 +29,7 @@ export const transform = (node : Program, opt : Params) => tf.Program(node);
 function trimTextNodes(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXElement(node) { 
+        JSXElement(node, svg) { 
             if (node.tag !== 'pre') {
                 // trim start and end whitespace in text nodes
                 let content = node.content.map(c =>
@@ -39,7 +39,7 @@ function trimTextNodes(tx : Copy) : Copy {
                 );
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         }
     };
 }
@@ -47,7 +47,7 @@ function trimTextNodes(tx : Copy) : Copy {
 function collapseExtraWhitespaceInTextNodes(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node) {
+        JSXElement(node, svg) {
             if (node.tag !== 'pre') {
                 const lessWsContent = node.content.map(c => 
                     c instanceof JSXText
@@ -56,7 +56,7 @@ function collapseExtraWhitespaceInTextNodes(tx : Copy) : Copy {
                 );
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         }
     }
 }
@@ -64,10 +64,10 @@ function collapseExtraWhitespaceInTextNodes(tx : Copy) : Copy {
 function removeEmptyTextNodes(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node) {
+        JSXElement(node, svg) {
             let content = node.content.filter(c => c.kind !== 'text' || c.text !== '');
             node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         }
     }
 }
@@ -93,7 +93,7 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx : Copy) : Copy {
 function removeDuplicateProperties(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node) {
+        JSXElement(node, svg) {
             const { tag, properties, references, functions, content, loc } = node,
                 lastid = {} as { [ name : string ] : number };
 
@@ -111,7 +111,7 @@ function removeDuplicateProperties(tx : Copy) : Copy {
                 node = new JSXElement(tag, uniqueProperties, references, functions, content, loc);
             }
 
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         }
     }
 }
@@ -119,7 +119,7 @@ function removeDuplicateProperties(tx : Copy) : Copy {
 function translateJSXPropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXElement(node) {
+        JSXElement(node, svg) {
             const { tag, properties, references, functions, content, loc } = node;
             if (node.isHTML) {
                 const nonJSXProperties = properties.map(p =>
@@ -129,7 +129,7 @@ function translateJSXPropertyNames(tx : Copy) : Copy {
                 );
                 node = new JSXElement(tag, nonJSXProperties, references, functions, content, loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } 
     };
 }
@@ -141,30 +141,35 @@ function translateJSXPropertyName(name : string) {
 function translateHTMLPropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXElement(node) {
+        JSXElement(node, svg) {
             if (node.isHTML) {
-                const nonHTMLProperties = node.properties.map(p =>
-                    p instanceof JSXDynamicProperty 
-                    ? new JSXDynamicProperty(translateHTMLPropertyName(p.name), p.code, p.loc) :
-                    p instanceof JSXStaticProperty
-                    ? new JSXStaticProperty(translateHTMLPropertyName(p.name), p.value) :
-                    p
-                );
-                node = new JSXElement(node.tag, nonHTMLProperties, node.references, node.functions, node.content, node.loc);
+                const transName = svg ? translateHTMLPropertyToAttribute : translateHTMLAttributeToProperty,
+                    translatedProperties = node.properties.map(p =>
+                        p instanceof JSXDynamicProperty 
+                        ? new JSXDynamicProperty(transName(p.name), p.code, p.loc) :
+                        p instanceof JSXStaticProperty
+                        ? new JSXStaticProperty(transName(p.name), p.value) :
+                        p
+                    );
+                node = new JSXElement(node.tag, translatedProperties, node.references, node.functions, node.content, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } 
     };
 }
 
-function translateHTMLPropertyName(name : string) {
+function translateHTMLAttributeToProperty(name : string) {
     return name === "class" ? "className" : name === "for" ? "htmlFor" : name;
+}
+
+function translateHTMLPropertyToAttribute(name : string) {
+    return name === "className" ? "class" : name === "htmlFor" ? "for" : name;
 }
 
 function translateDeepStylePropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXElement(node) {
+        JSXElement(node, svg) {
             if (node.isHTML) {
                 const nonJSXProperties = node.properties.map(p =>
                     p instanceof JSXDynamicProperty && p.name.substr(0, 6) === 'style-' ?
@@ -175,7 +180,7 @@ function translateDeepStylePropertyNames(tx : Copy) : Copy {
                 );
                 node = new JSXElement(node.tag, nonJSXProperties, node.references, node.functions, node.content, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } 
     };
 }
@@ -183,14 +188,14 @@ function translateDeepStylePropertyNames(tx : Copy) : Copy {
 function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node) {
+        JSXElement(node, svg) {
             const { tag, properties, references, functions, content, loc } = node;
             if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
                 var text = this.JSXText(content[0] as JSXText),
                     textContent = new JSXStaticProperty("textContent", codeStr(text.text));
                 node = new JSXElement(tag, [ ...properties, textContent ], references, functions, [], loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         }
     };
 }

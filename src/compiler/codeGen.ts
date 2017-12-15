@@ -178,7 +178,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                         id           = addId(parent, tag, n),
                         propExprs    = properties.map(p => p instanceof JSXStaticProperty ? '' : compileSegments(p.code)), 
                         spreads      = properties.filter(p => p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty),
-                        classProp    = spreads.length === 0 && properties.filter(p => p instanceof JSXStaticProperty && p.name === 'className')[0] as JSXStaticProperty || null,
+                        classProp    = spreads.length === 0 && properties.filter(p => p instanceof JSXStaticProperty && (svg ? p.name === 'class' : p.name === 'className'))[0] as JSXStaticProperty || null,
                         propsDynamic = propExprs.some(e => !noApparentSignals(e)),
                         propStmts    = properties.map((p, i) => 
                             p === classProp                 ? '' :

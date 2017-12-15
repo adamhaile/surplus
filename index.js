@@ -592,7 +592,7 @@ function spread(node, obj, svg) {
             assign(node.style, obj.style);
         }
         else {
-            var propName = translateJSXPropertyName(rawName);
+            var propName = translateJSXPropertyName(rawName, svg);
             setField(node, propName, obj[rawName], svg);
         }
     }
@@ -606,10 +606,10 @@ function setField(node, name, value, svg) {
         node.setAttribute(name, value);
 }
 var jsxEventProperty = /^on[A-Z]/;
-function translateJSXPropertyName(name) {
-    return jsxEventProperty.test(name)
-        ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase())
-        : name;
+function translateJSXPropertyName(name, svg) {
+    return jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) :
+        svg ? (name === 'className' ? 'class' : name === 'htmlFor' ? 'for' : name) :
+            name;
 }
 
 exports.insert = insert;

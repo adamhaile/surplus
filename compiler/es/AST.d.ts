@@ -88,9 +88,9 @@ export declare const Copy: {
     Program(node: Program): Program;
     CodeSegments(segments: CodeSegment[]): CodeSegment[];
     EmbeddedCode(node: EmbeddedCode): EmbeddedCode;
-    JSXElement(node: JSXElement): JSXElement;
+    JSXElement(node: JSXElement, svg: boolean): JSXElement;
     JSXProperty(node: JSXProperty): JSXProperty;
-    JSXContent(node: JSXContent): JSXContent;
+    JSXContent(node: JSXContent, svg: boolean): JSXContent;
     JSXInsert(node: JSXInsert): JSXInsert;
     CodeText(node: CodeText): CodeText;
     JSXText(node: JSXText): JSXText;

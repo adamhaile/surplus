@@ -134,7 +134,7 @@ var codeGen = function (ctl, opts) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), propExprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && p.name === 'className'; })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), propExprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && (svg ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
                         p instanceof JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg) :
                             p instanceof JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg) :

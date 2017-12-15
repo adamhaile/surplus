@@ -30,7 +30,7 @@ var tf = [
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 export var transform = function (node, opt) { return tf.Program(node); };
 function trimTextNodes(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             if (node.tag !== 'pre') {
                 // trim start and end whitespace in text nodes
                 var content = node.content.map(function (c) {
@@ -40,11 +40,11 @@ function trimTextNodes(tx) {
                 });
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
 function collapseExtraWhitespaceInTextNodes(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             if (node.tag !== 'pre') {
                 var lessWsContent = node.content.map(function (c) {
                     return c instanceof JSXText
@@ -53,14 +53,14 @@ function collapseExtraWhitespaceInTextNodes(tx) {
                 });
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
 function removeEmptyTextNodes(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             var content = node.content.filter(function (c) { return c.kind !== 'text' || c.text !== ''; });
             node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
 function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
@@ -77,7 +77,7 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
         } });
 }
 function removeDuplicateProperties(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc, lastid = {};
             properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty || (lastid[p.name] = i); });
             var uniqueProperties = properties.filter(function (p, i) {
@@ -90,11 +90,11 @@ function removeDuplicateProperties(tx) {
             if (properties.length !== uniqueProperties.length) {
                 node = new JSXElement(tag, uniqueProperties, references, functions, content, loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
 function translateJSXPropertyNames(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             if (node.isHTML) {
                 var nonJSXProperties = properties.map(function (p) {
@@ -104,32 +104,35 @@ function translateJSXPropertyNames(tx) {
                 });
                 node = new JSXElement(tag, nonJSXProperties, references, functions, content, loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
 function translateJSXPropertyName(name) {
     return rx.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
 function translateHTMLPropertyNames(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             if (node.isHTML) {
-                var nonHTMLProperties = node.properties.map(function (p) {
+                var transName_1 = svg ? translateHTMLPropertyToAttribute : translateHTMLAttributeToProperty, translatedProperties = node.properties.map(function (p) {
                     return p instanceof JSXDynamicProperty
-                        ? new JSXDynamicProperty(translateHTMLPropertyName(p.name), p.code, p.loc) :
+                        ? new JSXDynamicProperty(transName_1(p.name), p.code, p.loc) :
                         p instanceof JSXStaticProperty
-                            ? new JSXStaticProperty(translateHTMLPropertyName(p.name), p.value) :
+                            ? new JSXStaticProperty(transName_1(p.name), p.value) :
                             p;
                 });
-                node = new JSXElement(node.tag, nonHTMLProperties, node.references, node.functions, node.content, node.loc);
+                node = new JSXElement(node.tag, translatedProperties, node.references, node.functions, node.content, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
-function translateHTMLPropertyName(name) {
+function translateHTMLAttributeToProperty(name) {
     return name === "class" ? "className" : name === "for" ? "htmlFor" : name;
 }
+function translateHTMLPropertyToAttribute(name) {
+    return name === "className" ? "class" : name === "htmlFor" ? "for" : name;
+}
 function translateDeepStylePropertyNames(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             if (node.isHTML) {
                 var nonJSXProperties = node.properties.map(function (p) {
                     return p instanceof JSXDynamicProperty && p.name.substr(0, 6) === 'style-' ?
@@ -140,16 +143,16 @@ function translateDeepStylePropertyNames(tx) {
                 });
                 node = new JSXElement(node.tag, nonJSXProperties, node.references, node.functions, node.content, node.loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {
-    return __assign({}, tx, { JSXElement: function (node) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
                 var text = this.JSXText(content[0]), textContent = new JSXStaticProperty("textContent", codeStr(text.text));
                 node = new JSXElement(tag, properties.concat([textContent]), references, functions, [], loc);
             }
-            return tx.JSXElement.call(this, node);
+            return tx.JSXElement.call(this, node, svg);
         } });
 }
