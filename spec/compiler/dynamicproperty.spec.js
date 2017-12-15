@@ -9,12 +9,30 @@ describe("JSX dynamic property", function () {
         eval(code);
     });
 
-    it("sets an attribute to the value of the javascript expression when no property is available", function () {
+    it("sets an attribute to the value of the javascript expression when the name is known to be an attribute", function () {
         var code = window.SurplusCompiler.compile('          \n\
             var val = "true",                                       \n\
                 input = <input aria-hidden = { val } />;            \n\
                                                                     \n\
             expect(input.getAttribute("aria-hidden")).toBe("true"); \n\
+        ');
+        eval(code);
+    });
+
+    it("does not set an attribute to the value of the javascript expression when the name is known to be an attribute but the value is null, false, or undefined", function () {
+        var code = window.SurplusCompiler.compile('          \n\
+            var val = S.data(true),                                \n\
+                input = <input aria-hidden = { val() } />;         \n\
+                                                                   \n\
+            expect(input.hasAttribute("aria-hidden")).toBe(true);  \n\
+            val(false);                                            \n\
+            expect(input.hasAttribute("aria-hidden")).toBe(false); \n\
+            val(null);                                             \n\
+            expect(input.hasAttribute("aria-hidden")).toBe(false); \n\
+            val(undefined);                                        \n\
+            expect(input.hasAttribute("aria-hidden")).toBe(false); \n\
+            val("foo");                                            \n\
+            expect(input.hasAttribute("aria-hidden")).toBe(true);  \n\
         ');
         eval(code);
     });

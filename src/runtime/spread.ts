@@ -1,3 +1,5 @@
+import { setAttribute } from './dom';
+
 export type PropObj = { [ name : string ] : any };
 
 export function assign(a : PropObj, b : PropObj) {
@@ -23,8 +25,7 @@ export function spread(node : HTMLElement, obj : PropObj, svg : boolean) {
 
 function setField(node : Element, name : string, value : any, svg : boolean) {
     if (name in node && !svg) (node as any)[name] = value;
-    else if (value === false || value === null || value === undefined) node.removeAttribute(name);
-    else node.setAttribute(name, value);
+    else setAttribute(node, name, value);
 }
 
 var jsxEventProperty = /^on[A-Z]/; 

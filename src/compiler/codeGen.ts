@@ -211,7 +211,7 @@ const codeGen = (ctl : Program, opts : Params) => {
             },
             buildProperty = (id : string, prop : string, expr : string, svg : boolean) =>
                 svg || IsAttribute(prop)
-                ? `${id}.setAttribute(${codeStr(prop)}, ${expr});`
+                ? `Surplus.setAttribute(${id}, ${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
             buildSpread = (id : string, expr : string, svg : boolean) =>
                 `Surplus.spread(${id}, ${expr}, ${svg});`,

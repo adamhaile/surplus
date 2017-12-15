@@ -158,7 +158,7 @@ var codeGen = function (ctl, opts) {
             }
         }, buildProperty = function (id, prop, expr, svg) {
             return svg || IsAttribute(prop)
-                ? id + ".setAttribute(" + codeStr(prop) + ", " + expr + ");"
+                ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
                 : id + "." + prop + " = " + expr + ";";
         }, buildSpread = function (id, expr, svg) {
             return "Surplus.spread(" + id + ", " + expr + ", " + svg + ");";

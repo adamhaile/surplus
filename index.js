@@ -576,6 +576,12 @@ function createTextNode(text, parent) {
     parent.appendChild(node);
     return node;
 }
+function setAttribute(node, name, value) {
+    if (value === false || value === null || value === undefined)
+        node.removeAttribute(name);
+    else
+        node.setAttribute(name, value);
+}
 
 function assign(a, b) {
     var props = Object.keys(b);
@@ -600,10 +606,8 @@ function spread(node, obj, svg) {
 function setField(node, name, value, svg) {
     if (name in node && !svg)
         node[name] = value;
-    else if (value === false || value === null || value === undefined)
-        node.removeAttribute(name);
     else
-        node.setAttribute(name, value);
+        setAttribute(node, name, value);
 }
 var jsxEventProperty = /^on[A-Z]/;
 function translateJSXPropertyName(name, svg) {
@@ -621,6 +625,7 @@ exports.createElement = createElement;
 exports.createSvgElement = createSvgElement;
 exports.createComment = createComment;
 exports.createTextNode = createTextNode;
+exports.setAttribute = setAttribute;
 
 Object.defineProperty(exports, '__esModule', { value: true });
 

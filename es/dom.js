@@ -25,3 +25,9 @@ export function createTextNode(text, parent) {
     parent.appendChild(node);
     return node;
 }
+export function setAttribute(node, name, value) {
+    if (value === false || value === null || value === undefined)
+        node.removeAttribute(name);
+    else
+        node.setAttribute(name, value);
+}

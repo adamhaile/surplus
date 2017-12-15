@@ -1,3 +1,4 @@
+import { setAttribute } from './dom';
 export function assign(a, b) {
     var props = Object.keys(b);
     for (var i = 0, len = props.length; i < len; i++) {
@@ -21,10 +22,8 @@ export function spread(node, obj, svg) {
 function setField(node, name, value, svg) {
     if (name in node && !svg)
         node[name] = value;
-    else if (value === false || value === null || value === undefined)
-        node.removeAttribute(name);
     else
-        node.setAttribute(name, value);
+        setAttribute(node, name, value);
 }
 var jsxEventProperty = /^on[A-Z]/;
 function translateJSXPropertyName(name, svg) {
