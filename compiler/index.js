@@ -1329,7 +1329,7 @@ var Copy = {
         var _this = this;
         return segments.map(function (node) {
             return node instanceof CodeText ? _this.CodeText(node) :
-                _this.JSXElement(node, SvgOnlyTagRx.test(node.tag));
+                _this.JSXElement(node, false);
         });
     },
     EmbeddedCode: function (node) {
@@ -1337,7 +1337,7 @@ var Copy = {
     },
     JSXElement: function (node, svg) {
         var _this = this;
-        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.references.map(function (r) { return _this.JSXReference(r); }), node.functions.map(function (f) { return _this.JSXFunction(f); }), node.content.map(function (c) { return _this.JSXContent(c, svg && node.tag !== SvgForeignTag); }), node.loc);
+        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.references.map(function (r) { return _this.JSXReference(r); }), node.functions.map(function (f) { return _this.JSXFunction(f); }), node.content.map(function (c) { return _this.JSXContent(c, node, svg); }), node.loc);
     },
     JSXProperty: function (node) {
         return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node) :
@@ -1345,7 +1345,7 @@ var Copy = {
                 node instanceof JSXStyleProperty ? this.JSXStyleProperty(node) :
                     this.JSXSpreadProperty(node);
     },
-    JSXContent: function (node, svg) {
+    JSXContent: function (node, parent, svg) {
         return node instanceof JSXComment ? this.JSXComment(node) :
             node instanceof JSXText ? this.JSXText(node) :
                 node instanceof JSXInsert ? this.JSXInsert(node) :
@@ -1376,6 +1376,7 @@ var Copy = {
 };
 var tf = [
     // active transforms, in order from first to last applied
+    setTreeContext,
     trimTextNodes,
     collapseExtraWhitespaceInTextNodes,
     removeEmptyTextNodes,
@@ -1387,6 +1388,14 @@ var tf = [
     removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 var transform = function (node, opt) { return tf.Program(node); };
+function setTreeContext(tx) {
+    return __assign({}, tx, { JSXElement: function (node, svg) {
+            return tx.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
+        },
+        JSXContent: function (node, parent, svg) {
+            return tx.JSXContent(node, parent, svg && parent.tag !== SvgForeignTag);
+        } });
+}
 function trimTextNodes(tx) {
     return __assign({}, tx, { JSXElement: function (node, svg) {
             if (node.tag !== 'pre') {

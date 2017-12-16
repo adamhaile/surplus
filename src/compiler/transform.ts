@@ -19,7 +19,7 @@ export const Copy = {
     CodeSegments(segments : AST.CodeSegment[]) {
         return segments.map(node => 
             node instanceof AST.CodeText ? this.CodeText(node) : 
-            this.JSXElement(node, SvgOnlyTagRx.test(node.tag)));
+            this.JSXElement(node, false));
     },
     EmbeddedCode(node : AST.EmbeddedCode) {
         return new AST.EmbeddedCode(this.CodeSegments(node.segments));
@@ -29,7 +29,7 @@ export const Copy = {
             node.properties.map(p => this.JSXProperty(p)),
             node.references.map(r => this.JSXReference(r)),
             node.functions.map(f => this.JSXFunction(f)),
-            node.content.map(c => this.JSXContent(c, svg && node.tag !== SvgForeignTag)),
+            node.content.map(c => this.JSXContent(c, node, svg)),
             node.loc
         );
     },
@@ -39,7 +39,7 @@ export const Copy = {
                node instanceof AST.JSXStyleProperty ? this.JSXStyleProperty(node) :
                this.JSXSpreadProperty(node);
     },
-    JSXContent(node : AST.JSXContent, svg : boolean) {
+    JSXContent(node : AST.JSXContent, parent : AST.JSXElement, svg : boolean) {
         return node instanceof AST.JSXComment ? this.JSXComment(node) :
                node instanceof AST.JSXText    ? this.JSXText(node) :
                node instanceof AST.JSXInsert  ? this.JSXInsert(node) :
@@ -70,8 +70,10 @@ export const Copy = {
 };
 
 export type Copy = typeof Copy;
+
 const tf = [
     // active transforms, in order from first to last applied
+    setTreeContext,
     trimTextNodes,
     collapseExtraWhitespaceInTextNodes,
     removeEmptyTextNodes,
@@ -84,6 +86,18 @@ const tf = [
 ].reverse().reduce((tf, fn) => fn(tf), Copy);
 
 export const transform = (node : AST.Program, opt : Params) => tf.Program(node);
+
+function setTreeContext(tx : Copy) : Copy {
+    return {
+        ...tx,
+        JSXElement(node, svg) {
+            return tx.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
+        },
+        JSXContent(node, parent, svg) {
+            return tx.JSXContent(node, parent, svg && parent.tag !== SvgForeignTag)
+        }
+    }
+}
 
 function trimTextNodes(tx : Copy) : Copy {
     return { 

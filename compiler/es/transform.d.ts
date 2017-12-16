@@ -6,7 +6,7 @@ export declare const Copy: {
     EmbeddedCode(node: AST.EmbeddedCode): AST.EmbeddedCode;
     JSXElement(node: AST.JSXElement, svg: boolean): AST.JSXElement;
     JSXProperty(node: AST.JSXProperty): AST.JSXProperty;
-    JSXContent(node: AST.JSXContent, svg: boolean): AST.JSXContent;
+    JSXContent(node: AST.JSXContent, parent: AST.JSXElement, svg: boolean): AST.JSXContent;
     JSXInsert(node: AST.JSXInsert): AST.JSXInsert;
     CodeText(node: AST.CodeText): AST.CodeText;
     JSXText(node: AST.JSXText): AST.JSXText;
