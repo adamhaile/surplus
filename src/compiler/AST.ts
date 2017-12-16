@@ -1,5 +1,4 @@
 import { LOC } from './parse';
-import { SvgOnlyTagRx, SvgForeignTag } from './domRef';
 
 // 'kind' properties are to make sure that Typescript treats each of these as distinct classes
 // otherwise, two classes with same props, like the 4 with just code / loc, are treated
@@ -119,62 +118,3 @@ export class JSXFunction {
     ) { }
 }
 
-// a Copy transform, for building non-identity transforms on top of
-export const Copy = {
-    Program(node : Program) {
-        return new Program(this.CodeSegments(node.segments));
-    },
-    CodeSegments(segments : CodeSegment[]) {
-        return segments.map(node => 
-            node instanceof CodeText ? this.CodeText(node) : 
-            this.JSXElement(node, SvgOnlyTagRx.test(node.tag)));
-    },
-    EmbeddedCode(node : EmbeddedCode) {
-        return new EmbeddedCode(this.CodeSegments(node.segments));
-    },
-    JSXElement(node : JSXElement, svg : boolean) : JSXElement {
-        return new JSXElement(node.tag, 
-            node.properties.map(p => this.JSXProperty(p)),
-            node.references.map(r => this.JSXReference(r)),
-            node.functions.map(f => this.JSXFunction(f)),
-            node.content.map(c => this.JSXContent(c, svg && node.tag !== SvgForeignTag)),
-            node.loc
-        );
-    },
-    JSXProperty(node : JSXProperty) {
-        return node instanceof JSXStaticProperty  ? this.JSXStaticProperty(node) :
-               node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
-               node instanceof JSXStyleProperty ? this.JSXStyleProperty(node) :
-               this.JSXSpreadProperty(node);
-    },
-    JSXContent(node : JSXContent, svg : boolean) {
-        return node instanceof JSXComment ? this.JSXComment(node) :
-               node instanceof JSXText    ? this.JSXText(node) :
-               node instanceof JSXInsert  ? this.JSXInsert(node) :
-               this.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
-    },
-    JSXInsert(node : JSXInsert) {
-        return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
-    },
-    CodeText(node : CodeText) { return node; },
-    JSXText(node : JSXText) { return node; },
-    JSXComment(node : JSXComment) { return node; },
-    JSXStaticProperty(node : JSXStaticProperty) { return node; },
-    JSXDynamicProperty(node : JSXDynamicProperty) {
-        return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXSpreadProperty(node : JSXSpreadProperty) {
-        return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXStyleProperty(node : JSXStyleProperty) {
-        return new JSXStyleProperty(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXReference(node : JSXReference) {
-        return new JSXReference(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXFunction(node : JSXFunction) {
-        return new JSXFunction(this.EmbeddedCode(node.code), node.loc);
-    }
-};
-
-export type Copy = typeof Copy;

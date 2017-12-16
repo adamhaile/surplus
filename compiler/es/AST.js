@@ -1,4 +1,3 @@
-import { SvgOnlyTagRx, SvgForeignTag } from './domRef';
 // 'kind' properties are to make sure that Typescript treats each of these as distinct classes
 // otherwise, two classes with same props, like the 4 with just code / loc, are treated
 // as interchangeable
@@ -123,57 +122,3 @@ var JSXFunction = /** @class */ (function () {
     return JSXFunction;
 }());
 export { JSXFunction };
-// a Copy transform, for building non-identity transforms on top of
-export var Copy = {
-    Program: function (node) {
-        return new Program(this.CodeSegments(node.segments));
-    },
-    CodeSegments: function (segments) {
-        var _this = this;
-        return segments.map(function (node) {
-            return node instanceof CodeText ? _this.CodeText(node) :
-                _this.JSXElement(node, SvgOnlyTagRx.test(node.tag));
-        });
-    },
-    EmbeddedCode: function (node) {
-        return new EmbeddedCode(this.CodeSegments(node.segments));
-    },
-    JSXElement: function (node, svg) {
-        var _this = this;
-        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.references.map(function (r) { return _this.JSXReference(r); }), node.functions.map(function (f) { return _this.JSXFunction(f); }), node.content.map(function (c) { return _this.JSXContent(c, svg && node.tag !== SvgForeignTag); }), node.loc);
-    },
-    JSXProperty: function (node) {
-        return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node) :
-            node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
-                node instanceof JSXStyleProperty ? this.JSXStyleProperty(node) :
-                    this.JSXSpreadProperty(node);
-    },
-    JSXContent: function (node, svg) {
-        return node instanceof JSXComment ? this.JSXComment(node) :
-            node instanceof JSXText ? this.JSXText(node) :
-                node instanceof JSXInsert ? this.JSXInsert(node) :
-                    this.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
-    },
-    JSXInsert: function (node) {
-        return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
-    },
-    CodeText: function (node) { return node; },
-    JSXText: function (node) { return node; },
-    JSXComment: function (node) { return node; },
-    JSXStaticProperty: function (node) { return node; },
-    JSXDynamicProperty: function (node) {
-        return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXSpreadProperty: function (node) {
-        return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXStyleProperty: function (node) {
-        return new JSXStyleProperty(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXReference: function (node) {
-        return new JSXReference(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXFunction: function (node) {
-        return new JSXFunction(this.EmbeddedCode(node.code), node.loc);
-    }
-};

@@ -1,3 +1,22 @@
-import { Program } from './AST';
+import * as AST from './AST';
 import { Params } from './compile';
-export declare const transform: (node: Program, opt: Params) => Program;
+export declare const Copy: {
+    Program(node: AST.Program): AST.Program;
+    CodeSegments(segments: AST.CodeSegment[]): AST.CodeSegment[];
+    EmbeddedCode(node: AST.EmbeddedCode): AST.EmbeddedCode;
+    JSXElement(node: AST.JSXElement, svg: boolean): AST.JSXElement;
+    JSXProperty(node: AST.JSXProperty): AST.JSXProperty;
+    JSXContent(node: AST.JSXContent, svg: boolean): AST.JSXContent;
+    JSXInsert(node: AST.JSXInsert): AST.JSXInsert;
+    CodeText(node: AST.CodeText): AST.CodeText;
+    JSXText(node: AST.JSXText): AST.JSXText;
+    JSXComment(node: AST.JSXComment): AST.JSXComment;
+    JSXStaticProperty(node: AST.JSXStaticProperty): AST.JSXStaticProperty;
+    JSXDynamicProperty(node: AST.JSXDynamicProperty): AST.JSXDynamicProperty;
+    JSXSpreadProperty(node: AST.JSXSpreadProperty): AST.JSXSpreadProperty;
+    JSXStyleProperty(node: AST.JSXStyleProperty): AST.JSXStyleProperty;
+    JSXReference(node: AST.JSXReference): AST.JSXReference;
+    JSXFunction(node: AST.JSXFunction): AST.JSXFunction;
+};
+export declare type Copy = typeof Copy;
+export declare const transform: (node: AST.Program, opt: Params) => AST.Program;

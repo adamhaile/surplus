@@ -84,22 +84,3 @@ export declare class JSXFunction {
     kind: "function";
     constructor(code: EmbeddedCode, loc: LOC);
 }
-export declare const Copy: {
-    Program(node: Program): Program;
-    CodeSegments(segments: CodeSegment[]): CodeSegment[];
-    EmbeddedCode(node: EmbeddedCode): EmbeddedCode;
-    JSXElement(node: JSXElement, svg: boolean): JSXElement;
-    JSXProperty(node: JSXProperty): JSXProperty;
-    JSXContent(node: JSXContent, svg: boolean): JSXContent;
-    JSXInsert(node: JSXInsert): JSXInsert;
-    CodeText(node: CodeText): CodeText;
-    JSXText(node: JSXText): JSXText;
-    JSXComment(node: JSXComment): JSXComment;
-    JSXStaticProperty(node: JSXStaticProperty): JSXStaticProperty;
-    JSXDynamicProperty(node: JSXDynamicProperty): JSXDynamicProperty;
-    JSXSpreadProperty(node: JSXSpreadProperty): JSXSpreadProperty;
-    JSXStyleProperty(node: JSXStyleProperty): JSXStyleProperty;
-    JSXReference(node: JSXReference): JSXReference;
-    JSXFunction(node: JSXFunction): JSXFunction;
-};
-export declare type Copy = typeof Copy;

@@ -40,6 +40,532 @@ function tokenize(str, opts) {
     return toks || [];
 }
 
+// 'kind' properties are to make sure that Typescript treats each of these as distinct classes
+// otherwise, two classes with same props, like the 4 with just code / loc, are treated
+// as interchangeable
+var Program = /** @class */ (function () {
+    function Program(segments) {
+        this.segments = segments;
+        this.kind = 'program';
+    }
+    return Program;
+}());
+var CodeText = /** @class */ (function () {
+    function CodeText(text, loc) {
+        this.text = text;
+        this.loc = loc;
+        this.kind = 'code';
+    }
+    return CodeText;
+}());
+var EmbeddedCode = /** @class */ (function () {
+    function EmbeddedCode(segments) {
+        this.segments = segments;
+        this.kind = 'embeddedcode';
+    }
+    return EmbeddedCode;
+}());
+var JSXElement = /** @class */ (function () {
+    function JSXElement(tag, properties, references, functions, content, loc) {
+        this.tag = tag;
+        this.properties = properties;
+        this.references = references;
+        this.functions = functions;
+        this.content = content;
+        this.loc = loc;
+        this.kind = 'element';
+        this.isHTML = JSXElement.domTag.test(this.tag);
+    }
+    JSXElement.domTag = /^[a-z][^\.]*$/;
+    return JSXElement;
+}());
+var JSXText = /** @class */ (function () {
+    function JSXText(text) {
+        this.text = text;
+        this.kind = 'text';
+    }
+    return JSXText;
+}());
+var JSXComment = /** @class */ (function () {
+    function JSXComment(text) {
+        this.text = text;
+        this.kind = 'comment';
+    }
+    return JSXComment;
+}());
+var JSXInsert = /** @class */ (function () {
+    function JSXInsert(code, loc) {
+        this.code = code;
+        this.loc = loc;
+        this.kind = 'insert';
+    }
+    return JSXInsert;
+}());
+var JSXStaticProperty = /** @class */ (function () {
+    function JSXStaticProperty(name, value) {
+        this.name = name;
+        this.value = value;
+        this.kind = 'staticprop';
+    }
+    return JSXStaticProperty;
+}());
+var JSXDynamicProperty = /** @class */ (function () {
+    function JSXDynamicProperty(name, code, loc) {
+        this.name = name;
+        this.code = code;
+        this.loc = loc;
+        this.kind = 'dynamicprop';
+    }
+    return JSXDynamicProperty;
+}());
+var JSXSpreadProperty = /** @class */ (function () {
+    function JSXSpreadProperty(code, loc) {
+        this.code = code;
+        this.loc = loc;
+        this.kind = 'spread';
+    }
+    return JSXSpreadProperty;
+}());
+var JSXStyleProperty = /** @class */ (function () {
+    function JSXStyleProperty(code, loc) {
+        this.code = code;
+        this.loc = loc;
+        this.kind = 'style';
+        this.name = "style";
+    }
+    return JSXStyleProperty;
+}());
+var JSXReference = /** @class */ (function () {
+    function JSXReference(code, loc) {
+        this.code = code;
+        this.loc = loc;
+        this.kind = 'reference';
+    }
+    return JSXReference;
+}());
+var JSXFunction = /** @class */ (function () {
+    function JSXFunction(code, loc) {
+        this.code = code;
+        this.loc = loc;
+        this.kind = 'function';
+    }
+    return JSXFunction;
+}());
+
+// pre-compiled regular expressions
+var rx = {
+    identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
+    stringEscapedEnd: /[^\\](\\\\)*\\$/,
+    leadingWs: /^\s+/,
+    refProp: /^ref\d*$/,
+    fnProp: /^fn\d*$/,
+    styleProp: /^style$/,
+    badStaticProp: /^(ref\d*|fn\d*|style)$/
+};
+var parens = {
+    "(": ")",
+    "[": "]",
+    "{": "}",
+    "{...": "}",
+    "${": "}"
+};
+
+function parse(TOKS, opts) {
+    var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
+    return program();
+    function program() {
+        var segments = [], text = "", loc = LOC();
+        while (!EOF) {
+            if (IS('<')) {
+                if (text)
+                    segments.push(new CodeText(text, loc));
+                text = "";
+                segments.push(jsxElement());
+                loc = LOC();
+            }
+            else if (IS('"') || IS("'")) {
+                text += quotedString();
+            }
+            else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
+            }
+            else if (IS('//')) {
+                text += codeSingleLineComment();
+            }
+            else if (IS('/*')) {
+                text += codeMultiLineComment();
+            }
+            else {
+                text += TOK, NEXT();
+            }
+        }
+        if (text)
+            segments.push(new CodeText(text, loc));
+        return new Program(segments);
+    }
+    function jsxElement() {
+        if (NOT('<'))
+            ERR("not at start of html element");
+        var start = LOC(), tag = "", properties = [], references = [], functions = [], content = [], prop, hasContent = true;
+        NEXT(); // pass '<'
+        tag = SPLIT(rx.identifier);
+        if (!tag)
+            ERR("bad element name", start);
+        SKIPWS();
+        // scan for properties until end of opening tag
+        while (!EOF && NOT('>') && NOT('/>')) {
+            if (MATCH(rx.identifier)) {
+                prop = jsxProperty();
+                if (prop instanceof JSXReference)
+                    references.push(prop);
+                else if (prop instanceof JSXFunction)
+                    functions.push(prop);
+                else
+                    properties.push(prop);
+            }
+            else if (IS('{...')) {
+                properties.push(jsxSpreadProperty());
+            }
+            else {
+                ERR("unrecognized content in begin tag");
+            }
+            SKIPWS();
+        }
+        if (EOF)
+            ERR("unterminated start node", start);
+        hasContent = IS('>');
+        NEXT(); // pass '>' or '/>'
+        if (hasContent) {
+            while (!EOF && NOT('</')) {
+                if (IS('<')) {
+                    content.push(jsxElement());
+                }
+                else if (IS('{')) {
+                    content.push(jsxInsert());
+                }
+                else if (IS('<!--')) {
+                    content.push(jsxComment());
+                }
+                else {
+                    content.push(jsxText());
+                }
+            }
+            if (EOF)
+                ERR("element missing close tag", start);
+            NEXT(); // pass '</'
+            if (tag !== SPLIT(rx.identifier))
+                ERR("mismatched open and close tags", start);
+            if (NOT('>'))
+                ERR("malformed close tag");
+            NEXT(); // pass '>'
+        }
+        return new JSXElement(tag, properties, references, functions, content, start);
+    }
+    function jsxText() {
+        var text = "";
+        while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
+            text += TOK, NEXT();
+        }
+        return new JSXText(text);
+    }
+    function jsxComment() {
+        if (NOT('<!--'))
+            ERR("not in HTML comment");
+        var start = LOC(), text = "";
+        NEXT(); // skip '<!--'
+        while (!EOF && NOT('-->')) {
+            text += TOK, NEXT();
+        }
+        if (EOF)
+            ERR("unterminated html comment", start);
+        NEXT(); // skip '-->'
+        return new JSXComment(text);
+    }
+    function jsxInsert() {
+        var loc = LOC();
+        return new JSXInsert(embeddedCode(), loc);
+    }
+    function jsxProperty() {
+        if (!MATCH(rx.identifier))
+            ERR("not at start of property declaration");
+        var loc = LOC(), name = SPLIT(rx.identifier), code;
+        SKIPWS(); // pass name
+        if (IS('=')) {
+            NEXT(); // pass '='
+            SKIPWS();
+            if (IS('"') || IS("'")) {
+                if (rx.badStaticProp.test(name))
+                    ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
+                return new JSXStaticProperty(name, quotedString());
+            }
+            else if (IS('{')) {
+                code = embeddedCode();
+                return rx.refProp.test(name) ? new JSXReference(code, loc) :
+                    rx.fnProp.test(name) ? new JSXFunction(code, loc) :
+                        rx.styleProp.test(name) ? new JSXStyleProperty(code, loc) :
+                            new JSXDynamicProperty(name, code, loc);
+            }
+            else {
+                return ERR("unexepected value for JSX property");
+            }
+        }
+        else {
+            return new JSXStaticProperty(name, "true");
+        }
+    }
+    function jsxSpreadProperty() {
+        if (NOT('{...'))
+            ERR("not at start of JSX spread");
+        var loc = LOC();
+        return new JSXSpreadProperty(embeddedCode(), loc);
+    }
+    function embeddedCode() {
+        if (NOT('{') && NOT('{...'))
+            ERR("not at start of JSX embedded code");
+        var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
+        // remove closing '}'
+        last = last.substr(0, last.length - 1);
+        segments.push(new CodeText(last, loc));
+        // remove opening '{' or '{...', adjusting code loc accordingly
+        var first = segments[0];
+        first.loc.col += prefixLength;
+        segments[0] = new CodeText(first.text.substr(prefixLength), first.loc);
+        return new EmbeddedCode(segments);
+    }
+    function balancedParens(segments, text, loc) {
+        var start = LOC(), end = PARENS();
+        if (end === undefined)
+            ERR("not in parentheses");
+        text += TOK, NEXT();
+        while (!EOF && NOT(end)) {
+            if (IS("'") || IS('"')) {
+                text += quotedString();
+            }
+            else if (IS('`')) {
+                text = templateLiteral(segments, text, loc);
+            }
+            else if (IS('//')) {
+                text += codeSingleLineComment();
+            }
+            else if (IS('/*')) {
+                text += codeMultiLineComment();
+            }
+            else if (IS("<")) {
+                if (text)
+                    segments.push(new CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
+                text = "";
+                segments.push(jsxElement());
+                loc.line = LINE;
+                loc.col = COL;
+                loc.pos = POS;
+            }
+            else if (PARENS()) {
+                text = balancedParens(segments, text, loc);
+            }
+            else {
+                text += TOK, NEXT();
+            }
+        }
+        if (EOF)
+            ERR("unterminated parentheses", start);
+        text += TOK, NEXT();
+        return text;
+    }
+    function templateLiteral(segments, text, loc) {
+        if (NOT('`'))
+            ERR("not in template literal");
+        var start = LOC();
+        text += TOK, NEXT();
+        while (!EOF && NOT('`')) {
+            if (IS('${')) {
+                text = balancedParens(segments, text, loc);
+            }
+            else {
+                text += TOK, NEXT();
+            }
+        }
+        if (EOF)
+            ERR("unterminated template literal", start);
+        text += TOK, NEXT();
+        return text;
+    }
+    function quotedString() {
+        if (NOT("'") && NOT('"'))
+            ERR("not in quoted string");
+        var start = LOC(), quote, text;
+        quote = text = TOK, NEXT();
+        while (!EOF && (NOT(quote) || rx.stringEscapedEnd.test(text))) {
+            text += TOK, NEXT();
+        }
+        if (EOF)
+            ERR("unterminated string", start);
+        text += TOK, NEXT();
+        return text;
+    }
+    function codeSingleLineComment() {
+        if (NOT("//"))
+            ERR("not in code comment");
+        var text = "";
+        while (!EOF && NOT('\n')) {
+            text += TOK, NEXT();
+        }
+        // EOF within a code comment is ok, just means that the text ended with a comment
+        if (!EOF)
+            text += TOK, NEXT();
+        return text;
+    }
+    function codeMultiLineComment() {
+        if (NOT("/*"))
+            ERR("not in code comment");
+        var start = LOC(), text = "";
+        while (!EOF && NOT('*/')) {
+            text += TOK, NEXT();
+        }
+        if (EOF)
+            ERR("unterminated multi-line comment", start);
+        text += TOK, NEXT();
+        return text;
+    }
+    // token stream ops
+    function NEXT() {
+        if (TOK === "\n")
+            LINE++, COL = 0, POS++;
+        else if (TOK)
+            COL += TOK.length, POS += TOK.length;
+        if (++i >= TOKS.length)
+            EOF = true, TOK = "";
+        else
+            TOK = TOKS[i];
+    }
+    function ERR(msg, loc) {
+        loc = loc || LOC();
+        var frag = " at line " + loc.line + " col " + loc.col + ": ``" + TOKS.join('').substr(loc.pos, 30).replace("\n", "").replace("\r", "") + "''";
+        throw new Error(msg + frag);
+    }
+    function IS(t) {
+        return TOK === t;
+    }
+    function NOT(t) {
+        return TOK !== t;
+    }
+    function MATCH(rx) {
+        return rx.test(TOK);
+    }
+    function MATCHES(rx) {
+        return rx.exec(TOK);
+    }
+    function PARENS() {
+        return parens[TOK];
+    }
+    function SKIPWS() {
+        while (true) {
+            if (IS('\n'))
+                NEXT();
+            else if (MATCHES(rx.leadingWs))
+                SPLIT(rx.leadingWs);
+            else
+                break;
+        }
+    }
+    function SPLIT(rx) {
+        var ms = MATCHES(rx), m;
+        if (ms && (m = ms[0])) {
+            COL += m.length;
+            POS += m.length;
+            TOK = TOK.substring(m.length);
+            if (TOK === "")
+                NEXT();
+            return m;
+        }
+        else {
+            return "";
+        }
+    }
+    function LOC() {
+        return { line: LINE, col: COL, pos: POS };
+    }
+}
+
+var rx$3 = {
+    locs: /(\n)|(\u0000(\d+),(\d+)\u0000)/g
+};
+var vlqFinalDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
+var vlqContinuationDigits = "ghijklmnopqrstuvwxyz0123456789+/";
+function locationMark(loc) {
+    return "\u0000" + loc.line + "," + loc.col + "\u0000";
+}
+function extractMappings(embedded) {
+    var line = [], lines = [], lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, lineStartPos = 0, lineMarksLength = 0;
+    var src = embedded.replace(rx$3.locs, function (_, nl, mark, sourceLine, sourceCol, offset) {
+        if (nl) {
+            lines.push(line);
+            line = [];
+            lineStartPos = offset + 1;
+            lineMarksLength = 0;
+            lastGeneratedCol = 0;
+            return nl;
+        }
+        else {
+            var generatedCol = offset - lineStartPos - lineMarksLength;
+            sourceLine = parseInt(sourceLine);
+            sourceCol = parseInt(sourceCol);
+            line.push(vlq(generatedCol - lastGeneratedCol)
+                + "A" // only one file
+                + vlq(sourceLine - lastSourceLine)
+                + vlq(sourceCol - lastSourceCol));
+            //lineMarksLength += mark.length;
+            lineMarksLength -= 2;
+            lastGeneratedCol = generatedCol;
+            lastSourceLine = sourceLine;
+            lastSourceCol = sourceCol;
+            //return "";
+            return "/*" + sourceLine + "," + sourceCol + "*/";
+        }
+    });
+    lines.push(line);
+    var mappings = lines.map(function (l) { return l.join(','); }).join(';');
+    return {
+        src: src,
+        mappings: mappings
+    };
+}
+function extractMap(src, original, opts) {
+    var extract = extractMappings(src), map = createMap(extract.mappings, original, opts);
+    return {
+        src: extract.src,
+        map: map
+    };
+}
+function createMap(mappings, original, opts) {
+    return {
+        version: 3,
+        file: opts.targetfile,
+        sources: [opts.sourcefile],
+        sourcesContent: [original],
+        names: [],
+        mappings: mappings
+    };
+}
+function appendMap(src, original, opts) {
+    var extract = extractMap(src, original, opts), appended = extract.src
+        + "\n//# sourceMappingURL=data:application/json,"
+        + encodeURIComponent(JSON.stringify(extract.map));
+    return appended;
+}
+function vlq(num) {
+    var str = "", i;
+    // convert num sign representation from 2s complement to sign bit in lsd
+    num = num < 0 ? (-num << 1) + 1 : num << 1 + 0;
+    // convert num to base 32 number
+    var numstr = num.toString(32);
+    // convert base32 digits of num to vlq continuation digits in reverse order
+    for (i = numstr.length - 1; i > 0; i--)
+        str += vlqContinuationDigits[parseInt(numstr[i], 32)];
+    // add final vlq digit
+    str += vlqFinalDigits[parseInt(numstr[0], 32)];
+    return str;
+}
+
 // Reference information for the HTML and SVG DOM
 var HtmlTags = [
     "a",
@@ -532,586 +1058,6 @@ var HtmlEntites = {
     diams: "\u2666",
 };
 
-// 'kind' properties are to make sure that Typescript treats each of these as distinct classes
-// otherwise, two classes with same props, like the 4 with just code / loc, are treated
-// as interchangeable
-var Program = /** @class */ (function () {
-    function Program(segments) {
-        this.segments = segments;
-        this.kind = 'program';
-    }
-    return Program;
-}());
-var CodeText = /** @class */ (function () {
-    function CodeText(text, loc) {
-        this.text = text;
-        this.loc = loc;
-        this.kind = 'code';
-    }
-    return CodeText;
-}());
-var EmbeddedCode = /** @class */ (function () {
-    function EmbeddedCode(segments) {
-        this.segments = segments;
-        this.kind = 'embeddedcode';
-    }
-    return EmbeddedCode;
-}());
-var JSXElement = /** @class */ (function () {
-    function JSXElement(tag, properties, references, functions, content, loc) {
-        this.tag = tag;
-        this.properties = properties;
-        this.references = references;
-        this.functions = functions;
-        this.content = content;
-        this.loc = loc;
-        this.kind = 'element';
-        this.isHTML = JSXElement.domTag.test(this.tag);
-    }
-    JSXElement.domTag = /^[a-z][^\.]*$/;
-    return JSXElement;
-}());
-var JSXText = /** @class */ (function () {
-    function JSXText(text) {
-        this.text = text;
-        this.kind = 'text';
-    }
-    return JSXText;
-}());
-var JSXComment = /** @class */ (function () {
-    function JSXComment(text) {
-        this.text = text;
-        this.kind = 'comment';
-    }
-    return JSXComment;
-}());
-var JSXInsert = /** @class */ (function () {
-    function JSXInsert(code, loc) {
-        this.code = code;
-        this.loc = loc;
-        this.kind = 'insert';
-    }
-    return JSXInsert;
-}());
-var JSXStaticProperty = /** @class */ (function () {
-    function JSXStaticProperty(name, value) {
-        this.name = name;
-        this.value = value;
-        this.kind = 'staticprop';
-    }
-    return JSXStaticProperty;
-}());
-var JSXDynamicProperty = /** @class */ (function () {
-    function JSXDynamicProperty(name, code, loc) {
-        this.name = name;
-        this.code = code;
-        this.loc = loc;
-        this.kind = 'dynamicprop';
-    }
-    return JSXDynamicProperty;
-}());
-var JSXSpreadProperty = /** @class */ (function () {
-    function JSXSpreadProperty(code, loc) {
-        this.code = code;
-        this.loc = loc;
-        this.kind = 'spread';
-    }
-    return JSXSpreadProperty;
-}());
-var JSXStyleProperty = /** @class */ (function () {
-    function JSXStyleProperty(code, loc) {
-        this.code = code;
-        this.loc = loc;
-        this.kind = 'style';
-        this.name = "style";
-    }
-    return JSXStyleProperty;
-}());
-var JSXReference = /** @class */ (function () {
-    function JSXReference(code, loc) {
-        this.code = code;
-        this.loc = loc;
-        this.kind = 'reference';
-    }
-    return JSXReference;
-}());
-var JSXFunction = /** @class */ (function () {
-    function JSXFunction(code, loc) {
-        this.code = code;
-        this.loc = loc;
-        this.kind = 'function';
-    }
-    return JSXFunction;
-}());
-// a Copy transform, for building non-identity transforms on top of
-var Copy = {
-    Program: function (node) {
-        return new Program(this.CodeSegments(node.segments));
-    },
-    CodeSegments: function (segments) {
-        var _this = this;
-        return segments.map(function (node) {
-            return node instanceof CodeText ? _this.CodeText(node) :
-                _this.JSXElement(node, SvgOnlyTagRx.test(node.tag));
-        });
-    },
-    EmbeddedCode: function (node) {
-        return new EmbeddedCode(this.CodeSegments(node.segments));
-    },
-    JSXElement: function (node, svg) {
-        var _this = this;
-        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.references.map(function (r) { return _this.JSXReference(r); }), node.functions.map(function (f) { return _this.JSXFunction(f); }), node.content.map(function (c) { return _this.JSXContent(c, svg && node.tag !== SvgForeignTag); }), node.loc);
-    },
-    JSXProperty: function (node) {
-        return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node) :
-            node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
-                node instanceof JSXStyleProperty ? this.JSXStyleProperty(node) :
-                    this.JSXSpreadProperty(node);
-    },
-    JSXContent: function (node, svg) {
-        return node instanceof JSXComment ? this.JSXComment(node) :
-            node instanceof JSXText ? this.JSXText(node) :
-                node instanceof JSXInsert ? this.JSXInsert(node) :
-                    this.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
-    },
-    JSXInsert: function (node) {
-        return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
-    },
-    CodeText: function (node) { return node; },
-    JSXText: function (node) { return node; },
-    JSXComment: function (node) { return node; },
-    JSXStaticProperty: function (node) { return node; },
-    JSXDynamicProperty: function (node) {
-        return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXSpreadProperty: function (node) {
-        return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXStyleProperty: function (node) {
-        return new JSXStyleProperty(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXReference: function (node) {
-        return new JSXReference(this.EmbeddedCode(node.code), node.loc);
-    },
-    JSXFunction: function (node) {
-        return new JSXFunction(this.EmbeddedCode(node.code), node.loc);
-    }
-};
-
-// pre-compiled regular expressions
-var rx = {
-    identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
-    stringEscapedEnd: /[^\\](\\\\)*\\$/,
-    leadingWs: /^\s+/,
-    refProp: /^ref\d*$/,
-    fnProp: /^fn\d*$/,
-    styleProp: /^style$/,
-    badStaticProp: /^(ref\d*|fn\d*|style)$/
-};
-var parens = {
-    "(": ")",
-    "[": "]",
-    "{": "}",
-    "{...": "}",
-    "${": "}"
-};
-
-function parse(TOKS, opts) {
-    var i = 0, EOF = TOKS.length === 0, TOK = EOF ? '' : TOKS[i], LINE = 0, COL = 0, POS = 0;
-    return program();
-    function program() {
-        var segments = [], text = "", loc = LOC();
-        while (!EOF) {
-            if (IS('<')) {
-                if (text)
-                    segments.push(new CodeText(text, loc));
-                text = "";
-                segments.push(jsxElement());
-                loc = LOC();
-            }
-            else if (IS('"') || IS("'")) {
-                text += quotedString();
-            }
-            else if (IS('`')) {
-                text = templateLiteral(segments, text, loc);
-            }
-            else if (IS('//')) {
-                text += codeSingleLineComment();
-            }
-            else if (IS('/*')) {
-                text += codeMultiLineComment();
-            }
-            else {
-                text += TOK, NEXT();
-            }
-        }
-        if (text)
-            segments.push(new CodeText(text, loc));
-        return new Program(segments);
-    }
-    function jsxElement() {
-        if (NOT('<'))
-            ERR("not at start of html element");
-        var start = LOC(), tag = "", properties = [], references = [], functions = [], content = [], prop, hasContent = true;
-        NEXT(); // pass '<'
-        tag = SPLIT(rx.identifier);
-        if (!tag)
-            ERR("bad element name", start);
-        SKIPWS();
-        // scan for properties until end of opening tag
-        while (!EOF && NOT('>') && NOT('/>')) {
-            if (MATCH(rx.identifier)) {
-                prop = jsxProperty();
-                if (prop instanceof JSXReference)
-                    references.push(prop);
-                else if (prop instanceof JSXFunction)
-                    functions.push(prop);
-                else
-                    properties.push(prop);
-            }
-            else if (IS('{...')) {
-                properties.push(jsxSpreadProperty());
-            }
-            else {
-                ERR("unrecognized content in begin tag");
-            }
-            SKIPWS();
-        }
-        if (EOF)
-            ERR("unterminated start node", start);
-        hasContent = IS('>');
-        NEXT(); // pass '>' or '/>'
-        if (hasContent) {
-            while (!EOF && NOT('</')) {
-                if (IS('<')) {
-                    content.push(jsxElement());
-                }
-                else if (IS('{')) {
-                    content.push(jsxInsert());
-                }
-                else if (IS('<!--')) {
-                    content.push(jsxComment());
-                }
-                else {
-                    content.push(jsxText());
-                }
-            }
-            if (EOF)
-                ERR("element missing close tag", start);
-            NEXT(); // pass '</'
-            if (tag !== SPLIT(rx.identifier))
-                ERR("mismatched open and close tags", start);
-            if (NOT('>'))
-                ERR("malformed close tag");
-            NEXT(); // pass '>'
-        }
-        return new JSXElement(tag, properties, references, functions, content, start);
-    }
-    function jsxText() {
-        var text = "";
-        while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
-            text += TOK, NEXT();
-        }
-        return new JSXText(text);
-    }
-    function jsxComment() {
-        if (NOT('<!--'))
-            ERR("not in HTML comment");
-        var start = LOC(), text = "";
-        NEXT(); // skip '<!--'
-        while (!EOF && NOT('-->')) {
-            text += TOK, NEXT();
-        }
-        if (EOF)
-            ERR("unterminated html comment", start);
-        NEXT(); // skip '-->'
-        return new JSXComment(text);
-    }
-    function jsxInsert() {
-        var loc = LOC();
-        return new JSXInsert(embeddedCode(), loc);
-    }
-    function jsxProperty() {
-        if (!MATCH(rx.identifier))
-            ERR("not at start of property declaration");
-        var loc = LOC(), name = SPLIT(rx.identifier), code;
-        SKIPWS(); // pass name
-        if (IS('=')) {
-            NEXT(); // pass '='
-            SKIPWS();
-            if (IS('"') || IS("'")) {
-                if (rx.badStaticProp.test(name))
-                    ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
-                return new JSXStaticProperty(name, quotedString());
-            }
-            else if (IS('{')) {
-                code = embeddedCode();
-                return rx.refProp.test(name) ? new JSXReference(code, loc) :
-                    rx.fnProp.test(name) ? new JSXFunction(code, loc) :
-                        rx.styleProp.test(name) ? new JSXStyleProperty(code, loc) :
-                            new JSXDynamicProperty(name, code, loc);
-            }
-            else {
-                return ERR("unexepected value for JSX property");
-            }
-        }
-        else {
-            return new JSXStaticProperty(name, "true");
-        }
-    }
-    function jsxSpreadProperty() {
-        if (NOT('{...'))
-            ERR("not at start of JSX spread");
-        var loc = LOC();
-        return new JSXSpreadProperty(embeddedCode(), loc);
-    }
-    function embeddedCode() {
-        if (NOT('{') && NOT('{...'))
-            ERR("not at start of JSX embedded code");
-        var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
-        // remove closing '}'
-        last = last.substr(0, last.length - 1);
-        segments.push(new CodeText(last, loc));
-        // remove opening '{' or '{...', adjusting code loc accordingly
-        var first = segments[0];
-        first.loc.col += prefixLength;
-        segments[0] = new CodeText(first.text.substr(prefixLength), first.loc);
-        return new EmbeddedCode(segments);
-    }
-    function balancedParens(segments, text, loc) {
-        var start = LOC(), end = PARENS();
-        if (end === undefined)
-            ERR("not in parentheses");
-        text += TOK, NEXT();
-        while (!EOF && NOT(end)) {
-            if (IS("'") || IS('"')) {
-                text += quotedString();
-            }
-            else if (IS('`')) {
-                text = templateLiteral(segments, text, loc);
-            }
-            else if (IS('//')) {
-                text += codeSingleLineComment();
-            }
-            else if (IS('/*')) {
-                text += codeMultiLineComment();
-            }
-            else if (IS("<")) {
-                if (text)
-                    segments.push(new CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
-                text = "";
-                segments.push(jsxElement());
-                loc.line = LINE;
-                loc.col = COL;
-                loc.pos = POS;
-            }
-            else if (PARENS()) {
-                text = balancedParens(segments, text, loc);
-            }
-            else {
-                text += TOK, NEXT();
-            }
-        }
-        if (EOF)
-            ERR("unterminated parentheses", start);
-        text += TOK, NEXT();
-        return text;
-    }
-    function templateLiteral(segments, text, loc) {
-        if (NOT('`'))
-            ERR("not in template literal");
-        var start = LOC();
-        text += TOK, NEXT();
-        while (!EOF && NOT('`')) {
-            if (IS('${')) {
-                text = balancedParens(segments, text, loc);
-            }
-            else {
-                text += TOK, NEXT();
-            }
-        }
-        if (EOF)
-            ERR("unterminated template literal", start);
-        text += TOK, NEXT();
-        return text;
-    }
-    function quotedString() {
-        if (NOT("'") && NOT('"'))
-            ERR("not in quoted string");
-        var start = LOC(), quote, text;
-        quote = text = TOK, NEXT();
-        while (!EOF && (NOT(quote) || rx.stringEscapedEnd.test(text))) {
-            text += TOK, NEXT();
-        }
-        if (EOF)
-            ERR("unterminated string", start);
-        text += TOK, NEXT();
-        return text;
-    }
-    function codeSingleLineComment() {
-        if (NOT("//"))
-            ERR("not in code comment");
-        var text = "";
-        while (!EOF && NOT('\n')) {
-            text += TOK, NEXT();
-        }
-        // EOF within a code comment is ok, just means that the text ended with a comment
-        if (!EOF)
-            text += TOK, NEXT();
-        return text;
-    }
-    function codeMultiLineComment() {
-        if (NOT("/*"))
-            ERR("not in code comment");
-        var start = LOC(), text = "";
-        while (!EOF && NOT('*/')) {
-            text += TOK, NEXT();
-        }
-        if (EOF)
-            ERR("unterminated multi-line comment", start);
-        text += TOK, NEXT();
-        return text;
-    }
-    // token stream ops
-    function NEXT() {
-        if (TOK === "\n")
-            LINE++, COL = 0, POS++;
-        else if (TOK)
-            COL += TOK.length, POS += TOK.length;
-        if (++i >= TOKS.length)
-            EOF = true, TOK = "";
-        else
-            TOK = TOKS[i];
-    }
-    function ERR(msg, loc) {
-        loc = loc || LOC();
-        var frag = " at line " + loc.line + " col " + loc.col + ": ``" + TOKS.join('').substr(loc.pos, 30).replace("\n", "").replace("\r", "") + "''";
-        throw new Error(msg + frag);
-    }
-    function IS(t) {
-        return TOK === t;
-    }
-    function NOT(t) {
-        return TOK !== t;
-    }
-    function MATCH(rx) {
-        return rx.test(TOK);
-    }
-    function MATCHES(rx) {
-        return rx.exec(TOK);
-    }
-    function PARENS() {
-        return parens[TOK];
-    }
-    function SKIPWS() {
-        while (true) {
-            if (IS('\n'))
-                NEXT();
-            else if (MATCHES(rx.leadingWs))
-                SPLIT(rx.leadingWs);
-            else
-                break;
-        }
-    }
-    function SPLIT(rx) {
-        var ms = MATCHES(rx), m;
-        if (ms && (m = ms[0])) {
-            COL += m.length;
-            POS += m.length;
-            TOK = TOK.substring(m.length);
-            if (TOK === "")
-                NEXT();
-            return m;
-        }
-        else {
-            return "";
-        }
-    }
-    function LOC() {
-        return { line: LINE, col: COL, pos: POS };
-    }
-}
-
-var rx$3 = {
-    locs: /(\n)|(\u0000(\d+),(\d+)\u0000)/g
-};
-var vlqFinalDigits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef";
-var vlqContinuationDigits = "ghijklmnopqrstuvwxyz0123456789+/";
-function locationMark(loc) {
-    return "\u0000" + loc.line + "," + loc.col + "\u0000";
-}
-function extractMappings(embedded) {
-    var line = [], lines = [], lastGeneratedCol = 0, lastSourceLine = 0, lastSourceCol = 0, lineStartPos = 0, lineMarksLength = 0;
-    var src = embedded.replace(rx$3.locs, function (_, nl, mark, sourceLine, sourceCol, offset) {
-        if (nl) {
-            lines.push(line);
-            line = [];
-            lineStartPos = offset + 1;
-            lineMarksLength = 0;
-            lastGeneratedCol = 0;
-            return nl;
-        }
-        else {
-            var generatedCol = offset - lineStartPos - lineMarksLength;
-            sourceLine = parseInt(sourceLine);
-            sourceCol = parseInt(sourceCol);
-            line.push(vlq(generatedCol - lastGeneratedCol)
-                + "A" // only one file
-                + vlq(sourceLine - lastSourceLine)
-                + vlq(sourceCol - lastSourceCol));
-            //lineMarksLength += mark.length;
-            lineMarksLength -= 2;
-            lastGeneratedCol = generatedCol;
-            lastSourceLine = sourceLine;
-            lastSourceCol = sourceCol;
-            //return "";
-            return "/*" + sourceLine + "," + sourceCol + "*/";
-        }
-    });
-    lines.push(line);
-    var mappings = lines.map(function (l) { return l.join(','); }).join(';');
-    return {
-        src: src,
-        mappings: mappings
-    };
-}
-function extractMap(src, original, opts) {
-    var extract = extractMappings(src), map = createMap(extract.mappings, original, opts);
-    return {
-        src: extract.src,
-        map: map
-    };
-}
-function createMap(mappings, original, opts) {
-    return {
-        version: 3,
-        file: opts.targetfile,
-        sources: [opts.sourcefile],
-        sourcesContent: [original],
-        names: [],
-        mappings: mappings
-    };
-}
-function appendMap(src, original, opts) {
-    var extract = extractMap(src, original, opts), appended = extract.src
-        + "\n//# sourceMappingURL=data:application/json,"
-        + encodeURIComponent(JSON.stringify(extract.map));
-    return appended;
-}
-function vlq(num) {
-    var str = "", i;
-    // convert num sign representation from 2s complement to sign bit in lsd
-    num = num < 0 ? (-num << 1) + 1 : num << 1 + 0;
-    // convert num to base 32 number
-    var numstr = num.toString(32);
-    // convert base32 digits of num to vlq continuation digits in reverse order
-    for (i = numstr.length - 1; i > 0; i--)
-        str += vlqContinuationDigits[parseInt(numstr[i], 32)];
-    // add final vlq digit
-    str += vlqFinalDigits[parseInt(numstr[0], 32)];
-    return str;
-}
-
 var __assign$1 = (undefined && undefined.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
         s = arguments[i];
@@ -1373,6 +1319,60 @@ var rx$1 = {
     extraWs: /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
     htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g
+};
+// a Copy transform, for building non-identity transforms on top of
+var Copy = {
+    Program: function (node) {
+        return new Program(this.CodeSegments(node.segments));
+    },
+    CodeSegments: function (segments) {
+        var _this = this;
+        return segments.map(function (node) {
+            return node instanceof CodeText ? _this.CodeText(node) :
+                _this.JSXElement(node, SvgOnlyTagRx.test(node.tag));
+        });
+    },
+    EmbeddedCode: function (node) {
+        return new EmbeddedCode(this.CodeSegments(node.segments));
+    },
+    JSXElement: function (node, svg) {
+        var _this = this;
+        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.references.map(function (r) { return _this.JSXReference(r); }), node.functions.map(function (f) { return _this.JSXFunction(f); }), node.content.map(function (c) { return _this.JSXContent(c, svg && node.tag !== SvgForeignTag); }), node.loc);
+    },
+    JSXProperty: function (node) {
+        return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node) :
+            node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
+                node instanceof JSXStyleProperty ? this.JSXStyleProperty(node) :
+                    this.JSXSpreadProperty(node);
+    },
+    JSXContent: function (node, svg) {
+        return node instanceof JSXComment ? this.JSXComment(node) :
+            node instanceof JSXText ? this.JSXText(node) :
+                node instanceof JSXInsert ? this.JSXInsert(node) :
+                    this.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
+    },
+    JSXInsert: function (node) {
+        return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
+    },
+    CodeText: function (node) { return node; },
+    JSXText: function (node) { return node; },
+    JSXComment: function (node) { return node; },
+    JSXStaticProperty: function (node) { return node; },
+    JSXDynamicProperty: function (node) {
+        return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
+    },
+    JSXSpreadProperty: function (node) {
+        return new JSXSpreadProperty(this.EmbeddedCode(node.code), node.loc);
+    },
+    JSXStyleProperty: function (node) {
+        return new JSXStyleProperty(this.EmbeddedCode(node.code), node.loc);
+    },
+    JSXReference: function (node) {
+        return new JSXReference(this.EmbeddedCode(node.code), node.loc);
+    },
+    JSXFunction: function (node) {
+        return new JSXFunction(this.EmbeddedCode(node.code), node.loc);
+    }
 };
 var tf = [
     // active transforms, in order from first to last applied
