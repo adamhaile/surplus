@@ -1318,8 +1318,15 @@ var rx$1 = {
     trimmableWS: /^\s*?\n\s*|\s*?\n\s*$/g,
     extraWs: /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
-    htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g
+    htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g,
+    subcomponent: /(^[A-Z])|\./
 };
+var TreeContext;
+(function (TreeContext) {
+    TreeContext[TreeContext["HTML"] = 0] = "HTML";
+    TreeContext[TreeContext["SVG"] = 1] = "SVG";
+    TreeContext[TreeContext["SubComponent"] = 2] = "SubComponent";
+})(TreeContext || (TreeContext = {}));
 // a Copy transform, for building non-identity transforms on top of
 var Copy = {
     Program: function (node) {
@@ -1329,27 +1336,27 @@ var Copy = {
         var _this = this;
         return segments.map(function (node) {
             return node instanceof CodeText ? _this.CodeText(node) :
-                _this.JSXElement(node, false);
+                _this.JSXElement(node, TreeContext.HTML);
         });
     },
     EmbeddedCode: function (node) {
         return new EmbeddedCode(this.CodeSegments(node.segments));
     },
-    JSXElement: function (node, svg) {
+    JSXElement: function (node, ctx) {
         var _this = this;
-        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p); }), node.references.map(function (r) { return _this.JSXReference(r); }), node.functions.map(function (f) { return _this.JSXFunction(f); }), node.content.map(function (c) { return _this.JSXContent(c, node, svg); }), node.loc);
+        return new JSXElement(node.tag, node.properties.map(function (p) { return _this.JSXProperty(p, ctx); }), node.references.map(function (r) { return _this.JSXReference(r); }), node.functions.map(function (f) { return _this.JSXFunction(f); }), node.content.map(function (c) { return _this.JSXContent(c, node, ctx); }), node.loc);
     },
-    JSXProperty: function (node) {
-        return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node) :
-            node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node) :
+    JSXProperty: function (node, ctx) {
+        return node instanceof JSXStaticProperty ? this.JSXStaticProperty(node, ctx) :
+            node instanceof JSXDynamicProperty ? this.JSXDynamicProperty(node, ctx) :
                 node instanceof JSXStyleProperty ? this.JSXStyleProperty(node) :
                     this.JSXSpreadProperty(node);
     },
-    JSXContent: function (node, parent, svg) {
+    JSXContent: function (node, parent, ctx) {
         return node instanceof JSXComment ? this.JSXComment(node) :
             node instanceof JSXText ? this.JSXText(node) :
                 node instanceof JSXInsert ? this.JSXInsert(node) :
-                    this.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
+                    this.JSXElement(node, ctx);
     },
     JSXInsert: function (node) {
         return new JSXInsert(this.EmbeddedCode(node.code), node.loc);
@@ -1357,8 +1364,8 @@ var Copy = {
     CodeText: function (node) { return node; },
     JSXText: function (node) { return node; },
     JSXComment: function (node) { return node; },
-    JSXStaticProperty: function (node) { return node; },
-    JSXDynamicProperty: function (node) {
+    JSXStaticProperty: function (node, ctx) { return node; },
+    JSXDynamicProperty: function (node, ctx) {
         return new JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
     JSXSpreadProperty: function (node) {
@@ -1382,22 +1389,25 @@ var tf = [
     removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
     translateJSXPropertyNames,
-    translateHTMLPropertyNames,
+    translateHTMLAttributeNames,
+    translateSVGPropertyNames,
     translateDeepStylePropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 var transform = function (node, opt) { return tf.Program(node); };
 function setTreeContext(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
-            return tx.JSXElement(node, svg || SvgOnlyTagRx.test(node.tag));
+    return __assign({}, tx, { JSXElement: function (node, ctx) {
+            return tx.JSXElement(node, rx$1.subcomponent.test(node.tag) ? TreeContext.SubComponent :
+                SvgOnlyTagRx.test(node.tag) || ctx === TreeContext.SVG ? TreeContext.SVG :
+                    TreeContext.HTML);
         },
-        JSXContent: function (node, parent, svg) {
-            return tx.JSXContent(node, parent, svg && parent.tag !== SvgForeignTag);
+        JSXContent: function (node, parent, ctx) {
+            return tx.JSXContent(node, parent, parent.tag === SvgForeignTag ? TreeContext.HTML : ctx);
         } });
 }
 function trimTextNodes(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
+    return __assign({}, tx, { JSXElement: function (node, ctx) {
             if (node.tag !== 'pre') {
                 // trim start and end whitespace in text nodes
                 var content = node.content.map(function (c) {
@@ -1407,11 +1417,11 @@ function trimTextNodes(tx) {
                 });
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
             }
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXElement.call(this, node, ctx);
         } });
 }
 function collapseExtraWhitespaceInTextNodes(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
+    return __assign({}, tx, { JSXElement: function (node, ctx) {
             if (node.tag !== 'pre') {
                 var lessWsContent = node.content.map(function (c) {
                     return c instanceof JSXText
@@ -1420,14 +1430,14 @@ function collapseExtraWhitespaceInTextNodes(tx) {
                 });
                 node = new JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
             }
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXElement.call(this, node, ctx);
         } });
 }
 function removeEmptyTextNodes(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
+    return __assign({}, tx, { JSXElement: function (node, ctx) {
             var content = node.content.filter(function (c) { return c.kind !== 'text' || c.text !== ''; });
             node = new JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXElement.call(this, node, ctx);
         } });
 }
 function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
@@ -1444,7 +1454,7 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
         } });
 }
 function removeDuplicateProperties(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
+    return __assign({}, tx, { JSXElement: function (node, ctx) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc, lastid = {};
             properties.forEach(function (p, i) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty || (lastid[p.name] = i); });
             var uniqueProperties = properties.filter(function (p, i) {
@@ -1457,70 +1467,72 @@ function removeDuplicateProperties(tx) {
             if (properties.length !== uniqueProperties.length) {
                 node = new JSXElement(tag, uniqueProperties, references, functions, content, loc);
             }
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXElement.call(this, node, ctx);
         } });
 }
 function translateJSXPropertyNames(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
-            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
-            if (node.isHTML) {
-                var nonJSXProperties = properties.map(function (p) {
-                    return p instanceof JSXDynamicProperty
-                        ? new JSXDynamicProperty(translateJSXPropertyName(p.name), p.code, p.loc)
-                        : p;
-                });
-                node = new JSXElement(tag, nonJSXProperties, references, functions, content, loc);
+    return __assign({}, tx, { JSXDynamicProperty: function (node, ctx) {
+            if (ctx === TreeContext.HTML) {
+                node = new JSXDynamicProperty(translateJSXPropertyName(node.name), node.code, node.loc);
             }
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXDynamicProperty.call(this, node, ctx);
         } });
 }
 function translateJSXPropertyName(name) {
     return rx$1.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
-function translateHTMLPropertyNames(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
-            if (node.isHTML) {
-                var transName_1 = svg ? translateHTMLPropertyToAttribute : translateHTMLAttributeToProperty, translatedProperties = node.properties.map(function (p) {
-                    return p instanceof JSXDynamicProperty
-                        ? new JSXDynamicProperty(transName_1(p.name), p.code, p.loc) :
-                        p instanceof JSXStaticProperty
-                            ? new JSXStaticProperty(transName_1(p.name), p.value) :
-                            p;
-                });
-                node = new JSXElement(node.tag, translatedProperties, node.references, node.functions, node.content, node.loc);
+function translateHTMLAttributeNames(tx) {
+    var txAttributeToProperty = function (name) { return name === "class" ? "className" : name === "for" ? "htmlFor" : name; };
+    return __assign({}, tx, { JSXDynamicProperty: function (node, ctx) {
+            if (ctx === TreeContext.HTML) {
+                node = new JSXDynamicProperty(txAttributeToProperty(node.name), node.code, node.loc);
             }
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXDynamicProperty(node, ctx);
+        },
+        JSXStaticProperty: function (node, ctx) {
+            if (ctx === TreeContext.HTML) {
+                node = new JSXStaticProperty(txAttributeToProperty(node.name), node.value);
+            }
+            return tx.JSXStaticProperty(node, ctx);
         } });
 }
-function translateHTMLAttributeToProperty(name) {
-    return name === "class" ? "className" : name === "for" ? "htmlFor" : name;
-}
-function translateHTMLPropertyToAttribute(name) {
-    return name === "className" ? "class" : name === "htmlFor" ? "for" : name;
+function translateSVGPropertyNames(tx) {
+    var txPropertyToAttribute = function (name) { return name === "className" ? "class" : name === "htmlFor" ? "for" : name; };
+    return __assign({}, tx, { JSXDynamicProperty: function (node, ctx) {
+            if (ctx === TreeContext.SVG) {
+                node = new JSXDynamicProperty(txPropertyToAttribute(node.name), node.code, node.loc);
+            }
+            return tx.JSXDynamicProperty(node, ctx);
+        },
+        JSXStaticProperty: function (node, ctx) {
+            if (ctx === TreeContext.SVG) {
+                node = new JSXStaticProperty(txPropertyToAttribute(node.name), node.value);
+            }
+            return tx.JSXStaticProperty(node, ctx);
+        } });
 }
 function translateDeepStylePropertyNames(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
-            if (node.isHTML) {
-                var nonJSXProperties = node.properties.map(function (p) {
-                    return p instanceof JSXDynamicProperty && p.name.substr(0, 6) === 'style-' ?
-                        new JSXDynamicProperty('style.' + p.name.substr(6), p.code, p.loc) :
-                        p instanceof JSXStaticProperty && p.name.substr(0, 6) === 'style-' ?
-                            new JSXStaticProperty('style.' + p.name.substr(6), p.value) :
-                            p;
-                });
-                node = new JSXElement(node.tag, nonJSXProperties, node.references, node.functions, node.content, node.loc);
+    return __assign({}, tx, { JSXDynamicProperty: function (node, ctx) {
+            if (ctx === TreeContext.HTML && node.name.substr(0, 6) === 'style-') {
+                node = new JSXDynamicProperty('style.' + node.name.substr(6), node.code, node.loc);
             }
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXDynamicProperty(node, ctx);
+        },
+        JSXStaticProperty: function (node, ctx) {
+            if (ctx === TreeContext.HTML && node.name.substr(0, 6) === 'style-') {
+                node = new JSXStaticProperty('style.' + node.name.substr(6), node.value);
+            }
+            return tx.JSXStaticProperty(node, ctx);
         } });
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {
-    return __assign({}, tx, { JSXElement: function (node, svg) {
+    return __assign({}, tx, { JSXElement: function (node, ctx) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
-            if (node.isHTML && content.length === 1 && content[0] instanceof JSXText) {
+            if (ctx === TreeContext.HTML && content.length === 1 && content[0] instanceof JSXText) {
                 var text = this.JSXText(content[0]), textContent = new JSXStaticProperty("textContent", codeStr(text.text));
                 node = new JSXElement(tag, properties.concat([textContent]), references, functions, [], loc);
             }
-            return tx.JSXElement.call(this, node, svg);
+            return tx.JSXElement.call(this, node, ctx);
         } });
 }
 
