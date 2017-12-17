@@ -18,17 +18,21 @@ export declare class EmbeddedCode {
 }
 export declare type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXStyleProperty | JSXSpreadProperty;
 export declare type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
+export declare enum JSXElementRole {
+    HTML = 0,
+    SVG = 1,
+    SubComponent = 2,
+}
 export declare class JSXElement {
     readonly tag: string;
     readonly properties: JSXProperty[];
     readonly references: JSXReference[];
     readonly functions: JSXFunction[];
     readonly content: JSXContent[];
+    readonly role: JSXElementRole;
     readonly loc: LOC;
     kind: "element";
-    constructor(tag: string, properties: JSXProperty[], references: JSXReference[], functions: JSXFunction[], content: JSXContent[], loc: LOC);
-    private static domTag;
-    isHTML: boolean;
+    constructor(tag: string, properties: JSXProperty[], references: JSXReference[], functions: JSXFunction[], content: JSXContent[], role: JSXElementRole, loc: LOC);
 }
 export declare class JSXText {
     readonly text: string;

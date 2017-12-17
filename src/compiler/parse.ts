@@ -127,7 +127,7 @@ export function parse(TOKS : string[], opts : Params) {
             NEXT(); // pass '>'
         }
 
-        return new AST.JSXElement(tag, properties, references, functions, content, start);
+        return new AST.JSXElement(tag, properties, references, functions, content, AST.JSXElementRole.HTML, start);
     }
 
     function jsxText() {

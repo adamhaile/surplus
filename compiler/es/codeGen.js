@@ -6,9 +6,9 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
     }
     return t;
 };
-import { EmbeddedCode, CodeText, JSXElement, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty } from './AST';
+import { EmbeddedCode, CodeText, JSXElement, JSXElementRole, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty } from './AST';
 import { locationMark } from './sourcemap';
-import { SvgOnlyTagRx, SvgForeignTag, IsAttribute } from './domRef';
+import { IsAttribute } from './domRef';
 export { codeGen, codeStr };
 // pre-compiled regular expressions
 var rx = {
@@ -57,7 +57,7 @@ var codeGen = function (ctl, opts) {
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
     }, compileHtmlElement = function (node, indent) {
-        var code = !node.isHTML ?
+        var code = node.role === JSXElementRole.SubComponent ?
             emitSubComponent(buildSubComponent(node), indent) :
             (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
@@ -127,21 +127,20 @@ var codeGen = function (ctl, opts) {
         return expr;
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
-        var buildHtmlElement = function (node, parent, n, svg) {
+        var buildHtmlElement = function (node, parent, n) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
-            svg = svg || SvgOnlyTagRx.test(tag);
-            if (!node.isHTML) {
+            if (node.role === JSXElementRole.SubComponent) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), propExprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && (svg ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), svg_1 = node.role === JSXElementRole.SVG, propExprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p instanceof JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg) :
-                            p instanceof JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg) :
+                        p instanceof JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg_1) :
+                            p instanceof JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg_1) :
                                 p instanceof JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
-                                    buildSpread(id_1, propExprs_1[i], svg);
-                }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join(''), childSvg_1 = svg && tag !== SvgForeignTag;
-                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
+                                    buildSpread(id_1, propExprs_1[i], svg_1);
+                }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
+                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
                 if (!propsDynamic_1) {
                     propStmts.forEach(addStatement);
                 }
@@ -149,7 +148,7 @@ var codeGen = function (ctl, opts) {
                     buildJSXContent(content[0], id_1);
                 }
                 else {
-                    content.forEach(function (c, i) { return buildChild(c, id_1, i, childSvg_1); });
+                    content.forEach(function (c, i) { return buildChild(c, id_1, i); });
                 }
                 if (propsDynamic_1) {
                     addComputation(propStmts, null, null, loc);
@@ -167,8 +166,8 @@ var codeGen = function (ctl, opts) {
             addComputation(["(" + expr + ")(" + id + ", __state);"], '__state', null, node.loc);
         }, buildStyle = function (node, id, expr, dynamic, spreads) {
             return "Surplus.assign(" + id + ".style, " + expr + ");";
-        }, buildChild = function (node, parent, n, svg) {
-            return node instanceof JSXElement ? buildHtmlElement(node, parent, n, svg) :
+        }, buildChild = function (node, parent, n) {
+            return node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :
                     node instanceof JSXText ? buildJSXText(node, parent, n) :
                         buildJSXInsert(node, parent, n);
@@ -198,7 +197,7 @@ var codeGen = function (ctl, opts) {
         }, addComputation = function (body, stateVar, seed, loc) {
             computations.push(new Computation(body, loc, stateVar, seed));
         };
-        buildHtmlElement(top, '', 0, false);
+        buildHtmlElement(top, '', 0);
         return new DOMExpression(ids, statements, computations);
     }, emitDOMExpression = function (code, indent) {
         var nl = indent.nl, nli = indent.nli, nlii = indent.nlii;

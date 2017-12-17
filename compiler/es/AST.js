@@ -26,18 +26,23 @@ var EmbeddedCode = /** @class */ (function () {
     return EmbeddedCode;
 }());
 export { EmbeddedCode };
+export var JSXElementRole;
+(function (JSXElementRole) {
+    JSXElementRole[JSXElementRole["HTML"] = 0] = "HTML";
+    JSXElementRole[JSXElementRole["SVG"] = 1] = "SVG";
+    JSXElementRole[JSXElementRole["SubComponent"] = 2] = "SubComponent";
+})(JSXElementRole || (JSXElementRole = {}));
 var JSXElement = /** @class */ (function () {
-    function JSXElement(tag, properties, references, functions, content, loc) {
+    function JSXElement(tag, properties, references, functions, content, role, loc) {
         this.tag = tag;
         this.properties = properties;
         this.references = references;
         this.functions = functions;
         this.content = content;
+        this.role = role;
         this.loc = loc;
         this.kind = 'element';
-        this.isHTML = JSXElement.domTag.test(this.tag);
     }
-    JSXElement.domTag = /^[a-z][^\.]*$/;
     return JSXElement;
 }());
 export { JSXElement };

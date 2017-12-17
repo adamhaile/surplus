@@ -31,6 +31,12 @@ export class EmbeddedCode {
 export type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXStyleProperty | JSXSpreadProperty;
 export type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
 
+export enum JSXElementRole {
+    HTML,
+    SVG,
+    SubComponent
+}
+
 export class JSXElement {
     kind = 'element' as 'element';
     constructor(
@@ -39,11 +45,9 @@ export class JSXElement {
         public readonly references : JSXReference[],
         public readonly functions : JSXFunction[],
         public readonly content : JSXContent[],
+        public readonly role : JSXElementRole,
         public readonly loc : LOC
-    ) { }    
-
-    private static domTag = /^[a-z][^\.]*$/;
-    isHTML = JSXElement.domTag.test(this.tag);
+    ) { }
 }
 
 export class JSXText {

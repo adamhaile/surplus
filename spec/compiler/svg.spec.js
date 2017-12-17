@@ -131,7 +131,6 @@ describe("SVG nodes", function () {
 
     it("does not translate attributes to HTML property names", function () {
         var code = window.SurplusCompiler.compile(`
-            debugger;
             var svg = <svg class="foo" for="baz" cx="100" cy="100" r="50" fill="red"></svg>,
                 svg2 = <svg class={"foo"} for={"baz"} cx="100" cy="100" r="50" fill="red"></svg>,
                 svg3 = <svg {...{ class: "foo", for: "baz" }} cx="100" cy="100" r="50" fill="red"></svg>;
@@ -149,7 +148,6 @@ describe("SVG nodes", function () {
 
     it("does translate HTML property names to attributes", function () {
         var code = window.SurplusCompiler.compile(`
-            debugger;
             var svg = <svg className="foo" htmlFor="baz" cx="100" cy="100" r="50" fill="red"></svg>
                 svg2 = <svg className={"foo"} htmlFor={"baz"} cx="100" cy="100" r="50" fill="red"></svg>,
                 svg3 = <svg {...{ className: "foo", htmlFor: "baz" }} cx="100" cy="100" r="50" fill="red"></svg>;

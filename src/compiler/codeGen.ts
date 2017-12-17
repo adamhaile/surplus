@@ -3,6 +3,7 @@ import {
     EmbeddedCode,   
     CodeText,       
     JSXElement,    
+    JSXElementRole,
     JSXText,       
     JSXComment,    
     JSXInsert,     
@@ -18,7 +19,7 @@ import {
 import { LOC } from './parse';
 import { locationMark } from './sourcemap';
 import { Params } from './compile';
-import { SvgOnlyTagRx, SvgForeignTag, IsAttribute } from './domRef';
+import { IsAttribute } from './domRef';
 
 export { codeGen, codeStr };
 
@@ -72,7 +73,7 @@ const codeGen = (ctl : Program, opts : Params) => {
             markBlockLocs(node.text, node.loc, opts),
         compileHtmlElement = (node : JSXElement, indent : Indents) : string => {
             const code = 
-                !node.isHTML ?
+                node.role === JSXElementRole.SubComponent ?
                     emitSubComponent(buildSubComponent(node), indent) :
                 (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
@@ -168,14 +169,14 @@ const codeGen = (ctl : Program, opts : Params) => {
                 statements = [] as string[],
                 computations = [] as Computation[];
 
-            const buildHtmlElement = (node : JSXElement, parent : string, n : number, svg : boolean) => {
+            const buildHtmlElement = (node : JSXElement, parent : string, n : number) => {
                 const { tag, properties, references, functions, content, loc } = node;
-                svg = svg || SvgOnlyTagRx.test(tag);
-                if (!node.isHTML) {
+                if (node.role === JSXElementRole.SubComponent) {
                     buildInsertedSubComponent(node, parent, n);
                 } else {
                     const
                         id           = addId(parent, tag, n),
+                        svg          = node.role === JSXElementRole.SVG,
                         propExprs    = properties.map(p => p instanceof JSXStaticProperty ? '' : compileSegments(p.code)), 
                         spreads      = properties.filter(p => p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty),
                         classProp    = spreads.length === 0 && properties.filter(p => p instanceof JSXStaticProperty && (svg ? p.name === 'class' : p.name === 'className'))[0] as JSXStaticProperty || null,
@@ -187,8 +188,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                             p instanceof JSXStyleProperty   ? buildStyle(p, id, propExprs[i], propsDynamic, spreads) :
                             buildSpread(id, propExprs[i], svg)
                         ).filter(s => s !== ''),
-                        refStmts     = references.map(r => compileSegments(r.code) + ' = ').join(''),
-                        childSvg     = svg && tag !== SvgForeignTag;
+                        refStmts     = references.map(r => compileSegments(r.code) + ' = ').join('');
 
                     addStatement(`${id} = ${refStmts}Surplus.create${svg ? 'Svg' : ''}Element('${tag}', ${classProp && classProp.value}, ${parent || null});`);
                     
@@ -199,7 +199,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                     if (content.length === 1 && content[0] instanceof JSXInsert) {
                         buildJSXContent(content[0] as JSXInsert, id);
                     } else {
-                        content.forEach((c, i) => buildChild(c, id, i, childSvg));
+                        content.forEach((c, i) => buildChild(c, id, i));
                     }
 
                     if (propsDynamic) {
@@ -221,8 +221,8 @@ const codeGen = (ctl : Program, opts : Params) => {
             },
             buildStyle = (node : JSXStyleProperty, id : string, expr : string, dynamic : boolean, spreads : JSXProperty[]) =>
                 `Surplus.assign(${id}.style, ${expr});`,
-            buildChild = (node : JSXContent, parent : string, n : number, svg : boolean) =>
-                node instanceof JSXElement ? buildHtmlElement(node, parent, n, svg) :
+            buildChild = (node : JSXContent, parent : string, n : number) =>
+                node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
                 node instanceof JSXComment ? buildHtmlComment(node, parent) :
                 node instanceof JSXText    ? buildJSXText(node, parent, n) :
                 buildJSXInsert(node, parent, n),
@@ -257,7 +257,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                 computations.push(new Computation(body, loc, stateVar, seed));
             }
 
-            buildHtmlElement(top, '', 0, false);
+            buildHtmlElement(top, '', 0);
 
             return new DOMExpression(ids, statements, computations);
         },

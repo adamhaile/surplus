@@ -12,12 +12,6 @@ const rx = {
     subcomponent    : /(^[A-Z])|\./
 };
 
-enum TreeContext {
-    HTML,
-    SVG,
-    SubComponent
-}
-
 // a Copy transform, for building non-identity transforms on top of
 const Copy = {
     Program(node : AST.Program) {
@@ -26,31 +20,32 @@ const Copy = {
     CodeSegments(segments : AST.CodeSegment[]) {
         return segments.map(node => 
             node instanceof AST.CodeText ? this.CodeText(node) : 
-            this.JSXElement(node, TreeContext.HTML));
+            this.JSXElement(node, null));
     },
     EmbeddedCode(node : AST.EmbeddedCode) {
         return new AST.EmbeddedCode(this.CodeSegments(node.segments));
     },
-    JSXElement(node : AST.JSXElement, ctx : TreeContext) : AST.JSXElement {
+    JSXElement(node : AST.JSXElement, parent : AST.JSXElement | null) : AST.JSXElement {
         return new AST.JSXElement(node.tag, 
-            node.properties.map(p => this.JSXProperty(p, ctx)),
+            node.properties.map(p => this.JSXProperty(p, node)),
             node.references.map(r => this.JSXReference(r)),
             node.functions.map(f => this.JSXFunction(f)),
-            node.content.map(c => this.JSXContent(c, node, ctx)),
+            node.content.map(c => this.JSXContent(c, node)),
+            node.role,
             node.loc
         );
     },
-    JSXProperty(node : AST.JSXProperty, ctx : TreeContext) {
-        return node instanceof AST.JSXStaticProperty  ? this.JSXStaticProperty(node, ctx) :
-               node instanceof AST.JSXDynamicProperty ? this.JSXDynamicProperty(node, ctx) :
-               node instanceof AST.JSXStyleProperty ? this.JSXStyleProperty(node) :
+    JSXProperty(node : AST.JSXProperty, parent : AST.JSXElement) {
+        return node instanceof AST.JSXStaticProperty  ? this.JSXStaticProperty(node, parent) :
+               node instanceof AST.JSXDynamicProperty ? this.JSXDynamicProperty(node, parent) :
+               node instanceof AST.JSXStyleProperty   ? this.JSXStyleProperty(node) :
                this.JSXSpreadProperty(node);
     },
-    JSXContent(node : AST.JSXContent, parent : AST.JSXElement, ctx : TreeContext) {
+    JSXContent(node : AST.JSXContent, parent : AST.JSXElement) {
         return node instanceof AST.JSXComment ? this.JSXComment(node) :
                node instanceof AST.JSXText    ? this.JSXText(node) :
                node instanceof AST.JSXInsert  ? this.JSXInsert(node) :
-               this.JSXElement(node, ctx);
+               this.JSXElement(node, parent);
     },
     JSXInsert(node : AST.JSXInsert) {
         return new AST.JSXInsert(this.EmbeddedCode(node.code), node.loc);
@@ -58,8 +53,8 @@ const Copy = {
     CodeText(node : AST.CodeText) { return node; },
     JSXText(node : AST.JSXText) { return node; },
     JSXComment(node : AST.JSXComment) { return node; },
-    JSXStaticProperty(node : AST.JSXStaticProperty, ctx : TreeContext) { return node; },
-    JSXDynamicProperty(node : AST.JSXDynamicProperty, ctx : TreeContext) {
+    JSXStaticProperty(node : AST.JSXStaticProperty, parent : AST.JSXElement) { return node; },
+    JSXDynamicProperty(node : AST.JSXDynamicProperty, parent : AST.JSXElement) {
         return new AST.JSXDynamicProperty(node.name, this.EmbeddedCode(node.code), node.loc);
     },
     JSXSpreadProperty(node : AST.JSXSpreadProperty) {
@@ -80,7 +75,7 @@ type Copy = typeof Copy;
 
 const tf = [
     // active transforms, in order from first to last applied
-    setTreeContext,
+    determineElementRole,
     trimTextNodes,
     collapseExtraWhitespaceInTextNodes,
     removeEmptyTextNodes,
@@ -95,17 +90,17 @@ const tf = [
 
 export const transform = (node : AST.Program, opt : Params) => tf.Program(node);
 
-function setTreeContext(tx : Copy) : Copy {
+function determineElementRole(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node, ctx) {
-            return tx.JSXElement(node, 
-                rx.subcomponent.test(node.tag)                         ? TreeContext.SubComponent :
-                SvgOnlyTagRx.test(node.tag) || ctx === TreeContext.SVG ? TreeContext.SVG :
-                TreeContext.HTML);
-        },
-        JSXContent(node, parent, ctx) {
-            return tx.JSXContent(node, parent, parent.tag === SvgForeignTag ? TreeContext.HTML : ctx);
+        JSXElement(node, parent) {
+            const role = 
+                rx.subcomponent.test(node.tag) ? AST.JSXElementRole.SubComponent :
+                SvgOnlyTagRx.test(node.tag)    ? AST.JSXElementRole.SVG :
+                parent && parent.role === AST.JSXElementRole.SVG && parent.tag !== SvgForeignTag ? AST.JSXElementRole.SVG :
+                AST.JSXElementRole.HTML;
+            node = new AST.JSXElement(node.tag, node.properties, node.references, node.functions, node.content, role, node.loc);
+            return tx.JSXElement.call(this, node, parent);
         }
     }
 }
@@ -113,17 +108,15 @@ function setTreeContext(tx : Copy) : Copy {
 function trimTextNodes(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXElement(node, ctx) { 
+        JSXElement(node, parent) { 
             if (node.tag !== 'pre') {
                 // trim start and end whitespace in text nodes
                 let content = node.content.map(c =>
-                    c.kind === 'text' 
-                    ? new AST.JSXText(c.text.replace(rx.trimmableWS, '')) 
-                    : c
+                    c.kind === 'text' ? new AST.JSXText(c.text.replace(rx.trimmableWS, '')) : c
                 );
-                node = new AST.JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
+                node = new AST.JSXElement(node.tag, node.properties, node.references, node.functions, content, node.role, node.loc);
             }
-            return tx.JSXElement.call(this, node, ctx);
+            return tx.JSXElement.call(this, node, parent);
         }
     };
 }
@@ -131,16 +124,16 @@ function trimTextNodes(tx : Copy) : Copy {
 function collapseExtraWhitespaceInTextNodes(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node, ctx) {
+        JSXElement(node, parent) {
             if (node.tag !== 'pre') {
                 const lessWsContent = node.content.map(c => 
                     c instanceof AST.JSXText
                     ? new AST.JSXText(c.text.replace(rx.extraWs, ' '))
                     : c
                 );
-                node = new AST.JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.loc);
+                node = new AST.JSXElement(node.tag, node.properties, node.references, node.functions, lessWsContent, node.role, node.loc);
             }
-            return tx.JSXElement.call(this, node, ctx);
+            return tx.JSXElement.call(this, node, parent);
         }
     }
 }
@@ -148,10 +141,10 @@ function collapseExtraWhitespaceInTextNodes(tx : Copy) : Copy {
 function removeEmptyTextNodes(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node, ctx) {
+        JSXElement(node, parent) {
             let content = node.content.filter(c => c.kind !== 'text' || c.text !== '');
-            node = new AST.JSXElement(node.tag, node.properties, node.references, node.functions, content, node.loc);
-            return tx.JSXElement.call(this, node, ctx);
+            node = new AST.JSXElement(node.tag, node.properties, node.references, node.functions, content, node.role, node.loc);
+            return tx.JSXElement.call(this, node, parent);
         }
     }
 }
@@ -177,8 +170,8 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx : Copy) : Copy {
 function removeDuplicateProperties(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node, ctx) {
-            const { tag, properties, references, functions, content, loc } = node,
+        JSXElement(node, parent) {
+            const { tag, properties, references, functions, content, loc, role } = node,
                 lastid = {} as { [ name : string ] : number };
 
             properties.forEach((p, i) => p instanceof AST.JSXSpreadProperty || p instanceof AST.JSXStyleProperty || (lastid[p.name] = i));
@@ -192,10 +185,10 @@ function removeDuplicateProperties(tx : Copy) : Copy {
             );
 
             if (properties.length !== uniqueProperties.length) {
-                node = new AST.JSXElement(tag, uniqueProperties, references, functions, content, loc);
+                node = new AST.JSXElement(tag, uniqueProperties, references, functions, content, role, loc);
             }
 
-            return tx.JSXElement.call(this, node, ctx);
+            return tx.JSXElement.call(this, node, parent);
         }
     }
 }
@@ -203,11 +196,11 @@ function removeDuplicateProperties(tx : Copy) : Copy {
 function translateJSXPropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXDynamicProperty(node, ctx) {
-            if (ctx === TreeContext.HTML) {
+        JSXDynamicProperty(node, parent) {
+            if (parent.role === AST.JSXElementRole.HTML) {
                 node = new AST.JSXDynamicProperty(translateJSXPropertyName(node.name), node.code, node.loc);
             }
-            return tx.JSXDynamicProperty.call(this, node, ctx);
+            return tx.JSXDynamicProperty.call(this, node, parent);
         } 
     };
 }
@@ -220,17 +213,17 @@ function translateHTMLAttributeNames(tx : Copy) : Copy {
     const txAttributeToProperty = (name : string) => name === "class" ? "className" : name === "for" ? "htmlFor" : name;
     return { 
         ...tx, 
-        JSXDynamicProperty(node, ctx) {
-            if (ctx === TreeContext.HTML) {
+        JSXDynamicProperty(node, parent) {
+            if (parent.role === AST.JSXElementRole.HTML) {
                 node = new AST.JSXDynamicProperty(txAttributeToProperty(node.name), node.code, node.loc);
             }
-            return tx.JSXDynamicProperty(node, ctx);
+            return tx.JSXDynamicProperty.call(this, node, parent);
         },
-        JSXStaticProperty(node, ctx) {
-            if (ctx === TreeContext.HTML) {
+        JSXStaticProperty(node, parent) {
+            if (parent.role === AST.JSXElementRole.HTML) {
                 node = new AST.JSXStaticProperty(txAttributeToProperty(node.name), node.value);
             }
-            return tx.JSXStaticProperty(node, ctx);
+            return tx.JSXStaticProperty.call(this, node, parent);
         }
     };
 }
@@ -239,17 +232,17 @@ function translateSVGPropertyNames(tx : Copy) : Copy {
     const txPropertyToAttribute = (name : string) => name === "className" ? "class" : name === "htmlFor" ? "for" : name;
     return { 
         ...tx, 
-        JSXDynamicProperty(node, ctx) {
-            if (ctx === TreeContext.SVG) {
+        JSXDynamicProperty(node, parent) {
+            if (parent.role === AST.JSXElementRole.SVG) {
                 node = new AST.JSXDynamicProperty(txPropertyToAttribute(node.name), node.code, node.loc);
             }
-            return tx.JSXDynamicProperty(node, ctx);
+            return tx.JSXDynamicProperty.call(this, node, parent);
         },
-        JSXStaticProperty(node, ctx) {
-            if (ctx === TreeContext.SVG) {
+        JSXStaticProperty(node, parent) {
+            if (parent.role === AST.JSXElementRole.SVG) {
                 node = new AST.JSXStaticProperty(txPropertyToAttribute(node.name), node.value);
             }
-            return tx.JSXStaticProperty(node, ctx);
+            return tx.JSXStaticProperty.call(this, node, parent);
         }
     };
 }
@@ -257,17 +250,17 @@ function translateSVGPropertyNames(tx : Copy) : Copy {
 function translateDeepStylePropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXDynamicProperty(node, ctx) {
-            if (ctx === TreeContext.HTML && node.name.substr(0, 6) === 'style-') {
+        JSXDynamicProperty(node, parent) {
+            if (parent.role === AST.JSXElementRole.HTML && node.name.substr(0, 6) === 'style-') {
                 node = new AST.JSXDynamicProperty('style.' + node.name.substr(6), node.code, node.loc);
             }
-            return tx.JSXDynamicProperty(node, ctx);
+            return tx.JSXDynamicProperty.call(this, node, parent);
         },
-        JSXStaticProperty(node, ctx) {
-            if (ctx === TreeContext.HTML && node.name.substr(0, 6) === 'style-') {
+        JSXStaticProperty(node, parent) {
+            if (parent.role === AST.JSXElementRole.HTML && node.name.substr(0, 6) === 'style-') {
                 node = new AST.JSXStaticProperty('style.' + node.name.substr(6), node.value);
             }
-            return tx.JSXStaticProperty(node, ctx);
+            return tx.JSXStaticProperty.call(this, node, parent);
         }
     };
 }
@@ -275,14 +268,14 @@ function translateDeepStylePropertyNames(tx : Copy) : Copy {
 function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {
     return {
         ...tx,
-        JSXElement(node, ctx) {
-            const { tag, properties, references, functions, content, loc } = node;
-            if (ctx === TreeContext.HTML && content.length === 1 && content[0] instanceof AST.JSXText) {
+        JSXElement(node, parent) {
+            const { tag, properties, references, functions, content, loc, role } = node;
+            if (node.role === AST.JSXElementRole.HTML && content.length === 1 && content[0] instanceof AST.JSXText) {
                 var text = this.JSXText(content[0] as AST.JSXText),
                     textContent = new AST.JSXStaticProperty("textContent", codeStr(text.text));
-                node = new AST.JSXElement(tag, [ ...properties, textContent ], references, functions, [], loc);
+                node = new AST.JSXElement(tag, [ ...properties, textContent ], references, functions, [], role, loc);
             }
-            return tx.JSXElement.call(this, node, ctx);
+            return tx.JSXElement.call(this, node, parent);
         }
     };
 }

@@ -106,7 +106,7 @@ export function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return new AST.JSXElement(tag, properties, references, functions, content, start);
+        return new AST.JSXElement(tag, properties, references, functions, content, AST.JSXElementRole.HTML, start);
     }
     function jsxText() {
         var text = "";
