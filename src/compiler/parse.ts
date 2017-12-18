@@ -22,7 +22,7 @@ const parens : { [p : string] : string } = {
 
 export interface LOC { line: number, col: number, pos: number };
 
-export function parse(TOKS : string[], opts : Params) {
+export function parse(TOKS : string[], opts : Params) : AST.Program {
     var i = 0,
         EOF = TOKS.length === 0,
         TOK = EOF ? '' : TOKS[i],
@@ -39,7 +39,7 @@ export function parse(TOKS : string[], opts : Params) {
 
         while (!EOF) {
             if (IS('<')) {
-                if (text) segments.push(new AST.CodeText(text, loc));
+                if (text) segments.push({ type: AST.CodeText, text, loc });
                 text = "";
                 segments.push(jsxElement());
                 loc = LOC();
@@ -56,9 +56,9 @@ export function parse(TOKS : string[], opts : Params) {
             }
         }
 
-        if (text) segments.push(new AST.CodeText(text, loc));
+        if (text) segments.push({ type: AST.CodeText, text, loc });
 
-        return new AST.Program(segments);
+        return { type: AST.Program, segments };
     }
 
     function jsxElement() : AST.JSXElement {
@@ -85,8 +85,8 @@ export function parse(TOKS : string[], opts : Params) {
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
                 prop = jsxProperty();
-                if (prop instanceof AST.JSXReference) references.push(prop);
-                else if (prop instanceof AST.JSXFunction) functions.push(prop);
+                if (prop.type === AST.JSXReference) references.push(prop);
+                else if (prop.type === AST.JSXFunction) functions.push(prop);
                 else properties.push(prop);
             } else if (IS('{...')) {
                 properties.push(jsxSpreadProperty());
@@ -127,20 +127,20 @@ export function parse(TOKS : string[], opts : Params) {
             NEXT(); // pass '>'
         }
 
-        return new AST.JSXElement(tag, properties, references, functions, content, AST.JSXElementRole.HTML, start);
+        return { type: AST.JSXElement, tag, properties, references, functions, content, kind: AST.JSXElementKind.HTML, loc: start };
     }
 
-    function jsxText() {
+    function jsxText() : AST.JSXText {
         var text = "";
 
         while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
             text += TOK, NEXT();
         }
 
-        return new AST.JSXText(text);
+        return { type: AST.JSXText, text };
     }
 
-    function jsxComment() {
+    function jsxComment() : AST.JSXComment {
         if (NOT('<!--')) ERR("not in HTML comment");
 
         var start = LOC(),
@@ -156,15 +156,15 @@ export function parse(TOKS : string[], opts : Params) {
 
         NEXT(); // skip '-->'
 
-        return new AST.JSXComment(text);
+        return { type: AST.JSXComment, text };
     }
 
-    function jsxInsert() {
+    function jsxInsert() : AST.JSXInsert {
         var loc = LOC();
-        return new AST.JSXInsert(embeddedCode(), loc);
+        return { type: AST.JSXInsert, code: embeddedCode(), loc };
     }
 
-    function jsxProperty() {
+    function jsxProperty() : AST.JSXProperty | AST.JSXReference | AST.JSXFunction {
         if (!MATCH(rx.identifier)) ERR("not at start of property declaration");
 
         var loc = LOC(),
@@ -180,30 +180,30 @@ export function parse(TOKS : string[], opts : Params) {
 
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name)) ERR(`cannot name a static property '${name}' as it has a special meaning as a dynamic property`, loc);
-                return new AST.JSXStaticProperty(name, quotedString());
+                return { type: AST.JSXStaticProperty, name, value: quotedString() };
             } else if (IS('{')) {
                 code = embeddedCode();
-                return rx.refProp.test(name) ? new AST.JSXReference(code, loc) :
-                    rx.fnProp.test(name) ? new AST.JSXFunction(code, loc) : 
-                    rx.styleProp.test(name) ? new AST.JSXStyleProperty(code, loc) :
-                    new AST.JSXDynamicProperty(name, code, loc);
+                return rx.refProp.test(name) ? { type: AST.JSXReference, code, loc } :
+                    rx.fnProp.test(name) ? { type: AST.JSXFunction, code, loc } : 
+                    rx.styleProp.test(name) ? { type: AST.JSXStyleProperty, name: 'style', code, loc } :
+                    { type: AST.JSXDynamicProperty, name, code, loc };
             } else {
                 return ERR("unexepected value for JSX property");
             }
         } else {
-            return new AST.JSXStaticProperty(name, "true");
+            return { type: AST.JSXStaticProperty, name, value: "true" };
         }
     }
 
-    function jsxSpreadProperty() {
+    function jsxSpreadProperty() : AST.JSXSpreadProperty {
         if (NOT('{...')) ERR("not at start of JSX spread");
 
         var loc = LOC();
 
-        return new AST.JSXSpreadProperty(embeddedCode(), loc);
+        return { type: AST.JSXSpreadProperty, code: embeddedCode(), loc };
     }
 
-    function embeddedCode() {
+    function embeddedCode() : AST.EmbeddedCode {
         if (NOT('{') && NOT('{...')) ERR("not at start of JSX embedded code");
 
         var prefixLength = TOK.length,
@@ -213,14 +213,14 @@ export function parse(TOKS : string[], opts : Params) {
         
         // remove closing '}'
         last = last.substr(0, last.length - 1);
-        segments.push(new AST.CodeText(last, loc));
+        segments.push({ type: AST.CodeText, text: last, loc });
 
         // remove opening '{' or '{...', adjusting code loc accordingly
         var first = segments[0] as AST.CodeText;
         first.loc.col += prefixLength;
-        segments[0] = new AST.CodeText(first.text.substr(prefixLength), first.loc);
+        segments[0] = { type: AST.CodeText, text: first.text.substr(prefixLength), loc: first.loc };
 
-        return new AST.EmbeddedCode(segments);
+        return { type: AST.EmbeddedCode, segments };
     }
 
     function balancedParens(segments : AST.CodeSegment[], text : string, loc : LOC) {
@@ -241,7 +241,7 @@ export function parse(TOKS : string[], opts : Params) {
             } else if (IS('/*')) {
                 text += codeMultiLineComment();
             } else if (IS("<")) {
-                if (text) segments.push(new AST.CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
+                if (text) segments.push({ type: AST.CodeText, text, loc: { line: loc.line, col: loc.col, pos: loc.pos } });
                 text = "";
                 segments.push(jsxElement());
                 loc.line = LINE;

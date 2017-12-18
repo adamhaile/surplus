@@ -25,7 +25,7 @@ export function parse(TOKS, opts) {
         while (!EOF) {
             if (IS('<')) {
                 if (text)
-                    segments.push(new AST.CodeText(text, loc));
+                    segments.push({ type: AST.CodeText, text: text, loc: loc });
                 text = "";
                 segments.push(jsxElement());
                 loc = LOC();
@@ -47,8 +47,8 @@ export function parse(TOKS, opts) {
             }
         }
         if (text)
-            segments.push(new AST.CodeText(text, loc));
-        return new AST.Program(segments);
+            segments.push({ type: AST.CodeText, text: text, loc: loc });
+        return { type: AST.Program, segments: segments };
     }
     function jsxElement() {
         if (NOT('<'))
@@ -63,9 +63,9 @@ export function parse(TOKS, opts) {
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
                 prop = jsxProperty();
-                if (prop instanceof AST.JSXReference)
+                if (prop.type === AST.JSXReference)
                     references.push(prop);
-                else if (prop instanceof AST.JSXFunction)
+                else if (prop.type === AST.JSXFunction)
                     functions.push(prop);
                 else
                     properties.push(prop);
@@ -106,14 +106,14 @@ export function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return new AST.JSXElement(tag, properties, references, functions, content, AST.JSXElementRole.HTML, start);
+        return { type: AST.JSXElement, tag: tag, properties: properties, references: references, functions: functions, content: content, kind: AST.JSXElementKind.HTML, loc: start };
     }
     function jsxText() {
         var text = "";
         while (!EOF && NOT('<') && NOT('<!--') && NOT('{') && NOT('</')) {
             text += TOK, NEXT();
         }
-        return new AST.JSXText(text);
+        return { type: AST.JSXText, text: text };
     }
     function jsxComment() {
         if (NOT('<!--'))
@@ -126,11 +126,11 @@ export function parse(TOKS, opts) {
         if (EOF)
             ERR("unterminated html comment", start);
         NEXT(); // skip '-->'
-        return new AST.JSXComment(text);
+        return { type: AST.JSXComment, text: text };
     }
     function jsxInsert() {
         var loc = LOC();
-        return new AST.JSXInsert(embeddedCode(), loc);
+        return { type: AST.JSXInsert, code: embeddedCode(), loc: loc };
     }
     function jsxProperty() {
         if (!MATCH(rx.identifier))
@@ -143,28 +143,28 @@ export function parse(TOKS, opts) {
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name))
                     ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
-                return new AST.JSXStaticProperty(name, quotedString());
+                return { type: AST.JSXStaticProperty, name: name, value: quotedString() };
             }
             else if (IS('{')) {
                 code = embeddedCode();
-                return rx.refProp.test(name) ? new AST.JSXReference(code, loc) :
-                    rx.fnProp.test(name) ? new AST.JSXFunction(code, loc) :
-                        rx.styleProp.test(name) ? new AST.JSXStyleProperty(code, loc) :
-                            new AST.JSXDynamicProperty(name, code, loc);
+                return rx.refProp.test(name) ? { type: AST.JSXReference, code: code, loc: loc } :
+                    rx.fnProp.test(name) ? { type: AST.JSXFunction, code: code, loc: loc } :
+                        rx.styleProp.test(name) ? { type: AST.JSXStyleProperty, name: 'style', code: code, loc: loc } :
+                            { type: AST.JSXDynamicProperty, name: name, code: code, loc: loc };
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return new AST.JSXStaticProperty(name, "true");
+            return { type: AST.JSXStaticProperty, name: name, value: "true" };
         }
     }
     function jsxSpreadProperty() {
         if (NOT('{...'))
             ERR("not at start of JSX spread");
         var loc = LOC();
-        return new AST.JSXSpreadProperty(embeddedCode(), loc);
+        return { type: AST.JSXSpreadProperty, code: embeddedCode(), loc: loc };
     }
     function embeddedCode() {
         if (NOT('{') && NOT('{...'))
@@ -172,12 +172,12 @@ export function parse(TOKS, opts) {
         var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
         // remove closing '}'
         last = last.substr(0, last.length - 1);
-        segments.push(new AST.CodeText(last, loc));
+        segments.push({ type: AST.CodeText, text: last, loc: loc });
         // remove opening '{' or '{...', adjusting code loc accordingly
         var first = segments[0];
         first.loc.col += prefixLength;
-        segments[0] = new AST.CodeText(first.text.substr(prefixLength), first.loc);
-        return new AST.EmbeddedCode(segments);
+        segments[0] = { type: AST.CodeText, text: first.text.substr(prefixLength), loc: first.loc };
+        return { type: AST.EmbeddedCode, segments: segments };
     }
     function balancedParens(segments, text, loc) {
         var start = LOC(), end = PARENS();
@@ -199,7 +199,7 @@ export function parse(TOKS, opts) {
             }
             else if (IS("<")) {
                 if (text)
-                    segments.push(new AST.CodeText(text, { line: loc.line, col: loc.col, pos: loc.pos }));
+                    segments.push({ type: AST.CodeText, text: text, loc: { line: loc.line, col: loc.col, pos: loc.pos } });
                 text = "";
                 segments.push(jsxElement());
                 loc.line = LINE;

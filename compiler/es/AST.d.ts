@@ -1,90 +1,90 @@
 import { LOC } from './parse';
-export declare class Program {
+export declare const Program: "Program";
+export interface Program {
+    type: typeof Program;
     segments: CodeSegment[];
-    kind: "program";
-    constructor(segments: CodeSegment[]);
 }
 export declare type CodeSegment = CodeText | JSXElement;
-export declare class CodeText {
-    readonly text: string;
-    readonly loc: LOC;
-    kind: "code";
-    constructor(text: string, loc: LOC);
+export declare const CodeText: "CodeText";
+export interface CodeText {
+    type: typeof CodeText;
+    text: string;
+    loc: LOC;
 }
-export declare class EmbeddedCode {
-    readonly segments: CodeSegment[];
-    kind: "embeddedcode";
-    constructor(segments: CodeSegment[]);
+export declare const EmbeddedCode: "EmbeddedCode";
+export interface EmbeddedCode {
+    type: typeof EmbeddedCode;
+    segments: CodeSegment[];
 }
 export declare type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXStyleProperty | JSXSpreadProperty;
 export declare type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
-export declare enum JSXElementRole {
+export declare enum JSXElementKind {
     HTML = 0,
     SVG = 1,
     SubComponent = 2,
 }
-export declare class JSXElement {
-    readonly tag: string;
-    readonly properties: JSXProperty[];
-    readonly references: JSXReference[];
-    readonly functions: JSXFunction[];
-    readonly content: JSXContent[];
-    readonly role: JSXElementRole;
-    readonly loc: LOC;
-    kind: "element";
-    constructor(tag: string, properties: JSXProperty[], references: JSXReference[], functions: JSXFunction[], content: JSXContent[], role: JSXElementRole, loc: LOC);
+export declare const JSXElement: "JSXElement";
+export interface JSXElement {
+    type: typeof JSXElement;
+    tag: string;
+    properties: JSXProperty[];
+    references: JSXReference[];
+    functions: JSXFunction[];
+    content: JSXContent[];
+    kind: JSXElementKind;
+    loc: LOC;
 }
-export declare class JSXText {
-    readonly text: string;
-    kind: "text";
-    constructor(text: string);
+export declare const JSXText: "JSXText";
+export interface JSXText {
+    type: typeof JSXText;
+    text: string;
 }
-export declare class JSXComment {
-    readonly text: string;
-    kind: "comment";
-    constructor(text: string);
+export declare const JSXComment: "JSXComment";
+export interface JSXComment {
+    type: typeof JSXComment;
+    text: string;
 }
-export declare class JSXInsert {
-    readonly code: EmbeddedCode;
-    readonly loc: LOC;
-    kind: "insert";
-    constructor(code: EmbeddedCode, loc: LOC);
+export declare const JSXInsert: "JSXInsert";
+export interface JSXInsert {
+    type: typeof JSXInsert;
+    code: EmbeddedCode;
+    loc: LOC;
 }
-export declare class JSXStaticProperty {
-    readonly name: string;
-    readonly value: string;
-    kind: "staticprop";
-    constructor(name: string, value: string);
-}
-export declare class JSXDynamicProperty {
-    readonly name: string;
-    readonly code: EmbeddedCode;
-    readonly loc: LOC;
-    kind: "dynamicprop";
-    constructor(name: string, code: EmbeddedCode, loc: LOC);
-}
-export declare class JSXSpreadProperty {
-    readonly code: EmbeddedCode;
-    readonly loc: LOC;
-    kind: "spread";
-    constructor(code: EmbeddedCode, loc: LOC);
-}
-export declare class JSXStyleProperty {
-    readonly code: EmbeddedCode;
-    readonly loc: LOC;
-    kind: "style";
+export declare const JSXStaticProperty: "JSXStaticProperty";
+export interface JSXStaticProperty {
+    type: typeof JSXStaticProperty;
     name: string;
-    constructor(code: EmbeddedCode, loc: LOC);
+    value: string;
 }
-export declare class JSXReference {
-    readonly code: EmbeddedCode;
-    readonly loc: LOC;
-    kind: "reference";
-    constructor(code: EmbeddedCode, loc: LOC);
+export declare const JSXDynamicProperty: "JSXDynamicProperty";
+export interface JSXDynamicProperty {
+    type: typeof JSXDynamicProperty;
+    name: string;
+    code: EmbeddedCode;
+    loc: LOC;
 }
-export declare class JSXFunction {
-    readonly code: EmbeddedCode;
-    readonly loc: LOC;
-    kind: "function";
-    constructor(code: EmbeddedCode, loc: LOC);
+export declare const JSXSpreadProperty: "JSXSpreadProperty";
+export interface JSXSpreadProperty {
+    type: typeof JSXSpreadProperty;
+    code: EmbeddedCode;
+    loc: LOC;
+}
+export declare const JSXStyleProperty: "JSXStyleProperty";
+export interface JSXStyleProperty {
+    type: typeof JSXStyleProperty;
+    name: string;
+    code: EmbeddedCode;
+    loc: LOC;
+}
+export declare const JSXReference: "JSXReference";
+export interface JSXReference {
+    type: typeof JSXReference;
+    code: EmbeddedCode;
+    loc: LOC;
+}
+export declare const JSXFunction: "JSXFunction";
+export interface JSXFunction {
+    type: typeof JSXFunction;
+    code: EmbeddedCode;
+    loc: LOC;
 }

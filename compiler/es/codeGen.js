@@ -6,7 +6,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
     }
     return t;
 };
-import { EmbeddedCode, CodeText, JSXElement, JSXElementRole, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty } from './AST';
+import { EmbeddedCode, CodeText, JSXElement, JSXElementKind, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty } from './AST';
 import { locationMark } from './sourcemap';
 import { IsAttribute } from './domRef';
 export { codeGen, codeStr };
@@ -53,20 +53,20 @@ var codeGen = function (ctl, opts) {
     var compileSegments = function (node) {
         return node.segments.reduce(function (res, s) { return res + compileSegment(s, res); }, "");
     }, compileSegment = function (node, previousCode) {
-        return node instanceof CodeText ? compileCodeText(node) : compileHtmlElement(node, indent(previousCode));
+        return node.type === CodeText ? compileCodeText(node) : compileHtmlElement(node, indent(previousCode));
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
     }, compileHtmlElement = function (node, indent) {
-        var code = node.role === JSXElementRole.SubComponent ?
+        var code = node.kind === JSXElementKind.SubComponent ?
             emitSubComponent(buildSubComponent(node), indent) :
             (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
                 // optimization: don't need IIFE for simple single nodes
                 node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
                     + ("Surplus.createElement('" + node.tag + "', null, null)") :
                 (node.properties.length === 1
-                    && node.properties[0] instanceof JSXStaticProperty
+                    && node.properties[0].type === JSXStaticProperty
                     && node.properties[0].name === "className"
-                    && node.functions.length === 1
+                    && node.functions.length === 0
                     && node.content.length === 0) ?
                     // optimization: don't need IIFE for simple single nodes
                     node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
@@ -78,13 +78,13 @@ var codeGen = function (ctl, opts) {
         // group successive properties into property objects, but spreads stand alone
         // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
         properties = node.properties.reduce(function (props, p) {
-            var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p instanceof JSXStaticProperty ? p.value : compileSegments(p.code);
-            if (p instanceof JSXSpreadProperty) {
+            var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p.type === JSXStaticProperty ? p.value : compileSegments(p.code);
+            if (p.type === JSXSpreadProperty) {
                 props.push(value);
             }
             else if (lastSegment === null
                 || typeof lastSegment === 'string'
-                || (p instanceof JSXStyleProperty && lastSegment["style"])) {
+                || (p.type === JSXStyleProperty && lastSegment["style"])) {
                 props.push((_a = {}, _a[p.name] = value, _a));
             }
             else {
@@ -93,9 +93,9 @@ var codeGen = function (ctl, opts) {
             return props;
             var _a;
         }, []), children = node.content.map(function (c) {
-            return c instanceof JSXElement ? compileHtmlElement(c, indent("")) :
-                c instanceof JSXText ? codeStr(c.text.trim()) :
-                    c instanceof JSXInsert ? compileSegments(c.code) :
+            return c.type === JSXElement ? compileHtmlElement(c, indent("")) :
+                c.type === JSXText ? codeStr(c.text.trim()) :
+                    c.type === JSXInsert ? compileSegments(c.code) :
                         "document.createComment(" + codeStr(c.text) + ")";
         });
         return new SubComponent(node.tag, refs, fns, properties, children, node.loc);
@@ -129,22 +129,22 @@ var codeGen = function (ctl, opts) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
             var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
-            if (node.role === JSXElementRole.SubComponent) {
+            if (node.kind === JSXElementKind.SubComponent) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), svg_1 = node.role === JSXElementRole.SVG, propExprs_1 = properties.map(function (p) { return p instanceof JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p instanceof JSXSpreadProperty || p instanceof JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p instanceof JSXStaticProperty && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
+                var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, propExprs_1 = properties.map(function (p) { return p.type === JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p.type === JSXSpreadProperty || p.type === JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p.type === JSXStaticProperty && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p instanceof JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg_1) :
-                            p instanceof JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg_1) :
-                                p instanceof JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
+                        p.type === JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg_1) :
+                            p.type === JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg_1) :
+                                p.type === JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
                                     buildSpread(id_1, propExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
                 addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
                 if (!propsDynamic_1) {
                     propStmts.forEach(addStatement);
                 }
-                if (content.length === 1 && content[0] instanceof JSXInsert) {
+                if (content.length === 1 && content[0].type === JSXInsert) {
                     buildJSXContent(content[0], id_1);
                 }
                 else {
@@ -167,12 +167,12 @@ var codeGen = function (ctl, opts) {
         }, buildStyle = function (node, id, expr, dynamic, spreads) {
             return "Surplus.assign(" + id + ".style, " + expr + ");";
         }, buildChild = function (node, parent, n) {
-            return node instanceof JSXElement ? buildHtmlElement(node, parent, n) :
-                node instanceof JSXComment ? buildHtmlComment(node, parent) :
-                    node instanceof JSXText ? buildJSXText(node, parent, n) :
+            return node.type === JSXElement ? buildHtmlElement(node, parent, n) :
+                node.type === JSXComment ? buildHtmlComment(node, parent) :
+                    node.type === JSXText ? buildJSXText(node, parent, n) :
                         buildJSXInsert(node, parent, n);
         }, buildInsertedSubComponent = function (node, parent, n) {
-            return buildJSXInsert(new JSXInsert(new EmbeddedCode([node]), node.loc), parent, n);
+            return buildJSXInsert({ type: JSXInsert, code: { type: EmbeddedCode, segments: [node] }, loc: node.loc }, parent, n);
         }, buildHtmlComment = function (node, parent) {
             return addStatement("Surplus.createComment(" + codeStr(node.text) + ", " + parent + ")");
         }, buildJSXText = function (node, parent, n) {
