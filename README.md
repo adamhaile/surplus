@@ -7,10 +7,13 @@ document.body.appendChild(view);
 ```
 Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, the views are clear, declarative definitions of your UI.  Thanks to S, they update automatically and efficiently as your data changes.
 
+*Note: these docs are for version 0.5, which is currently in late beta.  If installing from npm, be sure to specify `surplus@beta`.*
+
 ## Installation
 
 ```sh
-> npm install --save surplus s-js
+> npm install --save surplus@beta s-js // for 0.5 beta
+> npm install --save surplus s-js // for 0.4.x
 ```
 
 Like React, Surplus has two parts, a compiler and a runtime.
