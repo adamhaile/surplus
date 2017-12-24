@@ -37,6 +37,42 @@ The easiest way to run Surplus' compiler is via a plugin for your build tool:
 
 If you aren't using one of these tools, or if you want to write your own plugin, see [Calling the surplus compiler](#calling-the-surplus-compiler).
 
+## Example
+
+Here is a minimalist ToDo application, which you can run on [CodePen](https://codepen.io/adamhaile/pen/ppvdGa?editors=0010).
+```jsx
+var Todo = t => ({               // our Todo constructor
+       title: S.data(t.title),   // properties are S data signals
+       done: S.data(t.done)
+    }),
+    todos = SArray([]),          // our todos, using SArray
+    newTitle = S.data(""),       // title for new todos
+    addTodo = () => {            // push new title onto list
+       todos.push(Todo({ title: newTitle(), done: false }));
+       newTitle("");             // clear new title
+    },
+    view =                       // declarative main view
+       <div>                     
+          <h2>Minimalist ToDos in Surplus</h2>
+          <input type="text" fn={data(newTitle)}/>
+          <a onClick={addTodo}> + </a>
+          {todos.map(todo =>     // insert todo views
+             <div>
+                <input type="checkbox" fn={data(todo.done)}/>
+                <input type="text" fn={data(todo.title)}/>
+                <a onClick={() => todos.remove(todo)}>&times;</a>
+             </div>
+          )}
+       </div>;
+
+document.body.appendChild(view); // add view to document
+```
+Some things to note:
+- There is no `.mount()` or `.render()` command: Surplus JSX expressions return real nodes, which can be attached to the page with standard DOM commands, `document.body.appendChild(view)`.
+- There is no `.update()` command: Surplus uses [S](https://github.com/adamhaile/S) computations to build the view, so the view responds automatically to changes in S signals.
+
+For a slighlty longer example, see the standard [TodoMVC in Surplus](https://github.com/adamhaile/surplus-todomvc), which you can run [here](https://adamhaile.github.io/surplus-todomvc).
+
 ## Features
 
 ### Real DOM Elements, not Virtual
@@ -105,7 +141,7 @@ var svg       = <svg></svg>, // SVGSVGElement
     // ... etc
 ```
 
-If the tag name matches a known SVG element, Surplus will create an SVG element instead of an HTML one.  For the small set of tag names that belong to both -- `<font>`, `<title>`, `<script>` and `<style>` -- Surplus creates an HTML element.
+If the tag name matches a known SVG element, Surplus will create an SVG element instead of an HTML one.  For the small set of tag names that belong to both -- `<a>`, `<font>`, `<title>`, `<script>` and `<style>` -- Surplus creates an HTML element.
 
 ```javascript
 var title = <title></title>; // an HTMLTitleElement
@@ -337,10 +373,6 @@ Interop: communication between different virtual DOM libraries, or between virtu
 In comparison, S's automatic dependency graph tracks exactly which parts of the DOM need to be updated when data changes.  Surplus takes the React claim that it's &ldquo;just Javascript&rdquo; one step further, in that Surplus &ldquo;components&rdquo; are just functions, and its views just DOM nodes.  Interop with them is obvious.
 
 Surplus does have its own tradeoffs, the largest of which is that automatic updates of the DOM require that the changing state be held in S data signals.  The second largest is that declarative reactive programming is unfamiliar to many programmers who are already well versed in a procedural &ldquo;this happens then this happens then ...&rdquo; model of program execution.  Finally, Surplus trades the performance cost of diffing with the performance cost of bookkeeping in the S dependency graph.
-
-### Do you have an example project?
-
-But of course: [TodoMVC in Surplus](https://github.com/adamhaile/surplus-todomvc), which you can run [here](https://adamhaile.github.io/surplus-todomvc).
 
 ### If Surplus doesn't have components, how can views have state?
 
