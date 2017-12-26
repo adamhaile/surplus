@@ -68,27 +68,36 @@ const codeGen = (ctl : Program, opts : Params) => {
             return node.segments.reduce((res, s) => res + compileSegment(s, res), "");
         },
         compileSegment = (node : CodeSegment, previousCode : string) => 
-            node.type === CodeText ? compileCodeText(node) : compileHtmlElement(node, indent(previousCode)),
+            node.type === CodeText ? compileCodeText(node) : compileJSXElement(node, indent(previousCode)),
         compileCodeText = (node : CodeText) =>
             markBlockLocs(node.text, node.loc, opts),
-        compileHtmlElement = (node : JSXElement, indent : Indents) : string => {
+        compileJSXElement = (node : JSXElement, indent : Indents) : string => {
             const code = 
-                node.kind === JSXElementKind.SubComponent ?
-                    emitSubComponent(buildSubComponent(node), indent) :
+                node.kind === JSXElementKind.SubComponent 
+                ? compileSubComponent(node, indent) 
+                : compileHtmlElement(node, indent);
+            return markLoc(code, node.loc, opts);
+        },
+        compileSubComponent = (node : JSXElement, indent : Indents) : string => {
+            return emitSubComponent(buildSubComponent(node), indent);
+        },
+        compileHtmlElement = (node : JSXElement, indent : Indents) : string => {
+            const svg = node.kind === JSXElementKind.SVG;
+            return (
+                // optimization: don't need IIFE for simple single nodes
                 (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
-                    // optimization: don't need IIFE for simple single nodes
                     node.references.map(r => compileSegments(r.code) + ' = ').join('')
-                    + `Surplus.createElement('${node.tag}', null, null)` :
+                    + `Surplus.create${svg ? 'Svg' : ''}Element('${node.tag}', null, null)` :
+                // optimization: don't need IIFE for simple single nodes with a single class attribute
                 (node.properties.length === 1 
                     && node.properties[0].type === JSXStaticProperty 
-                    && (node.properties[0] as JSXStaticProperty).name === "className" 
+                    && (node.properties[0] as JSXStaticProperty).name === (svg ? "class" : "className")
                     && node.functions.length === 0
                     && node.content.length === 0) ?
-                    // optimization: don't need IIFE for simple single nodes
                     node.references.map(r => compileSegments(r.code) + ' = ').join('')
-                    + `Surplus.createElement('${node.tag}', ${(node.properties[0] as JSXStaticProperty).value}, null)` :
-                emitDOMExpression(buildDOMExpression(node), indent);
-            return markLoc(code, node.loc, opts);
+                    + `Surplus.create${svg ? 'Svg' : ''}Element('${node.tag}', ${(node.properties[0] as JSXStaticProperty).value}, null)` :
+                emitDOMExpression(buildDOMExpression(node), indent)
+            );
         },
         buildSubComponent = (node : JSXElement) => {
             const 

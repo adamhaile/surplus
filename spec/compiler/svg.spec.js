@@ -24,6 +24,26 @@ describe("SVG nodes", function () {
         eval(code);
     });
 
+    it("can be a single top-level SVG element", function () {
+        var code = window.SurplusCompiler.compile(`
+            var circle = <circle></circle>;
+
+            expect(circle instanceof SVGCircleElement).toBe(true);
+        `);
+
+        eval(code);
+    });
+
+    it("can be a single top-level SVG element with a class", function () {
+        var code = window.SurplusCompiler.compile(`
+            var circle = <circle class="foo"></circle>;
+
+            expect(circle instanceof SVGCircleElement).toBe(true);
+        `);
+
+        eval(code);
+    });
+
     it("can be an <svg> element that is the first child of an html element", function () {
         var code = window.SurplusCompiler.compile(`
             var div = 

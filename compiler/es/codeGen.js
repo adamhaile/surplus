@@ -53,26 +53,32 @@ var codeGen = function (ctl, opts) {
     var compileSegments = function (node) {
         return node.segments.reduce(function (res, s) { return res + compileSegment(s, res); }, "");
     }, compileSegment = function (node, previousCode) {
-        return node.type === CodeText ? compileCodeText(node) : compileHtmlElement(node, indent(previousCode));
+        return node.type === CodeText ? compileCodeText(node) : compileJSXElement(node, indent(previousCode));
     }, compileCodeText = function (node) {
         return markBlockLocs(node.text, node.loc, opts);
-    }, compileHtmlElement = function (node, indent) {
-        var code = node.kind === JSXElementKind.SubComponent ?
-            emitSubComponent(buildSubComponent(node), indent) :
-            (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
-                // optimization: don't need IIFE for simple single nodes
-                node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
-                    + ("Surplus.createElement('" + node.tag + "', null, null)") :
-                (node.properties.length === 1
-                    && node.properties[0].type === JSXStaticProperty
-                    && node.properties[0].name === "className"
-                    && node.functions.length === 0
-                    && node.content.length === 0) ?
-                    // optimization: don't need IIFE for simple single nodes
-                    node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
-                        + ("Surplus.createElement('" + node.tag + "', " + node.properties[0].value + ", null)") :
-                    emitDOMExpression(buildDOMExpression(node), indent);
+    }, compileJSXElement = function (node, indent) {
+        var code = node.kind === JSXElementKind.SubComponent
+            ? compileSubComponent(node, indent)
+            : compileHtmlElement(node, indent);
         return markLoc(code, node.loc, opts);
+    }, compileSubComponent = function (node, indent) {
+        return emitSubComponent(buildSubComponent(node), indent);
+    }, compileHtmlElement = function (node, indent) {
+        var svg = node.kind === JSXElementKind.SVG;
+        return (
+        // optimization: don't need IIFE for simple single nodes
+        (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
+            node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
+                + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', null, null)") :
+            // optimization: don't need IIFE for simple single nodes with a single class attribute
+            (node.properties.length === 1
+                && node.properties[0].type === JSXStaticProperty
+                && node.properties[0].name === (svg ? "class" : "className")
+                && node.functions.length === 0
+                && node.content.length === 0) ?
+                node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
+                    + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', " + node.properties[0].value + ", null)") :
+                emitDOMExpression(buildDOMExpression(node), indent));
     }, buildSubComponent = function (node) {
         var refs = node.references.map(function (r) { return compileSegments(r.code); }), fns = node.functions.map(function (r) { return compileSegments(r.code); }), 
         // group successive properties into property objects, but spreads stand alone
