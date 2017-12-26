@@ -20,9 +20,9 @@ describe("parser", function () {
 
     it("compiles template literals correctly", function () {
         var code = window.SurplusCompiler.compile('                 \n\
-            var span = (<span>{`<div>${1+2})&nbsp;`}&nbsp;</span>); \n\
+            var span = (<span>${`<div>${1+2+<div/>.children.length})&nbsp;`}&nbsp;</span>); \n\
                                                                     \n\
-            expect(span.innerText).toBe("<div>3)&nbsp;\xa0");       \n\
+            expect(span.innerText).toBe("$<div>3)&nbsp;\xa0");       \n\
         ');
         eval(code);
     });

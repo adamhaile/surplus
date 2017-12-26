@@ -13,8 +13,7 @@ var parens = {
     "(": ")",
     "[": "]",
     "{": "}",
-    "{...": "}",
-    "${": "}"
+    "{...": "}"
 };
 ;
 export function parse(TOKS, opts) {
@@ -224,8 +223,11 @@ export function parse(TOKS, opts) {
         var start = LOC();
         text += TOK, NEXT();
         while (!EOF && NOT('`')) {
-            if (IS('${')) {
-                text = balancedParens(segments, text, loc);
+            if (IS('$') && !rx.stringEscapedEnd.test(text)) {
+                text += TOK, NEXT();
+                if (IS('{')) {
+                    text = balancedParens(segments, text, loc);
+                }
             }
             else {
                 text += TOK, NEXT();

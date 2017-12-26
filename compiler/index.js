@@ -22,14 +22,14 @@
 /// "
 /// '
 /// `
-/// ${
+/// $
 /// //
 /// \n
 /// /*
 /// */
 /// misc (any string not containing one of the above)
 // pre-compiled regular expressions
-var tokensRx = /<\/?(?=\w)|\/?>|<!--|-->|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|`|\$\{|\/\/|\n|\/\*|\*\/|(?:[^<>=\/()[\]{}"'`$\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?|\$(?!\{))+/g;
+var tokensRx = /<\/?(?=\w)|\/?>|<!--|-->|=|\{\.\.\.|\)|\(|\[|\]|\{|\}|"|'|`|\$|\/\/|\n|\/\*|\*\/|(?:[^<>=\/()[\]{}"'`$\n*-]|(?!-->)-|\/(?![>/*])|\*(?!\/)|(?!<\/?\w|<!--)<\/?)+/g;
 //                |          |    |    |   +- =
 //                |          |    |    +- -->
 //                |          |    +- <!--
@@ -75,8 +75,7 @@ var parens = {
     "(": ")",
     "[": "]",
     "{": "}",
-    "{...": "}",
-    "${": "}"
+    "{...": "}"
 };
 
 function parse(TOKS, opts) {
@@ -286,8 +285,11 @@ function parse(TOKS, opts) {
         var start = LOC();
         text += TOK, NEXT();
         while (!EOF && NOT('`')) {
-            if (IS('${')) {
-                text = balancedParens(segments, text, loc);
+            if (IS('$') && !rx.stringEscapedEnd.test(text)) {
+                text += TOK, NEXT();
+                if (IS('{')) {
+                    text = balancedParens(segments, text, loc);
+                }
             }
             else {
                 text += TOK, NEXT();

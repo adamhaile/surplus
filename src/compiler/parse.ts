@@ -16,8 +16,7 @@ const parens : { [p : string] : string } = {
     "("   : ")",
     "["   : "]",
     "{"   : "}",
-    "{...": "}",
-    "${"  : "}"
+    "{...": "}"
 };
 
 export interface LOC { line: number, col: number, pos: number };
@@ -269,8 +268,11 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
         text += TOK, NEXT();
 
         while (!EOF && NOT('`')) {
-            if (IS('${')) {
-                text = balancedParens(segments, text, loc);
+            if (IS('$') && !rx.stringEscapedEnd.test(text)) {
+                text += TOK, NEXT();
+                if (IS('{')) {
+                    text = balancedParens(segments, text, loc);
+                }
             } else {
                 text += TOK, NEXT();
             }
