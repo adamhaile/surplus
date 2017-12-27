@@ -6,6 +6,8 @@ export * from './es/';
 declare global {
     namespace JSX {
 		interface Element extends HTMLElement { }
+        interface ElementAttributesProperty { props: {}; }
+        interface ElementChildrenAttribute { children: {}; }
 
         interface IntrinsicElements {
             // HTML
@@ -211,7 +213,10 @@ declare global {
 			fn20?: <U>(node : T, state? : U) => any;
 		}
 
+		type ChildNode = Element | string | number | boolean | null | undefined;
+
 		interface DOMAttributes<T> extends SurplusAtributes<T> {
+			children?: ChildNode | ChildNode[] | (() => ChildNode) | (() => ChildNode[]);
 
 			// Clipboard Events
 			onCopy?:                      EventHandler<T, ClipboardEvent>;
