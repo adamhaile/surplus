@@ -1077,11 +1077,17 @@ var codeGen = function (ctl, opts) {
         // build properties expression
         var 
         // convert children to an array expression
-        children = sub.children.length === 0 ? '[]' : '[' + nlii
-            + sub.children.join(',' + nlii) + nli
-            + ']', property0 = sub.properties.length === 0 ? null : sub.properties[0], propertiesWithChildren = property0 === null || typeof property0 === 'string'
-            // add children to first property object if we can, otherwise add an initial property object with just children
-            ? [{ children: children }].concat(sub.properties) : [__assign$1({}, property0, { children: children })].concat(sub.properties.splice(1)), propertyExprs = propertiesWithChildren.map(function (obj) {
+        children = sub.children.length === 0 ? null :
+            sub.children.length === 1 ? sub.children[0] :
+                '[' + nlii
+                    + sub.children.join(',' + nlii) + nli
+                    + ']', lastProperty = sub.properties.length === 0 ? null : sub.properties[sub.properties.length - 1], 
+        // if there are any children, add them to (or add a) last object
+        propertiesWithChildren = children === null ? sub.properties :
+            lastProperty === null || typeof lastProperty === 'string' ? sub.properties.concat([{ children: children }]) : sub.properties.slice(0, sub.properties.length - 1).concat([__assign$1({}, lastProperty, { children: children })]), 
+        // if we're going to ber Object.assign'ing to the first object, it needs to be one we made, not a spread
+        propertiesWithInitialObject = propertiesWithChildren.length === 0 || (propertiesWithChildren.length > 1 && typeof propertiesWithChildren[0] === 'string')
+            ? [{}].concat(propertiesWithChildren) : propertiesWithChildren, propertyExprs = propertiesWithInitialObject.map(function (obj) {
             return typeof obj === 'string' ? obj :
                 '{' + Object.keys(obj).map(function (p) { return "" + nli + codeStr(p) + ": " + obj[p]; }).join(',') + nl + '}';
         }), properties = propertyExprs.length === 1 ? propertyExprs[0] :
