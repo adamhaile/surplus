@@ -1,13 +1,43 @@
 export * from './es/';
 
-// JSX type definitions for Surplus initially based on those for React v0.14
+// JSX type definitions for Surplus initially based on those for React v0.14 but heavily modified since
 // React definitions by: Asana <https://asana.com>, AssureSign <http://www.assuresign.com>, Microsoft <https://microsoft.com>, John Reilly <https://github.com/johnnyreilly/>
+
+// best documentation I've found for TSX typing behavior is here: https://github.com/Microsoft/TypeScript/issues/5478
 
 declare global {
     namespace JSX {
+		// TSX won't currently let us define a specialized type for each intrinsic element,
+		// since React just has an opaque type, so we have to use just base type here.
 		interface Element extends HTMLElement { }
-        interface ElementAttributesProperty { props: {}; }
-        interface ElementChildrenAttribute { children: {}; }
+		// Defining ElementChildrenAttribute lets us type the children passed to an embedded subcomponent
+		interface ElementChildrenAttribute { children: {}; }
+		// define untyped ref and fn attributes, so they can be used on embedded subcomponents
+		interface IntrinsicAttributes { 
+			ref?: any,
+			fn?: (el : any, state : any) => any,
+			fn0?: (el : any, state : any) => any,
+			fn1?: (el : any, state : any) => any,
+			fn2?: (el : any, state : any) => any,
+			fn3?: (el : any, state : any) => any,
+			fn4?: (el : any, state : any) => any,
+			fn5?: (el : any, state : any) => any,
+			fn6?: (el : any, state : any) => any,
+			fn7?: (el : any, state : any) => any,
+			fn8?: (el : any, state : any) => any,
+			fn9?: (el : any, state : any) => any,
+			fn10?: (el : any, state : any) => any,
+			fn11?: (el : any, state : any) => any,
+			fn12?: (el : any, state : any) => any,
+			fn13?: (el : any, state : any) => any,
+			fn14?: (el : any, state : any) => any,
+			fn15?: (el : any, state : any) => any,
+			fn16?: (el : any, state : any) => any,
+			fn17?: (el : any, state : any) => any,
+			fn18?: (el : any, state : any) => any,
+			fn19?: (el : any, state : any) => any,
+			fn20?: (el : any, state : any) => any,
+		}
 
         interface IntrinsicElements {
             // HTML
@@ -213,10 +243,11 @@ declare global {
 			fn20?: <U>(node : T, state? : U) => any;
 		}
 
-		type ChildNode = Element | string | number | boolean | null | undefined;
+		type Child = Element | string | number | boolean | null | undefined;
+		type Children = Child | Child[] | (() => Child) | (() => Child[]);
 
 		interface DOMAttributes<T> extends SurplusAtributes<T> {
-			children?: ChildNode | ChildNode[] | (() => ChildNode) | (() => ChildNode[]);
+			children?: Children;
 
 			// Clipboard Events
 			onCopy?:                      EventHandler<T, ClipboardEvent>;
