@@ -7,11 +7,11 @@ export function content(parent, value, current) {
     else if (t === 'string') {
         current = parent.innerText = value;
     }
-    else if (t === 'number' || t === 'boolean') {
+    else if (t === 'number') {
         value = value.toString();
         current = parent.innerText = value;
     }
-    else if (value == null) {
+    else if (value == null || t === 'boolean') {
         clear(parent);
         current = "";
     }
@@ -324,7 +324,7 @@ function normalizeIncomingArray(normalized, array) {
         if (item instanceof Node) {
             normalized.push(item);
         }
-        else if (item == null) {
+        else if (item == null || item === true || item === false) {
             // skip
         }
         else if (Array.isArray(item)) {

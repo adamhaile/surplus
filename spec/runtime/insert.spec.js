@@ -12,6 +12,55 @@ describe("Surplus.insert", function () {
         expect(res.childNodes.length).toBe(3);
     });
 
+    it("inserts nothing for undefined", function () {
+        var res = insert(undefined);
+        expect(res.innerHTML)
+        .toBe("beforeafter");
+        expect(res.childNodes.length).toBe(3);
+    });
+
+    it("inserts nothing for false", function () {
+        var res = insert(false);
+        expect(res.innerHTML)
+        .toBe("beforeafter");
+        expect(res.childNodes.length).toBe(3);
+    });
+
+    it("inserts nothing for true", function () {
+        var res = insert(true);
+        expect(res.innerHTML)
+        .toBe("beforeafter");
+        expect(res.childNodes.length).toBe(3);
+    });
+
+    it("inserts nothing for null in array", function () {
+        var res = insert(["a", null, "b"]);
+        expect(res.innerHTML)
+        .toBe("beforeabafter");
+        expect(res.childNodes.length).toBe(4);
+    });
+
+    it("inserts nothing for undefined in array", function () {
+        var res = insert(["a", undefined, "b"]);
+        expect(res.innerHTML)
+        .toBe("beforeabafter");
+        expect(res.childNodes.length).toBe(4);
+    });
+
+    it("inserts nothing for false in array", function () {
+        var res = insert(["a", false, "b"]);
+        expect(res.innerHTML)
+        .toBe("beforeabafter");
+        expect(res.childNodes.length).toBe(4);
+    });
+
+    it("inserts nothing for true in array", function () {
+        var res = insert(["a", true, "b"]);
+        expect(res.innerHTML)
+        .toBe("beforeabafter");
+        expect(res.childNodes.length).toBe(4);
+    });
+
     it("can insert strings", function () {
         var res = insert("foo");
         expect(res.innerHTML)

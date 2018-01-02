@@ -9,6 +9,55 @@ describe("Surplus.content", function () {
         expect(res.childNodes.length).toBe(0);
     });
 
+    it("inserts nothing for undefined", function () {
+        var res = content(undefined);
+        expect(res.innerHTML)
+        .toBe("");
+        expect(res.childNodes.length).toBe(0);
+    });
+
+    it("inserts nothing for false", function () {
+        var res = content(false);
+        expect(res.innerHTML)
+        .toBe("");
+        expect(res.childNodes.length).toBe(0);
+    });
+
+    it("inserts nothing for true", function () {
+        var res = content(true);
+        expect(res.innerHTML)
+        .toBe("");
+        expect(res.childNodes.length).toBe(0);
+    });
+
+    it("inserts nothing for null in array", function () {
+        var res = content(["a", null, "b"]);
+        expect(res.innerHTML)
+        .toBe("ab");
+        expect(res.childNodes.length).toBe(2);
+    });
+
+    it("inserts nothing for undefined in array", function () {
+        var res = content(["a", undefined, "b"]);
+        expect(res.innerHTML)
+        .toBe("ab");
+        expect(res.childNodes.length).toBe(2);
+    });
+
+    it("inserts nothing for false in array", function () {
+        var res = content(["a", false, "b"]);
+        expect(res.innerHTML)
+        .toBe("ab");
+        expect(res.childNodes.length).toBe(2);
+    });
+
+    it("inserts nothing for true in array", function () {
+        var res = content(["a", true, "b"]);
+        expect(res.innerHTML)
+        .toBe("ab");
+        expect(res.childNodes.length).toBe(2);
+    });
+
     it("can insert strings", function () {
         var res = content("foo");
         expect(res.innerHTML)

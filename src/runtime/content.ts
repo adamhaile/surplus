@@ -9,10 +9,10 @@ export function content(parent : HTMLElement, value : InsertValue, current : str
         // nothing to do
     } else if (t === 'string') {
         current = parent.innerText = value as string;
-    } else if (t === 'number' || t === 'boolean') {
+    } else if (t === 'number') {
         value = value!.toString();
         current = parent.innerText = value;
-    } else if (value == null) { // matches both null and undefined
+    } else if (value == null || t === 'boolean') { // null, undefined, true or false
         clear(parent);
         current = "";
     } else if (t === 'function') {
@@ -337,7 +337,7 @@ function normalizeIncomingArray(normalized : (Node | string)[], array : InsertAr
         var item = array[i];
         if (item instanceof Node) {
             normalized.push(item);
-        } else if (item == null) { // matches both null and undefined
+        } else if (item == null || item === true || item === false) { // matches null, undefined, true or false
             // skip
         } else if (Array.isArray(item)) {
             normalizeIncomingArray(normalized, item);

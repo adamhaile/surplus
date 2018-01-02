@@ -11,7 +11,7 @@ export function insert(range, value) {
     //        + "of the original node.  The DOM has been modified such that this is \n"
     //        + "no longer the case.");
     //}
-    if (t === 'string' || t === 'number' || t === 'boolean') {
+    if (t === 'string' || t === 'number') {
         value = value.toString();
         if (test.nodeType === TEXT_NODE) {
             test.data = value;
@@ -43,7 +43,7 @@ export function insert(range, value) {
         });
         good = range.end;
     }
-    else if (value !== null && value !== undefined) {
+    else if (value !== null && value !== undefined && value !== true && value !== false) {
         value = value.toString();
         if (test.nodeType === TEXT_NODE) {
             test.data = value;
@@ -94,7 +94,7 @@ export function insert(range, value) {
                 else if (value instanceof Array) {
                     insertArray(value);
                 }
-                else if (value !== null && value !== undefined) {
+                else if (value !== null && value !== undefined && value !== false && value !== true) {
                     value = document.createTextNode(value.toString());
                     good = range.end = (good.nextSibling ? parent.insertBefore(value, good.nextSibling) : parent.appendChild(value));
                 }
@@ -131,7 +131,7 @@ export function insert(range, value) {
                 else if (value instanceof Array) {
                     insertArray(value);
                 }
-                else if (value !== null && value !== undefined) {
+                else if (value !== null && value !== undefined && value !== true && value !== false) {
                     value = value.toString();
                     if (test.nodeType === TEXT_NODE) {
                         test.data = value;
