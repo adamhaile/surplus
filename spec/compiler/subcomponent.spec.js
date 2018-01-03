@@ -60,27 +60,46 @@ describe("subcomponent", function () {
         eval(code);
     });
 
+    it("can have a single subcomponent child, whose value equals props.children", function () {
+        var code = window.SurplusCompiler.compile(`
+            var props = null,
+                SubComponent = p => (props = p, "sub"),
+                cprops = null,
+                ChildComponent = p => (cprops = p, "child"),
+                sub = <SubComponent foo={1}><ChildComponent bar={2} /></SubComponent>;
+
+            expect(sub).toBe("sub");
+            expect(props).toEqual({ foo: 1, children: "child" });
+            expect(cprops).toEqual({ bar: 2});
+        `);
+        eval(code);
+    });
+
     it("can have multiple children, passed as an array in props.children", function () {
         var code = window.SurplusCompiler.compile(`
             var props = null,
                 SubComponent = p => props = p,
+                cprops = null,
+                ChildComponent = p => (cprops = p, "child"),
                 sub =
                     <SubComponent foo="2">
                         <span>text</span>
                         some words
                         <!-- comment -->
                         {4}
+                        <ChildComponent />
                     </SubComponent>;
 
             expect(props).not.toBe(null);
             expect(props.foo).toBe("2");
-            expect(props.children.length).toBe(4);
+            expect(props.children.length).toBe(5);
             expect(props.children[0] instanceof HTMLSpanElement).toBe(true);
             expect(props.children[0].innerText).toBe("text");
             expect(props.children[1]).toBe("some words");
             expect(props.children[2] instanceof Comment).toBe(true);
             expect(props.children[2].data).toBe(" comment ");
             expect(props.children[3]).toBe(4);
+            expect(props.children[4]).toBe("child");
         `);
         eval(code);
     });
