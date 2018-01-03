@@ -116,7 +116,6 @@ describe("subcomponent", function () {
         eval(code);
     });
 
-
     it("can be children", function () {
         var code = window.SurplusCompiler.compile(`
             var SubComponent = p => <span>{p.text}</span>,
@@ -129,6 +128,49 @@ describe("subcomponent", function () {
             expect(div.childNodes.length).toBe(1);
             expect(div.childNodes[0] instanceof HTMLSpanElement).toBe(true);
             expect(div.childNodes[0].innerText).toBe("foo");
+        `);
+        eval(code);
+    });
+
+    it("can be children, which are re-evaluated when a signal changes", function () {
+        var code = window.SurplusCompiler.compile(`
+            var props = null,
+                count = 0,
+                SubComponent = p => (props = p, count++),
+                text = S.data("foo"),
+                div = <div><SubComponent>{text()}</SubComponent></div>;
+
+            expect(div instanceof HTMLDivElement).toBe(true);
+            expect(count).toBe(1);
+            expect(props).not.toBe(null);
+            expect(props.children).toBe("foo");
+            expect(div.innerText).toBe("0");
+            text("bar");
+            expect(count).toBe(2);
+            expect(props.children).toBe("bar");
+            expect(div.innerText).toBe("1");
+        `);
+        eval(code);
+    });
+
+    it("can have node children, whose update does not cause the subcomponent to re-evaluate", function () {
+        var code = window.SurplusCompiler.compile(`
+            var props = null,
+                count = 0,
+                SubComponent = p => (props = p, count++),
+                text = S.data("foo"),
+                div = <div><SubComponent><span>{text()}</span></SubComponent></div>;
+
+            expect(div instanceof HTMLDivElement).toBe(true);
+            expect(count).toBe(1);
+            expect(props).not.toBe(null);
+            expect(props.children instanceof HTMLSpanElement).toBe(true);
+            expect(props.children.innerText).toBe("foo");
+            expect(div.innerText).toBe("0");
+            text("bar");
+            expect(count).toBe(1);
+            expect(props.children.innerText).toBe("bar");
+            expect(div.innerText).toBe("0");
         `);
         eval(code);
     });
