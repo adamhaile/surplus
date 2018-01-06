@@ -16,20 +16,16 @@ function extractMappings(embedded) {
             return nl;
         }
         else {
-            var generatedCol = offset - lineStartPos - lineMarksLength;
-            sourceLine = parseInt(sourceLine);
-            sourceCol = parseInt(sourceCol);
+            var generatedCol = offset - lineStartPos - lineMarksLength, sourceLineNum = parseInt(sourceLine, 10), sourceColNum = parseInt(sourceCol, 10);
             line.push(vlq(generatedCol - lastGeneratedCol)
                 + "A" // only one file
-                + vlq(sourceLine - lastSourceLine)
-                + vlq(sourceCol - lastSourceCol));
-            //lineMarksLength += mark.length;
-            lineMarksLength -= 2;
+                + vlq(sourceLineNum - lastSourceLine)
+                + vlq(sourceColNum - lastSourceCol));
+            lineMarksLength += mark.length;
             lastGeneratedCol = generatedCol;
-            lastSourceLine = sourceLine;
-            lastSourceCol = sourceCol;
-            //return "";
-            return "/*" + sourceLine + "," + sourceCol + "*/";
+            lastSourceLine = sourceLineNum;
+            lastSourceCol = sourceColNum;
+            return "";
         }
     });
     lines.push(line);

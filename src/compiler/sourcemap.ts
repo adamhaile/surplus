@@ -12,7 +12,7 @@ export function locationMark(loc : LOC) {
 }
 
 function extractMappings(embedded : string) {
-    var line = [] as string[],
+    let line = [] as string[],
         lines = [] as string[][],
         lastGeneratedCol = 0,
         lastSourceLine = 0,
@@ -20,7 +20,7 @@ function extractMappings(embedded : string) {
         lineStartPos = 0,
         lineMarksLength = 0;
 
-    var src = embedded.replace(rx.locs, function (_, nl, mark, sourceLine, sourceCol, offset) {
+    const src = embedded.replace(rx.locs, function (_, nl : string, mark : string, sourceLine : string, sourceCol : string, offset : number) {
         if (nl) {
             lines.push(line);
             line = [];
@@ -31,24 +31,22 @@ function extractMappings(embedded : string) {
 
             return nl;
         } else {
-            var generatedCol = offset - lineStartPos - lineMarksLength;
-            sourceLine = parseInt(sourceLine);
-            sourceCol = parseInt(sourceCol);
+            const generatedCol = offset - lineStartPos - lineMarksLength,
+                sourceLineNum = parseInt(sourceLine, 10),
+                sourceColNum = parseInt(sourceCol, 10);
 
             line.push(vlq(generatedCol - lastGeneratedCol)
                       + "A" // only one file
-                      + vlq(sourceLine - lastSourceLine)
-                      + vlq(sourceCol - lastSourceCol));
+                      + vlq(sourceLineNum - lastSourceLine)
+                      + vlq(sourceColNum - lastSourceCol));
 
-            //lineMarksLength += mark.length;
-            lineMarksLength -= 2;
+            lineMarksLength += mark.length;
 
             lastGeneratedCol = generatedCol;
-            lastSourceLine = sourceLine;
-            lastSourceCol = sourceCol;
+            lastSourceLine = sourceLineNum;
+            lastSourceCol = sourceColNum;
 
-            //return "";
-            return `/*${sourceLine},${sourceCol}*/`;
+            return "";
         }
     });
 

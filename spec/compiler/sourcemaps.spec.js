@@ -99,7 +99,8 @@ var todos =
             <p>Created by <a href="https://github.com/adamhaile">Adam Haile</a></p>
             <p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
         </footer>
-    </section>`, { sourcemap: 'append', sourcefile: 'complex.ts', targetfile: 'complex.js' });
+    </section>
+`, { sourcemap: 'append', sourcefile: 'complex.ts', targetfile: 'complex.js' });
 
         eval(code);
     });
