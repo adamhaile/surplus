@@ -2,7 +2,7 @@
 
 ```javascript
 var name = S.data("world"),
-    view = <h1>Hello {name()}!</h1>;
+    view = <h1>Hello {name}!</h1>;
 document.body.appendChild(view);
 ```
 Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, the views are clear, declarative definitions of your UI.  Thanks to S, they update automatically and efficiently as your data changes.
@@ -94,7 +94,7 @@ If your Surplus JSX expression references any S signals, then Surplus creates an
 
 ```javascript
 var text = S.data("foo"),
-    node = <span>{text()}</span>; 
+    node = <span>{text}</span>; 
 
 // node starts out equal to <span>foo</span>
 
@@ -383,7 +383,7 @@ const Counter = init => {
     const count = S.data(init);
     return (
         <div>
-            Count is: {count()}
+            Count is: {count}
             <button onClick={() => count(count() + 1)}>
                 Increment
             </button>
