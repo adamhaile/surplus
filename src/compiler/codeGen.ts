@@ -203,8 +203,8 @@ const codeGen = (ctl : Program, opts : Params) => {
                         propsDynamic = propExprs.some(e => !noApparentSignals(e)),
                         propStmts    = properties.map((p, i) => 
                             p === classProp                 ? '' :
-                            p.type === JSXStaticProperty  ? buildProperty(id, p.name, p.value, svg) :
-                            p.type === JSXDynamicProperty ? buildProperty(id, p.name, propExprs[i], svg) :
+                            p.type === JSXStaticProperty  ? buildProperty(id, p.name, p.namespace, p.value, svg) :
+                            p.type === JSXDynamicProperty ? buildProperty(id, p.name, p.namespace,  propExprs[i], svg) :
                             p.type === JSXStyleProperty   ? buildStyle(p, id, propExprs[i], propsDynamic, spreads) :
                             buildSpread(id, propExprs[i], svg)
                         ).filter(s => s !== ''),
@@ -229,9 +229,9 @@ const codeGen = (ctl : Program, opts : Params) => {
                     functions.forEach(f => buildNodeFn(f, id));
                 }
             },
-            buildProperty = (id : string, prop : string, expr : string, svg : boolean) =>
-                svg || IsAttribute(prop)
-                ? `Surplus.setAttribute(${id}, ${codeStr(prop)}, ${expr});`
+            buildProperty = (id : string, prop : string, ns : string | null, expr : string, svg : boolean) =>
+                ns                       ? `Surplus.setAttributeNS(${id}, ${codeStr(ns)}, ${codeStr(prop)}, ${expr});` :
+                svg || IsAttribute(prop) ? `Surplus.setAttribute(${id}, ${codeStr(prop)}, ${expr});`
                 : `${id}.${prop} = ${expr};`,
             buildSpread = (id : string, expr : string, svg : boolean) =>
                 `Surplus.spread(${id}, ${expr}, ${svg});`,

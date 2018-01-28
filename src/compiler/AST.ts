@@ -67,6 +67,7 @@ export const JSXStaticProperty = 'JSXStaticProperty' as 'JSXStaticProperty';
 export interface JSXStaticProperty {
     type : typeof JSXStaticProperty;
     name : string;
+    namespace : string | null;
     value : string;
 }
 
@@ -74,6 +75,7 @@ export const JSXDynamicProperty = 'JSXDynamicProperty' as 'JSXDynamicProperty';
 export interface JSXDynamicProperty {
     type : typeof JSXDynamicProperty;
     name : string;
+    namespace : string | null;
     code : EmbeddedCode;
     loc : LOC;
 }

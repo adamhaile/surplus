@@ -149,6 +149,26 @@ describe("SVG nodes", function () {
         eval(code);
     });
 
+    it("can have xlink namespaced attributes", function () {
+        var code = window.SurplusCompiler.compile(`
+            var circle = <circle xlinkHref="#foo"></circle>;
+
+            expect(circle.getAttributeNS("http://www.w3.org/1999/xlink", "href")).toBe("#foo");
+        `);
+
+        eval(code);
+    });
+
+    it("can have xml namespaced attributes", function () {
+        var code = window.SurplusCompiler.compile(`
+            var circle = <circle xmlRole="foo"></circle>;
+
+            expect(circle.getAttributeNS("http://www.w3.org/XML/1998/namespace", "role")).toBe("foo");
+        `);
+
+        eval(code);
+    });
+
     it("does not translate attributes to HTML property names", function () {
         var code = window.SurplusCompiler.compile(`
             var svg = <svg class="foo" for="baz" cx="100" cy="100" r="50" fill="red"></svg>,

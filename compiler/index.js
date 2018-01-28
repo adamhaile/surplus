@@ -204,21 +204,21 @@ function parse(TOKS, opts) {
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name))
                     ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
-                return { type: JSXStaticProperty, name: name, value: quotedString() };
+                return { type: JSXStaticProperty, name: name, namespace: null, value: quotedString() };
             }
             else if (IS('{')) {
                 code = embeddedCode();
                 return rx.refProp.test(name) ? { type: JSXReference, code: code, loc: loc } :
                     rx.fnProp.test(name) ? { type: JSXFunction, code: code, loc: loc } :
                         rx.styleProp.test(name) ? { type: JSXStyleProperty, name: 'style', code: code, loc: loc } :
-                            { type: JSXDynamicProperty, name: name, code: code, loc: loc };
+                            { type: JSXDynamicProperty, name: name, namespace: null, code: code, loc: loc };
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return { type: JSXStaticProperty, name: name, value: "true" };
+            return { type: JSXStaticProperty, name: name, namespace: null, value: "true" };
         }
     }
     function jsxSpreadProperty() {
@@ -1110,8 +1110,8 @@ var codeGen = function (ctl, opts) {
             else {
                 var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, propExprs_1 = properties.map(function (p) { return p.type === JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p.type === JSXSpreadProperty || p.type === JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p.type === JSXStaticProperty && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p.type === JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg_1) :
-                            p.type === JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg_1) :
+                        p.type === JSXStaticProperty ? buildProperty(id_1, p.name, p.namespace, p.value, svg_1) :
+                            p.type === JSXDynamicProperty ? buildProperty(id_1, p.name, p.namespace, propExprs_1[i], svg_1) :
                                 p.type === JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
                                     buildSpread(id_1, propExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
@@ -1130,10 +1130,10 @@ var codeGen = function (ctl, opts) {
                 }
                 functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
-        }, buildProperty = function (id, prop, expr, svg) {
-            return svg || IsAttribute(prop)
-                ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
-                : id + "." + prop + " = " + expr + ";";
+        }, buildProperty = function (id, prop, ns, expr, svg) {
+            return ns ? "Surplus.setAttributeNS(" + id + ", " + codeStr(ns) + ", " + codeStr(prop) + ", " + expr + ");" :
+                svg || IsAttribute(prop) ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
+                    : id + "." + prop + " = " + expr + ";";
         }, buildSpread = function (id, expr, svg) {
             return "Surplus.spread(" + id + ", " + expr + ", " + svg + ");";
         }, buildNodeFn = function (node, id) {
@@ -1232,10 +1232,15 @@ var __assign = (undefined && undefined.__assign) || Object.assign || function(t)
     return t;
 };
 // Cross-browser compatibility shims
+var namespaceAliases = {
+    xlink: "http://www.w3.org/1999/xlink",
+    xml: "http://www.w3.org/XML/1998/namespace",
+};
 var rx$1 = {
     trimmableWS: /^\s*?\n\s*|\s*?\n\s*$/g,
     extraWs: /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
+    namespacedAttr: new RegExp("^(" + Object.keys(namespaceAliases).join('|') + ")([A-Z])(.*)"),
     htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g,
     subcomponent: /(^[A-Z])|\./
 };
@@ -1303,6 +1308,7 @@ var tf = [
     translateJSXPropertyNames,
     translateHTMLAttributeNames,
     translateSVGPropertyNames,
+    translateNamespacedAttributes,
     translateDeepStylePropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
@@ -1409,6 +1415,17 @@ function translateSVGPropertyNames(tx) {
             return tx.JSXProperty.call(this, node, parent);
         } });
 }
+function translateNamespacedAttributes(tx) {
+    return __assign({}, tx, { JSXProperty: function (node, parent) {
+            var m;
+            if ((node.type === JSXDynamicProperty || node.type === JSXStaticProperty)
+                && (m = rx$1.namespacedAttr.exec(node.name))) {
+                var namespace = namespaceAliases[m[1]], name_3 = m[2].toLowerCase() + m[3];
+                node = __assign({}, node, { name: name_3, namespace: namespace });
+            }
+            return tx.JSXProperty.call(this, node, parent);
+        } });
+}
 function translateDeepStylePropertyNames(tx) {
     return __assign({}, tx, { JSXProperty: function (node, parent) {
             if ((node.type === JSXDynamicProperty || node.type === JSXStaticProperty)
@@ -1423,7 +1440,7 @@ function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node, parent) {
             var content0 = node.content[0];
             if (node.kind === JSXElementKind.HTML && node.content.length === 1 && content0.type === JSXText) {
-                var text = this.JSXText(content0), textContent = { type: JSXStaticProperty, name: "textContent", value: codeStr(text.text) };
+                var text = this.JSXText(content0), textContent = { type: JSXStaticProperty, name: "textContent", namespace: null, value: codeStr(text.text) };
                 node = __assign({}, node, { properties: node.properties.concat([textContent]), content: [] });
             }
             return tx.JSXElement.call(this, node, parent);

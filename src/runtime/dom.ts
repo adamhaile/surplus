@@ -30,3 +30,8 @@ export function setAttribute(node : Element, name : string, value : any) {
     if (value === false || value === null || value === undefined) node.removeAttribute(name);
     else node.setAttribute(name, value);
 }
+
+export function setAttributeNS(node : Element, namespace : string, name : string, value : any) {
+    if (value === false || value === null || value === undefined) node.removeAttributeNS(namespace, name);
+    else node.setAttributeNS(namespace, name, value);
+}

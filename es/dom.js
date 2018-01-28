@@ -31,3 +31,9 @@ export function setAttribute(node, name, value) {
     else
         node.setAttribute(name, value);
 }
+export function setAttributeNS(node, namespace, name, value) {
+    if (value === false || value === null || value === undefined)
+        node.removeAttributeNS(namespace, name);
+    else
+        node.setAttributeNS(namespace, name, value);
+}

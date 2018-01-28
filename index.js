@@ -582,6 +582,12 @@ function setAttribute(node, name, value) {
     else
         node.setAttribute(name, value);
 }
+function setAttributeNS(node, namespace, name, value) {
+    if (value === false || value === null || value === undefined)
+        node.removeAttributeNS(namespace, name);
+    else
+        node.setAttributeNS(namespace, name, value);
+}
 
 function assign(a, b) {
     var props = Object.keys(b);
@@ -626,6 +632,7 @@ exports.createSvgElement = createSvgElement;
 exports.createComment = createComment;
 exports.createTextNode = createTextNode;
 exports.setAttribute = setAttribute;
+exports.setAttributeNS = setAttributeNS;
 
 Object.defineProperty(exports, '__esModule', { value: true });
 

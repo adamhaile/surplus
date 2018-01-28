@@ -147,8 +147,8 @@ var codeGen = function (ctl, opts) {
             else {
                 var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, propExprs_1 = properties.map(function (p) { return p.type === JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p.type === JSXSpreadProperty || p.type === JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p.type === JSXStaticProperty && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
                     return p === classProp_1 ? '' :
-                        p.type === JSXStaticProperty ? buildProperty(id_1, p.name, p.value, svg_1) :
-                            p.type === JSXDynamicProperty ? buildProperty(id_1, p.name, propExprs_1[i], svg_1) :
+                        p.type === JSXStaticProperty ? buildProperty(id_1, p.name, p.namespace, p.value, svg_1) :
+                            p.type === JSXDynamicProperty ? buildProperty(id_1, p.name, p.namespace, propExprs_1[i], svg_1) :
                                 p.type === JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
                                     buildSpread(id_1, propExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
@@ -167,10 +167,10 @@ var codeGen = function (ctl, opts) {
                 }
                 functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
-        }, buildProperty = function (id, prop, expr, svg) {
-            return svg || IsAttribute(prop)
-                ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
-                : id + "." + prop + " = " + expr + ";";
+        }, buildProperty = function (id, prop, ns, expr, svg) {
+            return ns ? "Surplus.setAttributeNS(" + id + ", " + codeStr(ns) + ", " + codeStr(prop) + ", " + expr + ");" :
+                svg || IsAttribute(prop) ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
+                    : id + "." + prop + " = " + expr + ";";
         }, buildSpread = function (id, expr, svg) {
             return "Surplus.spread(" + id + ", " + expr + ", " + svg + ");";
         }, buildNodeFn = function (node, id) {

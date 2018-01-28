@@ -10,10 +10,15 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 import * as AST from './AST';
 import { codeStr } from './codeGen';
 import { HtmlEntites, SvgOnlyTagRx, SvgForeignTag } from './domRef';
+var namespaceAliases = {
+    xlink: "http://www.w3.org/1999/xlink",
+    xml: "http://www.w3.org/XML/1998/namespace",
+};
 var rx = {
     trimmableWS: /^\s*?\n\s*|\s*?\n\s*$/g,
     extraWs: /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
+    namespacedAttr: new RegExp("^(" + Object.keys(namespaceAliases).join('|') + ")([A-Z])(.*)"),
     htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g,
     subcomponent: /(^[A-Z])|\./
 };
@@ -81,6 +86,7 @@ var tf = [
     translateJSXPropertyNames,
     translateHTMLAttributeNames,
     translateSVGPropertyNames,
+    translateNamespacedAttributes,
     translateDeepStylePropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
@@ -187,6 +193,17 @@ function translateSVGPropertyNames(tx) {
             return tx.JSXProperty.call(this, node, parent);
         } });
 }
+function translateNamespacedAttributes(tx) {
+    return __assign({}, tx, { JSXProperty: function (node, parent) {
+            var m;
+            if ((node.type === AST.JSXDynamicProperty || node.type === AST.JSXStaticProperty)
+                && (m = rx.namespacedAttr.exec(node.name))) {
+                var namespace = namespaceAliases[m[1]], name_3 = m[2].toLowerCase() + m[3];
+                node = __assign({}, node, { name: name_3, namespace: namespace });
+            }
+            return tx.JSXProperty.call(this, node, parent);
+        } });
+}
 function translateDeepStylePropertyNames(tx) {
     return __assign({}, tx, { JSXProperty: function (node, parent) {
             if ((node.type === AST.JSXDynamicProperty || node.type === AST.JSXStaticProperty)
@@ -201,7 +218,7 @@ function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node, parent) {
             var content0 = node.content[0];
             if (node.kind === AST.JSXElementKind.HTML && node.content.length === 1 && content0.type === AST.JSXText) {
-                var text = this.JSXText(content0), textContent = { type: AST.JSXStaticProperty, name: "textContent", value: codeStr(text.text) };
+                var text = this.JSXText(content0), textContent = { type: AST.JSXStaticProperty, name: "textContent", namespace: null, value: codeStr(text.text) };
                 node = __assign({}, node, { properties: node.properties.concat([textContent]), content: [] });
             }
             return tx.JSXElement.call(this, node, parent);

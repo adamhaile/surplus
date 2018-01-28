@@ -54,12 +54,14 @@ export declare const JSXStaticProperty: "JSXStaticProperty";
 export interface JSXStaticProperty {
     type: typeof JSXStaticProperty;
     name: string;
+    namespace: string | null;
     value: string;
 }
 export declare const JSXDynamicProperty: "JSXDynamicProperty";
 export interface JSXDynamicProperty {
     type: typeof JSXDynamicProperty;
     name: string;
+    namespace: string | null;
     code: EmbeddedCode;
     loc: LOC;
 }

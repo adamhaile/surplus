@@ -4,10 +4,16 @@ import { Params } from './compile';
 import { codeStr } from './codeGen';
 import { HtmlEntites, SvgOnlyTagRx, SvgForeignTag } from './domRef';
 
+const namespaceAliases : { [ name : string ] : string } = {
+    xlink: "http://www.w3.org/1999/xlink",
+    xml:   "http://www.w3.org/XML/1998/namespace",
+};
+
 const rx = {
     trimmableWS     : /^\s*?\n\s*|\s*?\n\s*$/g,
     extraWs         : /\s\s+/g,
     jsxEventProperty: /^on[A-Z]/,
+    namespacedAttr  : new RegExp(`^(${Object.keys(namespaceAliases).join('|')})([A-Z])(.*)`),
     htmlEntity      : /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g,
     subcomponent    : /(^[A-Z])|\./
 };
@@ -82,6 +88,7 @@ const tf = [
     translateJSXPropertyNames,
     translateHTMLAttributeNames,
     translateSVGPropertyNames,
+    translateNamespacedAttributes,
     translateDeepStylePropertyNames,
     promoteTextOnlyContentsToTextContentProperties,
     removeDuplicateProperties
@@ -234,6 +241,23 @@ function translateSVGPropertyNames(tx : Copy) : Copy {
     };
 }
 
+function translateNamespacedAttributes(tx : Copy) : Copy {
+    return { 
+        ...tx, 
+        JSXProperty(node, parent) {
+            let m : RegExpMatchArray | null;
+            if ((node.type === AST.JSXDynamicProperty || node.type === AST.JSXStaticProperty) 
+                && (m = rx.namespacedAttr.exec(node.name))
+            ) {
+                const namespace = namespaceAliases[m[1]],
+                    name = m[2].toLowerCase() + m[3];
+                node = { ...node, name, namespace };
+            }
+            return tx.JSXProperty.call(this, node, parent);
+        }
+    };
+}
+
 function translateDeepStylePropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
@@ -256,7 +280,7 @@ function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {
             const content0 = node.content[0];
             if (node.kind === AST.JSXElementKind.HTML && node.content.length === 1 && content0.type === AST.JSXText) {
                 var text = this.JSXText(content0),
-                    textContent = { type: AST.JSXStaticProperty, name: "textContent", value: codeStr(text.text) };
+                    textContent = { type: AST.JSXStaticProperty, name: "textContent", namespace: null, value: codeStr(text.text) };
                 node = { ...node, properties: [ ...node.properties, textContent ], content: [] };
             }
             return tx.JSXElement.call(this, node, parent);
