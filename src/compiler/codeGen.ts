@@ -30,7 +30,7 @@ const rx = {
     hasParen    : /\(/,
     loneFunction: /^function |^\(\w*\) =>|^\w+ =>/,
     endsInParen : /\)\s*$/,
-    nonIdChars  : /[^a-zA-Z0-9]/,
+    nonIdChars  : /[^a-zA-Z0-9]/g,
     doubleQuotes: /"/g,
     indent      : /\n(?=[^\n]+$)([ \t]*)/
 };
