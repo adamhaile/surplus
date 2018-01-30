@@ -17,20 +17,22 @@ export function spread(node : HTMLElement, obj : PropObj, svg : boolean) {
         if (rawName === 'style') {
             assign(node.style, obj.style);
         } else {
-            var propName = translateJSXPropertyName(rawName, svg);
-            setField(node, propName, obj[rawName], svg);
+            var fieldName = getRealFieldName(rawName, svg);
+            setField(node, fieldName, obj[rawName], svg);
         }
     }
 }
 
+var eventProp = /^on/;
+
 function setField(node : Element, name : string, value : any, svg : boolean) {
-    if (name in node && !svg) (node as any)[name] = value;
+    if (name in node && (!svg || eventProp.test(name))) (node as any)[name] = value;
     else setAttribute(node, name, value);
 }
 
 var jsxEventProperty = /^on[A-Z]/; 
 
-function translateJSXPropertyName(name : string, svg : boolean) {
+function getRealFieldName(name : string, svg : boolean) {
     return jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) :
     svg ? (name === 'className' ? 'class' : name === 'htmlFor' ? 'for' : name) :
     name;

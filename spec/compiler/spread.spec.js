@@ -87,7 +87,7 @@ describe("JSX ...spreads", function () {
         eval(code);
     });
 
-    it("convert JSX property names to DOM names", function () {
+    it("accept JSX property names", function () {
         var code = window.SurplusCompiler.compile(`
             var func = () => null,
                 spread = { onClick : func };
@@ -100,7 +100,7 @@ describe("JSX ...spreads", function () {
         eval(code);
     });
 
-    it("convert HTML property names to DOM names", function () {
+    it("accept HTML attribute names", function () {
         var code = window.SurplusCompiler.compile(`
             var spread = { "class": "foo", "for" : "bar" };
 
@@ -108,6 +108,32 @@ describe("JSX ...spreads", function () {
 
             expect(label.className).toBe("foo");
             expect(label.htmlFor).toBe("bar");
+        `);
+
+        eval(code);
+    });
+
+    it("accept DOM property names for SVG nodes and set corresponding attribute", function () {
+        var code = window.SurplusCompiler.compile(`
+            var spread = { "className": "foo", "htmlFor" : "bar" };
+
+            var rect = <rect {...spread} />;
+
+            expect(rect.getAttribute('class')).toBe("foo");
+            expect(rect.getAttribute('for')).toBe("bar");
+        `);
+
+        eval(code);
+    });
+
+    it("can add event handlers to SVG", function () {
+        var code = window.SurplusCompiler.compile(`
+            var func = () => {},
+                spread = { onClick : func };
+
+            var rect = <rect {...spread} />;
+
+            expect(rect.onclick).toBe(func);
         `);
 
         eval(code);

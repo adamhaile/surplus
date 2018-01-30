@@ -14,19 +14,20 @@ export function spread(node, obj, svg) {
             assign(node.style, obj.style);
         }
         else {
-            var propName = translateJSXPropertyName(rawName, svg);
-            setField(node, propName, obj[rawName], svg);
+            var fieldName = getRealFieldName(rawName, svg);
+            setField(node, fieldName, obj[rawName], svg);
         }
     }
 }
+var eventProp = /^on/;
 function setField(node, name, value, svg) {
-    if (name in node && !svg)
+    if (name in node && (!svg || eventProp.test(name)))
         node[name] = value;
     else
         setAttribute(node, name, value);
 }
 var jsxEventProperty = /^on[A-Z]/;
-function translateJSXPropertyName(name, svg) {
+function getRealFieldName(name, svg) {
     return jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) :
         svg ? (name === 'className' ? 'class' : name === 'htmlFor' ? 'for' : name) :
             name;
