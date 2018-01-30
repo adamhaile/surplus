@@ -8,10 +8,10 @@ export function content(parent : HTMLElement, value : InsertValue, current : str
     if (current === value) {
         // nothing to do
     } else if (t === 'string') {
-        current = parent.innerText = value as string;
+        current = parent.textContent = value as string;
     } else if (t === 'number') {
         value = value!.toString();
-        current = parent.innerText = value;
+        current = parent.textContent = value;
     } else if (value == null || t === 'boolean') { // null, undefined, true or false
         clear(parent);
         current = "";

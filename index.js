@@ -165,11 +165,11 @@ function content(parent, value, current) {
         // nothing to do
     }
     else if (t === 'string') {
-        current = parent.innerText = value;
+        current = parent.textContent = value;
     }
     else if (t === 'number') {
         value = value.toString();
-        current = parent.innerText = value;
+        current = parent.textContent = value;
     }
     else if (value == null || t === 'boolean') {
         clear(parent);
