@@ -54,9 +54,9 @@ var JSXElement = 'JSXElement';
 var JSXText = 'JSXText';
 var JSXComment = 'JSXComment';
 var JSXInsert = 'JSXInsert';
-var JSXStaticProperty = 'JSXStaticProperty';
-var JSXDynamicProperty = 'JSXDynamicProperty';
-var JSXSpreadProperty = 'JSXSpreadProperty';
+var JSXStaticField = 'JSXStaticField';
+var JSXDynamicField = 'JSXDynamicField';
+var JSXSpread = 'JSXSpread';
 var JSXStyleProperty = 'JSXStyleProperty';
 var JSXReference = 'JSXReference';
 var JSXFunction = 'JSXFunction';
@@ -114,7 +114,7 @@ function parse(TOKS, opts) {
     function jsxElement() {
         if (NOT('<'))
             ERR("not at start of html element");
-        var start = LOC(), tag = "", properties = [], references = [], functions = [], content = [], prop, hasContent = true;
+        var start = LOC(), tag = "", fields = [], references = [], functions = [], content = [], field, hasContent = true;
         NEXT(); // pass '<'
         tag = SPLIT(rx.identifier);
         if (!tag)
@@ -123,16 +123,16 @@ function parse(TOKS, opts) {
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
-                prop = jsxProperty();
-                if (prop.type === JSXReference)
-                    references.push(prop);
-                else if (prop.type === JSXFunction)
-                    functions.push(prop);
+                field = jsxField();
+                if (field.type === JSXReference)
+                    references.push(field);
+                else if (field.type === JSXFunction)
+                    functions.push(field);
                 else
-                    properties.push(prop);
+                    fields.push(field);
             }
             else if (IS('{...')) {
-                properties.push(jsxSpreadProperty());
+                fields.push(jsxSpreadProperty());
             }
             else {
                 ERR("unrecognized content in begin tag");
@@ -167,7 +167,7 @@ function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return { type: JSXElement, tag: tag, properties: properties, references: references, functions: functions, content: content, kind: JSXElementKind.HTML, loc: start };
+        return { type: JSXElement, tag: tag, fields: fields, references: references, functions: functions, content: content, kind: JSXElementKind.HTML, loc: start };
     }
     function jsxText() {
         var text = "";
@@ -193,7 +193,7 @@ function parse(TOKS, opts) {
         var loc = LOC();
         return { type: JSXInsert, code: embeddedCode(), loc: loc };
     }
-    function jsxProperty() {
+    function jsxField() {
         if (!MATCH(rx.identifier))
             ERR("not at start of property declaration");
         var loc = LOC(), name = SPLIT(rx.identifier), code;
@@ -204,28 +204,28 @@ function parse(TOKS, opts) {
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name))
                     ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
-                return { type: JSXStaticProperty, name: name, namespace: null, value: quotedString() };
+                return { type: JSXStaticField, name: name, namespace: null, value: quotedString() };
             }
             else if (IS('{')) {
                 code = embeddedCode();
                 return rx.refProp.test(name) ? { type: JSXReference, code: code, loc: loc } :
                     rx.fnProp.test(name) ? { type: JSXFunction, code: code, loc: loc } :
                         rx.styleProp.test(name) ? { type: JSXStyleProperty, name: 'style', code: code, loc: loc } :
-                            { type: JSXDynamicProperty, name: name, namespace: null, code: code, loc: loc };
+                            { type: JSXDynamicField, name: name, namespace: null, code: code, loc: loc };
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return { type: JSXStaticProperty, name: name, namespace: null, value: "true" };
+            return { type: JSXStaticField, name: name, namespace: null, value: "true" };
         }
     }
     function jsxSpreadProperty() {
         if (NOT('{...'))
             ERR("not at start of JSX spread");
         var loc = LOC();
-        return { type: JSXSpreadProperty, code: embeddedCode(), loc: loc };
+        return { type: JSXSpread, code: embeddedCode(), loc: loc };
     }
     function embeddedCode() {
         if (NOT('{') && NOT('{...'))
@@ -1030,25 +1030,25 @@ var codeGen = function (ctl, opts) {
         var svg = node.kind === JSXElementKind.SVG;
         return (
         // optimization: don't need IIFE for simple single nodes
-        (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
+        (node.fields.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
             node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
                 + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', null, null)") :
             // optimization: don't need IIFE for simple single nodes with a single class attribute
-            (node.properties.length === 1
-                && node.properties[0].type === JSXStaticProperty
-                && node.properties[0].name === (svg ? "class" : "className")
+            (node.fields.length === 1
+                && node.fields[0].type === JSXStaticField
+                && node.fields[0].name === (svg ? "class" : "className")
                 && node.functions.length === 0
                 && node.content.length === 0) ?
                 node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
-                    + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', " + node.properties[0].value + ", null)") :
+                    + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', " + node.fields[0].value + ", null)") :
                 emitDOMExpression(buildDOMExpression(node), indent));
     }, buildSubComponent = function (node) {
         var refs = node.references.map(function (r) { return compileSegments(r.code); }), fns = node.functions.map(function (r) { return compileSegments(r.code); }), 
         // group successive properties into property objects, but spreads stand alone
         // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
-        properties = node.properties.reduce(function (props, p) {
-            var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p.type === JSXStaticProperty ? p.value : compileSegments(p.code);
-            if (p.type === JSXSpreadProperty) {
+        properties = node.fields.reduce(function (props, p) {
+            var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p.type === JSXStaticField ? p.value : compileSegments(p.code);
+            if (p.type === JSXSpread) {
                 props.push(value);
             }
             else if (lastSegment === null
@@ -1081,7 +1081,7 @@ var codeGen = function (ctl, opts) {
         // if there are any children, add them to (or add a) last object
         propertiesWithChildren = children === null ? sub.properties :
             lastProperty === null || typeof lastProperty === 'string' ? sub.properties.concat([{ children: children }]) : sub.properties.slice(0, sub.properties.length - 1).concat([__assign$1({}, lastProperty, { children: children })]), 
-        // if we're going to ber Object.assign'ing to the first object, it needs to be one we made, not a spread
+        // if we're going to be Object.assign'ing to the first object, it needs to be one we made, not a spread
         propertiesWithInitialObject = propertiesWithChildren.length === 0 || (propertiesWithChildren.length > 1 && typeof propertiesWithChildren[0] === 'string')
             ? [{}].concat(propertiesWithChildren) : propertiesWithChildren, propertyExprs = propertiesWithInitialObject.map(function (obj) {
             return typeof obj === 'string' ? obj :
@@ -1103,21 +1103,21 @@ var codeGen = function (ctl, opts) {
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
-            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
+            var tag = node.tag, fields = node.fields, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             if (node.kind === JSXElementKind.SubComponent) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, propExprs_1 = properties.map(function (p) { return p.type === JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p.type === JSXSpreadProperty || p.type === JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p.type === JSXStaticProperty && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
-                    return p === classProp_1 ? '' :
-                        p.type === JSXStaticProperty ? buildProperty(id_1, p.name, p.namespace, p.value, svg_1) :
-                            p.type === JSXDynamicProperty ? buildProperty(id_1, p.name, p.namespace, propExprs_1[i], svg_1) :
-                                p.type === JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
-                                    buildSpread(id_1, propExprs_1[i], svg_1);
+                var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, fieldExprs_1 = fields.map(function (p) { return p.type === JSXStaticField ? '' : compileSegments(p.code); }), spreads_1 = fields.filter(function (p) { return p.type === JSXSpread || p.type === JSXStyleProperty; }), classField_1 = spreads_1.length === 0 && fields.filter(function (p) { return p.type === JSXStaticField && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, fieldsDynamic_1 = fieldExprs_1.some(function (e) { return !noApparentSignals(e); }), fieldStmts = fields.map(function (f, i) {
+                    return f === classField_1 ? '' :
+                        f.type === JSXStaticField ? buildField(id_1, f.name, f.namespace, f.value, svg_1) :
+                            f.type === JSXDynamicField ? buildField(id_1, f.name, f.namespace, fieldExprs_1[i], svg_1) :
+                                f.type === JSXStyleProperty ? buildStyle(f, id_1, fieldExprs_1[i], fieldsDynamic_1, spreads_1) :
+                                    buildSpread(id_1, fieldExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
-                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
-                if (!propsDynamic_1) {
-                    propStmts.forEach(addStatement);
+                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element('" + tag + "', " + (classField_1 && classField_1.value) + ", " + (parent || null) + ");");
+                if (!fieldsDynamic_1) {
+                    fieldStmts.forEach(addStatement);
                 }
                 if (content.length === 1 && content[0].type === JSXInsert) {
                     buildJSXContent(content[0], id_1);
@@ -1125,12 +1125,12 @@ var codeGen = function (ctl, opts) {
                 else {
                     content.forEach(function (c, i) { return buildChild(c, id_1, i); });
                 }
-                if (propsDynamic_1) {
-                    addComputation(propStmts, null, null, loc);
+                if (fieldsDynamic_1) {
+                    addComputation(fieldStmts, null, null, loc);
                 }
                 functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
-        }, buildProperty = function (id, prop, ns, expr, svg) {
+        }, buildField = function (id, prop, ns, expr, svg) {
             return ns ? "Surplus.setAttributeNS(" + id + ", " + codeStr(ns) + ", " + codeStr(prop) + ", " + expr + ");" :
                 svg || IsAttribute(prop) ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
                     : id + "." + prop + " = " + expr + ";";
@@ -1261,11 +1261,11 @@ var Copy = {
     },
     JSXElement: function (node, parent) {
         var _this = this;
-        return __assign({}, node, { properties: node.properties.map(function (p) { return _this.JSXProperty(p, node); }), references: node.references.map(function (r) { return _this.JSXReference(r); }), functions: node.functions.map(function (f) { return _this.JSXFunction(f); }), content: node.content.map(function (c) { return _this.JSXContent(c, node); }) });
+        return __assign({}, node, { fields: node.fields.map(function (p) { return _this.JSXField(p, node); }), references: node.references.map(function (r) { return _this.JSXReference(r); }), functions: node.functions.map(function (f) { return _this.JSXFunction(f); }), content: node.content.map(function (c) { return _this.JSXContent(c, node); }) });
     },
-    JSXProperty: function (node, parent) {
-        return node.type === JSXStaticProperty ? this.JSXStaticProperty(node, parent) :
-            node.type === JSXDynamicProperty ? this.JSXDynamicProperty(node, parent) :
+    JSXField: function (node, parent) {
+        return node.type === JSXStaticField ? this.JSXStaticField(node, parent) :
+            node.type === JSXDynamicField ? this.JSXDynamicField(node, parent) :
                 node.type === JSXStyleProperty ? this.JSXStyleProperty(node) :
                     this.JSXSpreadProperty(node);
     },
@@ -1281,8 +1281,8 @@ var Copy = {
     CodeText: function (node) { return node; },
     JSXText: function (node) { return node; },
     JSXComment: function (node) { return node; },
-    JSXStaticProperty: function (node, parent) { return node; },
-    JSXDynamicProperty: function (node, parent) {
+    JSXStaticField: function (node, parent) { return node; },
+    JSXDynamicField: function (node, parent) {
         return __assign({}, node, { code: this.EmbeddedCode(node.code) });
     },
     JSXSpreadProperty: function (node) {
@@ -1370,78 +1370,78 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
 function removeDuplicateProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node, parent) {
             var lastid = {};
-            node.properties.forEach(function (p, i) { return p.type === JSXSpreadProperty || p.type === JSXStyleProperty || (lastid[p.name] = i); });
-            var properties = node.properties.filter(function (p, i) {
+            node.fields.forEach(function (p, i) { return p.type === JSXSpread || p.type === JSXStyleProperty || (lastid[p.name] = i); });
+            var fields = node.fields.filter(function (p, i) {
                 // spreads and styles can be repeated
-                return p.type === JSXSpreadProperty
+                return p.type === JSXSpread
                     || p.type === JSXStyleProperty
                     // but named properties can't
                     || lastid[p.name] === i;
             });
-            if (properties.length !== node.properties.length) {
-                node = __assign({}, node, { properties: properties });
+            if (fields.length !== node.fields.length) {
+                node = __assign({}, node, { fields: fields });
             }
             return tx.JSXElement.call(this, node, parent);
         } });
 }
 function translateJSXPropertyNames(tx) {
-    return __assign({}, tx, { JSXDynamicProperty: function (node, parent) {
+    return __assign({}, tx, { JSXDynamicField: function (node, parent) {
             if (parent.kind === JSXElementKind.HTML) {
                 node = __assign({}, node, { name: translateJSXPropertyName(node.name) });
             }
-            return tx.JSXDynamicProperty.call(this, node, parent);
+            return tx.JSXDynamicField.call(this, node, parent);
         } });
 }
 function translateJSXPropertyName(name) {
     return rx$1.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
 }
 function translateHTMLAttributeNames(tx) {
-    return __assign({}, tx, { JSXProperty: function (node, parent) {
-            if ((node.type === JSXDynamicProperty || node.type === JSXStaticProperty)
+    return __assign({}, tx, { JSXField: function (node, parent) {
+            if ((node.type === JSXDynamicField || node.type === JSXStaticField)
                 && parent.kind === JSXElementKind.HTML) {
                 var name_1 = node.name === "class" ? "className" : node.name === "for" ? "htmlFor" : node.name;
                 node = __assign({}, node, { name: name_1 });
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         } });
 }
 function translateSVGPropertyNames(tx) {
-    return __assign({}, tx, { JSXProperty: function (node, parent) {
-            if ((node.type === JSXDynamicProperty || node.type === JSXStaticProperty)
+    return __assign({}, tx, { JSXField: function (node, parent) {
+            if ((node.type === JSXDynamicField || node.type === JSXStaticField)
                 && parent.kind === JSXElementKind.SVG) {
                 var name_2 = node.name === "className" ? "class" : node.name === "htmlFor" ? "for" : node.name;
                 node = __assign({}, node, { name: name_2 });
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         } });
 }
 function translateNamespacedAttributes(tx) {
-    return __assign({}, tx, { JSXProperty: function (node, parent) {
+    return __assign({}, tx, { JSXField: function (node, parent) {
             var m;
-            if ((node.type === JSXDynamicProperty || node.type === JSXStaticProperty)
+            if ((node.type === JSXDynamicField || node.type === JSXStaticField)
                 && (m = rx$1.namespacedAttr.exec(node.name))) {
                 var namespace = namespaceAliases[m[1]], name_3 = m[2].toLowerCase() + m[3];
                 node = __assign({}, node, { name: name_3, namespace: namespace });
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         } });
 }
 function translateDeepStylePropertyNames(tx) {
-    return __assign({}, tx, { JSXProperty: function (node, parent) {
-            if ((node.type === JSXDynamicProperty || node.type === JSXStaticProperty)
+    return __assign({}, tx, { JSXField: function (node, parent) {
+            if ((node.type === JSXDynamicField || node.type === JSXStaticField)
                 && parent.kind === JSXElementKind.HTML
                 && node.name.substr(0, 6) === 'style-') {
                 node = __assign({}, node, { name: 'style.' + node.name.substr(6) });
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         } });
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node, parent) {
             var content0 = node.content[0];
             if (node.kind === JSXElementKind.HTML && node.content.length === 1 && content0.type === JSXText) {
-                var text = this.JSXText(content0), textContent = { type: JSXStaticProperty, name: "textContent", namespace: null, value: codeStr(text.text) };
-                node = __assign({}, node, { properties: node.properties.concat([textContent]), content: [] });
+                var text = this.JSXText(content0), textContent = { type: JSXStaticField, name: "textContent", namespace: null, value: codeStr(text.text) };
+                node = __assign({}, node, { fields: node.fields.concat([textContent]), content: [] });
             }
             return tx.JSXElement.call(this, node, parent);
         } });

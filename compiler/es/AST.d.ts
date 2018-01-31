@@ -16,7 +16,7 @@ export interface EmbeddedCode {
     type: typeof EmbeddedCode;
     segments: CodeSegment[];
 }
-export declare type JSXProperty = JSXStaticProperty | JSXDynamicProperty | JSXStyleProperty | JSXSpreadProperty;
+export declare type JSXField = JSXStaticField | JSXDynamicField | JSXStyleProperty | JSXSpread;
 export declare type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
 export declare enum JSXElementKind {
     HTML = 0,
@@ -27,7 +27,7 @@ export declare const JSXElement: "JSXElement";
 export interface JSXElement {
     type: typeof JSXElement;
     tag: string;
-    properties: JSXProperty[];
+    fields: JSXField[];
     references: JSXReference[];
     functions: JSXFunction[];
     content: JSXContent[];
@@ -50,24 +50,24 @@ export interface JSXInsert {
     code: EmbeddedCode;
     loc: LOC;
 }
-export declare const JSXStaticProperty: "JSXStaticProperty";
-export interface JSXStaticProperty {
-    type: typeof JSXStaticProperty;
+export declare const JSXStaticField: "JSXStaticField";
+export interface JSXStaticField {
+    type: typeof JSXStaticField;
     name: string;
     namespace: string | null;
     value: string;
 }
-export declare const JSXDynamicProperty: "JSXDynamicProperty";
-export interface JSXDynamicProperty {
-    type: typeof JSXDynamicProperty;
+export declare const JSXDynamicField: "JSXDynamicField";
+export interface JSXDynamicField {
+    type: typeof JSXDynamicField;
     name: string;
     namespace: string | null;
     code: EmbeddedCode;
     loc: LOC;
 }
-export declare const JSXSpreadProperty: "JSXSpreadProperty";
-export interface JSXSpreadProperty {
-    type: typeof JSXSpreadProperty;
+export declare const JSXSpread: "JSXSpread";
+export interface JSXSpread {
+    type: typeof JSXSpread;
     code: EmbeddedCode;
     loc: LOC;
 }

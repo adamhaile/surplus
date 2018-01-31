@@ -34,15 +34,15 @@ const Copy = {
     JSXElement(node : AST.JSXElement, parent : AST.JSXElement | null) : AST.JSXElement {
         return { 
             ...node,
-            properties: node.properties.map(p => this.JSXProperty(p, node)),
+            fields: node.fields.map(p => this.JSXField(p, node)),
             references: node.references.map(r => this.JSXReference(r)),
             functions: node.functions.map(f => this.JSXFunction(f)),
             content: node.content.map(c => this.JSXContent(c, node))
         };
     },
-    JSXProperty(node : AST.JSXProperty, parent : AST.JSXElement) {
-        return node.type === AST.JSXStaticProperty  ? this.JSXStaticProperty(node, parent) :
-               node.type === AST.JSXDynamicProperty ? this.JSXDynamicProperty(node, parent) :
+    JSXField(node : AST.JSXField, parent : AST.JSXElement) {
+        return node.type === AST.JSXStaticField  ? this.JSXStaticField(node, parent) :
+               node.type === AST.JSXDynamicField ? this.JSXDynamicField(node, parent) :
                node.type === AST.JSXStyleProperty   ? this.JSXStyleProperty(node) :
                this.JSXSpreadProperty(node);
     },
@@ -58,11 +58,11 @@ const Copy = {
     CodeText(node : AST.CodeText) { return node; },
     JSXText(node : AST.JSXText) { return node; },
     JSXComment(node : AST.JSXComment) { return node; },
-    JSXStaticProperty(node : AST.JSXStaticProperty, parent : AST.JSXElement) { return node; },
-    JSXDynamicProperty(node : AST.JSXDynamicProperty, parent : AST.JSXElement) {
+    JSXStaticField(node : AST.JSXStaticField, parent : AST.JSXElement) { return node; },
+    JSXDynamicField(node : AST.JSXDynamicField, parent : AST.JSXElement) {
         return { ...node, code: this.EmbeddedCode(node.code) };
     },
-    JSXSpreadProperty(node : AST.JSXSpreadProperty) {
+    JSXSpreadProperty(node : AST.JSXSpread) {
         return { ...node, code: this.EmbeddedCode(node.code) };
     },
     JSXStyleProperty(node : AST.JSXStyleProperty) {
@@ -176,18 +176,18 @@ function removeDuplicateProperties(tx : Copy) : Copy {
         JSXElement(node, parent) {
             const lastid = {} as { [ name : string ] : number };
 
-            node.properties.forEach((p, i) => p.type === AST.JSXSpreadProperty || p.type === AST.JSXStyleProperty || (lastid[p.name] = i));
+            node.fields.forEach((p, i) => p.type === AST.JSXSpread || p.type === AST.JSXStyleProperty || (lastid[p.name] = i));
 
-            const properties = node.properties.filter((p, i) => 
+            const fields = node.fields.filter((p, i) => 
                 // spreads and styles can be repeated
-                p.type === AST.JSXSpreadProperty 
+                p.type === AST.JSXSpread 
                 || p.type === AST.JSXStyleProperty 
                 // but named properties can't
                 || lastid[p.name] === i
             );
 
-            if (properties.length !== node.properties.length) {
-                node = { ...node, properties };
+            if (fields.length !== node.fields.length) {
+                node = { ...node, fields };
             }
 
             return tx.JSXElement.call(this, node, parent);
@@ -198,11 +198,11 @@ function removeDuplicateProperties(tx : Copy) : Copy {
 function translateJSXPropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXDynamicProperty(node, parent) {
+        JSXDynamicField(node, parent) {
             if (parent.kind === AST.JSXElementKind.HTML) {
                 node = { ...node, name: translateJSXPropertyName(node.name) };
             }
-            return tx.JSXDynamicProperty.call(this, node, parent);
+            return tx.JSXDynamicField.call(this, node, parent);
         } 
     };
 }
@@ -214,14 +214,14 @@ function translateJSXPropertyName(name : string) {
 function translateHTMLAttributeNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXProperty(node, parent) {
-            if ((node.type === AST.JSXDynamicProperty || node.type === AST.JSXStaticProperty) 
+        JSXField(node, parent) {
+            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) 
                 && parent.kind === AST.JSXElementKind.HTML
             ) {
                 const name = node.name === "class" ? "className" : node.name === "for" ? "htmlFor" : node.name;
                 node = { ...node, name };
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         }
     };
 }
@@ -229,14 +229,14 @@ function translateHTMLAttributeNames(tx : Copy) : Copy {
 function translateSVGPropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXProperty(node, parent) {
-            if ((node.type === AST.JSXDynamicProperty || node.type === AST.JSXStaticProperty) 
+        JSXField(node, parent) {
+            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) 
                 && parent.kind === AST.JSXElementKind.SVG
             ) {
                 const name = node.name === "className" ? "class" : node.name === "htmlFor" ? "for" : node.name
                 node = { ...node, name };
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         }
     };
 }
@@ -244,16 +244,16 @@ function translateSVGPropertyNames(tx : Copy) : Copy {
 function translateNamespacedAttributes(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXProperty(node, parent) {
+        JSXField(node, parent) {
             let m : RegExpMatchArray | null;
-            if ((node.type === AST.JSXDynamicProperty || node.type === AST.JSXStaticProperty) 
+            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) 
                 && (m = rx.namespacedAttr.exec(node.name))
             ) {
                 const namespace = namespaceAliases[m[1]],
                     name = m[2].toLowerCase() + m[3];
                 node = { ...node, name, namespace };
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         }
     };
 }
@@ -261,14 +261,14 @@ function translateNamespacedAttributes(tx : Copy) : Copy {
 function translateDeepStylePropertyNames(tx : Copy) : Copy {
     return { 
         ...tx, 
-        JSXProperty(node, parent) {
-            if ((node.type === AST.JSXDynamicProperty || node.type === AST.JSXStaticProperty) 
+        JSXField(node, parent) {
+            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) 
                 && parent.kind === AST.JSXElementKind.HTML 
                 && node.name.substr(0, 6) === 'style-'
             ) {
                 node = { ...node, name: 'style.' + node.name.substr(6) };
             }
-            return tx.JSXProperty.call(this, node, parent);
+            return tx.JSXField.call(this, node, parent);
         }
     };
 }
@@ -280,8 +280,8 @@ function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {
             const content0 = node.content[0];
             if (node.kind === AST.JSXElementKind.HTML && node.content.length === 1 && content0.type === AST.JSXText) {
                 var text = this.JSXText(content0),
-                    textContent = { type: AST.JSXStaticProperty, name: "textContent", namespace: null, value: codeStr(text.text) };
-                node = { ...node, properties: [ ...node.properties, textContent ], content: [] };
+                    textContent = { type: AST.JSXStaticField, name: "textContent", namespace: null, value: codeStr(text.text) };
+                node = { ...node, fields: [ ...node.fields, textContent ], content: [] };
             }
             return tx.JSXElement.call(this, node, parent);
         }

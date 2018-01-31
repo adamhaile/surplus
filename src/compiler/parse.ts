@@ -65,11 +65,11 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
 
         var start = LOC(),
             tag = "",
-            properties = [] as AST.JSXProperty[],
+            fields = [] as AST.JSXField[],
             references = [] as AST.JSXReference[],
             functions = [] as AST.JSXFunction[],
             content = [] as AST.JSXContent[],
-            prop : AST.JSXProperty | AST.JSXReference | AST.JSXFunction,
+            field : AST.JSXField | AST.JSXReference | AST.JSXFunction,
             hasContent = true;
 
         NEXT(); // pass '<'
@@ -83,12 +83,12 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
-                prop = jsxProperty();
-                if (prop.type === AST.JSXReference) references.push(prop);
-                else if (prop.type === AST.JSXFunction) functions.push(prop);
-                else properties.push(prop);
+                field = jsxField();
+                if (field.type === AST.JSXReference) references.push(field);
+                else if (field.type === AST.JSXFunction) functions.push(field);
+                else fields.push(field);
             } else if (IS('{...')) {
-                properties.push(jsxSpreadProperty());
+                fields.push(jsxSpreadProperty());
             } else {
                 ERR("unrecognized content in begin tag");
             }
@@ -126,7 +126,7 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
             NEXT(); // pass '>'
         }
 
-        return { type: AST.JSXElement, tag, properties, references, functions, content, kind: AST.JSXElementKind.HTML, loc: start };
+        return { type: AST.JSXElement, tag, fields, references, functions, content, kind: AST.JSXElementKind.HTML, loc: start };
     }
 
     function jsxText() : AST.JSXText {
@@ -163,7 +163,7 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
         return { type: AST.JSXInsert, code: embeddedCode(), loc };
     }
 
-    function jsxProperty() : AST.JSXProperty | AST.JSXReference | AST.JSXFunction {
+    function jsxField() : AST.JSXField | AST.JSXReference | AST.JSXFunction {
         if (!MATCH(rx.identifier)) ERR("not at start of property declaration");
 
         var loc = LOC(),
@@ -179,27 +179,27 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
 
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name)) ERR(`cannot name a static property '${name}' as it has a special meaning as a dynamic property`, loc);
-                return { type: AST.JSXStaticProperty, name, namespace: null, value: quotedString() };
+                return { type: AST.JSXStaticField, name, namespace: null, value: quotedString() };
             } else if (IS('{')) {
                 code = embeddedCode();
                 return rx.refProp.test(name) ? { type: AST.JSXReference, code, loc } :
                     rx.fnProp.test(name) ? { type: AST.JSXFunction, code, loc } : 
                     rx.styleProp.test(name) ? { type: AST.JSXStyleProperty, name: 'style', code, loc } :
-                    { type: AST.JSXDynamicProperty, name, namespace: null, code, loc };
+                    { type: AST.JSXDynamicField, name, namespace: null, code, loc };
             } else {
                 return ERR("unexepected value for JSX property");
             }
         } else {
-            return { type: AST.JSXStaticProperty, name, namespace: null, value: "true" };
+            return { type: AST.JSXStaticField, name, namespace: null, value: "true" };
         }
     }
 
-    function jsxSpreadProperty() : AST.JSXSpreadProperty {
+    function jsxSpreadProperty() : AST.JSXSpread {
         if (NOT('{...')) ERR("not at start of JSX spread");
 
         var loc = LOC();
 
-        return { type: AST.JSXSpreadProperty, code: embeddedCode(), loc };
+        return { type: AST.JSXSpread, code: embeddedCode(), loc };
     }
 
     function embeddedCode() : AST.EmbeddedCode {

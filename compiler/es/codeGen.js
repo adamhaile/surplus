@@ -6,7 +6,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
     }
     return t;
 };
-import { EmbeddedCode, CodeText, JSXElement, JSXElementKind, JSXText, JSXComment, JSXInsert, JSXStaticProperty, JSXDynamicProperty, JSXStyleProperty, JSXSpreadProperty } from './AST';
+import { EmbeddedCode, CodeText, JSXElement, JSXElementKind, JSXText, JSXComment, JSXInsert, JSXStaticField, JSXDynamicField, JSXStyleProperty, JSXSpread } from './AST';
 import { locationMark } from './sourcemap';
 import { IsAttribute } from './domRef';
 export { codeGen, codeStr };
@@ -67,25 +67,25 @@ var codeGen = function (ctl, opts) {
         var svg = node.kind === JSXElementKind.SVG;
         return (
         // optimization: don't need IIFE for simple single nodes
-        (node.properties.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
+        (node.fields.length === 0 && node.functions.length === 0 && node.content.length === 0) ?
             node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
                 + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', null, null)") :
             // optimization: don't need IIFE for simple single nodes with a single class attribute
-            (node.properties.length === 1
-                && node.properties[0].type === JSXStaticProperty
-                && node.properties[0].name === (svg ? "class" : "className")
+            (node.fields.length === 1
+                && node.fields[0].type === JSXStaticField
+                && node.fields[0].name === (svg ? "class" : "className")
                 && node.functions.length === 0
                 && node.content.length === 0) ?
                 node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
-                    + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', " + node.properties[0].value + ", null)") :
+                    + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', " + node.fields[0].value + ", null)") :
                 emitDOMExpression(buildDOMExpression(node), indent));
     }, buildSubComponent = function (node) {
         var refs = node.references.map(function (r) { return compileSegments(r.code); }), fns = node.functions.map(function (r) { return compileSegments(r.code); }), 
         // group successive properties into property objects, but spreads stand alone
         // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
-        properties = node.properties.reduce(function (props, p) {
-            var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p.type === JSXStaticProperty ? p.value : compileSegments(p.code);
-            if (p.type === JSXSpreadProperty) {
+        properties = node.fields.reduce(function (props, p) {
+            var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p.type === JSXStaticField ? p.value : compileSegments(p.code);
+            if (p.type === JSXSpread) {
                 props.push(value);
             }
             else if (lastSegment === null
@@ -118,7 +118,7 @@ var codeGen = function (ctl, opts) {
         // if there are any children, add them to (or add a) last object
         propertiesWithChildren = children === null ? sub.properties :
             lastProperty === null || typeof lastProperty === 'string' ? sub.properties.concat([{ children: children }]) : sub.properties.slice(0, sub.properties.length - 1).concat([__assign({}, lastProperty, { children: children })]), 
-        // if we're going to ber Object.assign'ing to the first object, it needs to be one we made, not a spread
+        // if we're going to be Object.assign'ing to the first object, it needs to be one we made, not a spread
         propertiesWithInitialObject = propertiesWithChildren.length === 0 || (propertiesWithChildren.length > 1 && typeof propertiesWithChildren[0] === 'string')
             ? [{}].concat(propertiesWithChildren) : propertiesWithChildren, propertyExprs = propertiesWithInitialObject.map(function (obj) {
             return typeof obj === 'string' ? obj :
@@ -140,21 +140,21 @@ var codeGen = function (ctl, opts) {
     }, buildDOMExpression = function (top) {
         var ids = [], statements = [], computations = [];
         var buildHtmlElement = function (node, parent, n) {
-            var tag = node.tag, properties = node.properties, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
+            var tag = node.tag, fields = node.fields, references = node.references, functions = node.functions, content = node.content, loc = node.loc;
             if (node.kind === JSXElementKind.SubComponent) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, propExprs_1 = properties.map(function (p) { return p.type === JSXStaticProperty ? '' : compileSegments(p.code); }), spreads_1 = properties.filter(function (p) { return p.type === JSXSpreadProperty || p.type === JSXStyleProperty; }), classProp_1 = spreads_1.length === 0 && properties.filter(function (p) { return p.type === JSXStaticProperty && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, propsDynamic_1 = propExprs_1.some(function (e) { return !noApparentSignals(e); }), propStmts = properties.map(function (p, i) {
-                    return p === classProp_1 ? '' :
-                        p.type === JSXStaticProperty ? buildProperty(id_1, p.name, p.namespace, p.value, svg_1) :
-                            p.type === JSXDynamicProperty ? buildProperty(id_1, p.name, p.namespace, propExprs_1[i], svg_1) :
-                                p.type === JSXStyleProperty ? buildStyle(p, id_1, propExprs_1[i], propsDynamic_1, spreads_1) :
-                                    buildSpread(id_1, propExprs_1[i], svg_1);
+                var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, fieldExprs_1 = fields.map(function (p) { return p.type === JSXStaticField ? '' : compileSegments(p.code); }), spreads_1 = fields.filter(function (p) { return p.type === JSXSpread || p.type === JSXStyleProperty; }), classField_1 = spreads_1.length === 0 && fields.filter(function (p) { return p.type === JSXStaticField && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, fieldsDynamic_1 = fieldExprs_1.some(function (e) { return !noApparentSignals(e); }), fieldStmts = fields.map(function (f, i) {
+                    return f === classField_1 ? '' :
+                        f.type === JSXStaticField ? buildField(id_1, f.name, f.namespace, f.value, svg_1) :
+                            f.type === JSXDynamicField ? buildField(id_1, f.name, f.namespace, fieldExprs_1[i], svg_1) :
+                                f.type === JSXStyleProperty ? buildStyle(f, id_1, fieldExprs_1[i], fieldsDynamic_1, spreads_1) :
+                                    buildSpread(id_1, fieldExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
-                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element('" + tag + "', " + (classProp_1 && classProp_1.value) + ", " + (parent || null) + ");");
-                if (!propsDynamic_1) {
-                    propStmts.forEach(addStatement);
+                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element('" + tag + "', " + (classField_1 && classField_1.value) + ", " + (parent || null) + ");");
+                if (!fieldsDynamic_1) {
+                    fieldStmts.forEach(addStatement);
                 }
                 if (content.length === 1 && content[0].type === JSXInsert) {
                     buildJSXContent(content[0], id_1);
@@ -162,12 +162,12 @@ var codeGen = function (ctl, opts) {
                 else {
                     content.forEach(function (c, i) { return buildChild(c, id_1, i); });
                 }
-                if (propsDynamic_1) {
-                    addComputation(propStmts, null, null, loc);
+                if (fieldsDynamic_1) {
+                    addComputation(fieldStmts, null, null, loc);
                 }
                 functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
-        }, buildProperty = function (id, prop, ns, expr, svg) {
+        }, buildField = function (id, prop, ns, expr, svg) {
             return ns ? "Surplus.setAttributeNS(" + id + ", " + codeStr(ns) + ", " + codeStr(prop) + ", " + expr + ");" :
                 svg || IsAttribute(prop) ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
                     : id + "." + prop + " = " + expr + ";";

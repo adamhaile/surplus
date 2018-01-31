@@ -52,7 +52,7 @@ export function parse(TOKS, opts) {
     function jsxElement() {
         if (NOT('<'))
             ERR("not at start of html element");
-        var start = LOC(), tag = "", properties = [], references = [], functions = [], content = [], prop, hasContent = true;
+        var start = LOC(), tag = "", fields = [], references = [], functions = [], content = [], field, hasContent = true;
         NEXT(); // pass '<'
         tag = SPLIT(rx.identifier);
         if (!tag)
@@ -61,16 +61,16 @@ export function parse(TOKS, opts) {
         // scan for properties until end of opening tag
         while (!EOF && NOT('>') && NOT('/>')) {
             if (MATCH(rx.identifier)) {
-                prop = jsxProperty();
-                if (prop.type === AST.JSXReference)
-                    references.push(prop);
-                else if (prop.type === AST.JSXFunction)
-                    functions.push(prop);
+                field = jsxField();
+                if (field.type === AST.JSXReference)
+                    references.push(field);
+                else if (field.type === AST.JSXFunction)
+                    functions.push(field);
                 else
-                    properties.push(prop);
+                    fields.push(field);
             }
             else if (IS('{...')) {
-                properties.push(jsxSpreadProperty());
+                fields.push(jsxSpreadProperty());
             }
             else {
                 ERR("unrecognized content in begin tag");
@@ -105,7 +105,7 @@ export function parse(TOKS, opts) {
                 ERR("malformed close tag");
             NEXT(); // pass '>'
         }
-        return { type: AST.JSXElement, tag: tag, properties: properties, references: references, functions: functions, content: content, kind: AST.JSXElementKind.HTML, loc: start };
+        return { type: AST.JSXElement, tag: tag, fields: fields, references: references, functions: functions, content: content, kind: AST.JSXElementKind.HTML, loc: start };
     }
     function jsxText() {
         var text = "";
@@ -131,7 +131,7 @@ export function parse(TOKS, opts) {
         var loc = LOC();
         return { type: AST.JSXInsert, code: embeddedCode(), loc: loc };
     }
-    function jsxProperty() {
+    function jsxField() {
         if (!MATCH(rx.identifier))
             ERR("not at start of property declaration");
         var loc = LOC(), name = SPLIT(rx.identifier), code;
@@ -142,28 +142,28 @@ export function parse(TOKS, opts) {
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name))
                     ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
-                return { type: AST.JSXStaticProperty, name: name, namespace: null, value: quotedString() };
+                return { type: AST.JSXStaticField, name: name, namespace: null, value: quotedString() };
             }
             else if (IS('{')) {
                 code = embeddedCode();
                 return rx.refProp.test(name) ? { type: AST.JSXReference, code: code, loc: loc } :
                     rx.fnProp.test(name) ? { type: AST.JSXFunction, code: code, loc: loc } :
                         rx.styleProp.test(name) ? { type: AST.JSXStyleProperty, name: 'style', code: code, loc: loc } :
-                            { type: AST.JSXDynamicProperty, name: name, namespace: null, code: code, loc: loc };
+                            { type: AST.JSXDynamicField, name: name, namespace: null, code: code, loc: loc };
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return { type: AST.JSXStaticProperty, name: name, namespace: null, value: "true" };
+            return { type: AST.JSXStaticField, name: name, namespace: null, value: "true" };
         }
     }
     function jsxSpreadProperty() {
         if (NOT('{...'))
             ERR("not at start of JSX spread");
         var loc = LOC();
-        return { type: AST.JSXSpreadProperty, code: embeddedCode(), loc: loc };
+        return { type: AST.JSXSpread, code: embeddedCode(), loc: loc };
     }
     function embeddedCode() {
         if (NOT('{') && NOT('{...'))
