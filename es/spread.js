@@ -1,5 +1,5 @@
 import { setAttribute } from './dom';
-import { getFieldData } from './fieldNames';
+import { getFieldData } from './fieldData';
 import { setAttributeNS } from './index';
 export function assign(a, b) {
     var props = Object.keys(b);

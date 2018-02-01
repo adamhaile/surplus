@@ -10,7 +10,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 import * as AST from './AST';
 import { codeStr } from './codeGen';
 import { htmlEntites, svgOnlyTagRx, svgForeignTag } from './domRef';
-import { getFieldData } from './fieldNames';
+import { getFieldData } from './fieldData';
 import { JSXElementKind } from './AST';
 var rx = {
     trimmableWS: /^\s*?\n\s*|\s*?\n\s*$/g,

@@ -1,5 +1,5 @@
 import { setAttribute } from './dom';
-import { getFieldData, FieldData } from './fieldNames';
+import { getFieldData, FieldData } from './fieldData';
 import { setAttributeNS } from './index';
 
 export type PropObj = { [ name : string ] : any };

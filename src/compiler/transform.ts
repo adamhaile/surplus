@@ -3,7 +3,7 @@ import * as AST from './AST';
 import { Params } from './compile';
 import { codeStr } from './codeGen';
 import { htmlEntites, svgOnlyTagRx, svgForeignTag } from './domRef';
-import { getFieldData, FieldData } from './fieldNames';
+import { getFieldData, FieldData } from './fieldData';
 import { JSXElementKind } from './AST';
 
 const rx = {
