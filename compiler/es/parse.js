@@ -142,21 +142,21 @@ export function parse(TOKS, opts) {
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name))
                     ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
-                return { type: AST.JSXStaticField, name: name, attr: false, namespace: null, value: quotedString() };
+                return { type: AST.JSXStaticField, name: name, value: quotedString() };
             }
             else if (IS('{')) {
                 code = embeddedCode();
                 return rx.refProp.test(name) ? { type: AST.JSXReference, code: code, loc: loc } :
                     rx.fnProp.test(name) ? { type: AST.JSXFunction, code: code, loc: loc } :
                         rx.styleProp.test(name) ? { type: AST.JSXStyleProperty, name: 'style', code: code, loc: loc } :
-                            { type: AST.JSXDynamicField, name: name, attr: false, namespace: null, code: code, loc: loc };
+                            { type: AST.JSXDynamicField, name: name, code: code, loc: loc };
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return { type: AST.JSXStaticField, name: name, attr: false, namespace: null, value: "true" };
+            return { type: AST.JSXStaticField, name: name, value: "true" };
         }
     }
     function jsxSpreadProperty() {

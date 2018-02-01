@@ -12,7 +12,7 @@
   "types": "index.d.ts",
   "scripts": {
     "test": "karma start",
-    "build": "tsc -p src/runtime/tsconfig.json && tsc -p src/compiler/tsconfig.json && rollup -c src/runtime/rollup.config.js && rollup -c src/compiler/rollup.config.js"
+    "build": "cp src/compiler/fieldData.ts src/runtime/fieldData.ts && tsc -p src/runtime/tsconfig.json && tsc -p src/compiler/tsconfig.json && rollup -c src/runtime/rollup.config.js && rollup -c src/compiler/rollup.config.js"
   },
   "author": "Adam Haile",
   "homepage": "https://github.com/adamhaile/surplus",

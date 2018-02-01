@@ -10,8 +10,6 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 import * as AST from './AST';
 import { codeStr } from './codeGen';
 import { htmlEntites, svgOnlyTagRx, svgForeignTag } from './domRef';
-import { getFieldData } from './fieldData';
-import { JSXElementKind } from './AST';
 var rx = {
     trimmableWS: /^\s*?\n\s*|\s*?\n\s*$/g,
     extraWs: /\s\s+/g,
@@ -79,9 +77,7 @@ var tf = [
     collapseExtraWhitespaceInTextNodes,
     removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
-    determinePropertiesAndAttributes,
-    promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateFields
+    promoteTextOnlyContentsToTextContentProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 export var transform = function (node, opt) { return tf.Program(node); };
 function determineElementRole(tx) {
@@ -135,35 +131,6 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
             if (text !== node.text)
                 node = __assign({}, node, { text: text });
             return tx.JSXText.call(this, node);
-        } });
-}
-function removeDuplicateFields(tx) {
-    return __assign({}, tx, { JSXElement: function (node, parent) {
-            var lastid = {};
-            node.fields.forEach(function (p, i) { return p.type === AST.JSXSpread || p.type === AST.JSXStyleProperty || (lastid[p.name] = i); });
-            var fields = node.fields.filter(function (p, i) {
-                // spreads and styles can be repeated
-                return p.type === AST.JSXSpread
-                    || p.type === AST.JSXStyleProperty
-                    // but named properties can't
-                    || lastid[p.name] === i;
-            });
-            if (fields.length !== node.fields.length) {
-                node = __assign({}, node, { fields: fields });
-            }
-            return tx.JSXElement.call(this, node, parent);
-        } });
-}
-function determinePropertiesAndAttributes(tx) {
-    // strategy: HTML prefers props, JSX attrs, unless not possible
-    // translate given field name into attr/prop appropriate versions (snake vs camel case)
-    // handle deep props and attr namespaces
-    return __assign({}, tx, { JSXField: function (node, parent) {
-            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) && parent.kind !== JSXElementKind.SubComponent) {
-                var _a = getFieldData(node.name, parent.kind === JSXElementKind.SVG), name_1 = _a[0], namespace = _a[1], attr = _a[2];
-                node = __assign({}, node, { attr: attr, name: name_1, namespace: namespace });
-            }
-            return tx.JSXField.call(this, node, parent);
         } });
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {

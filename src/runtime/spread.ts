@@ -1,5 +1,5 @@
 import { setAttribute } from './dom';
-import { getFieldData, FieldData } from './fieldData';
+import { getFieldData, FieldData, FieldFlags } from './fieldData';
 import { setAttributeNS } from './index';
 
 export type PropObj = { [ name : string ] : any };
@@ -21,25 +21,15 @@ export function spread(node : HTMLElement, obj : PropObj, svg : boolean) {
 }
 
 function setField(node : HTMLElement | SVGElement, field : string, value : any, svg : boolean) {
-    if (field === 'ref' || field === 'fm') {
-        // ignore
-    } else if (field === 'style') {
+    var [ name, namespace, flags ] = getFieldData(field, svg),
+        type = flags & FieldFlags.Type;
+    if (type === FieldFlags.Property) {
+        if (namespace) node = (node as any)[namespace];
+        (node as any)[name] = value;
+    } else if (type === FieldFlags.Attribute) {
+        if (namespace) setAttributeNS(node, namespace, name, value);
+        else setAttribute(node, name, value);
+    } else if (type === FieldFlags.Assign) {
         if (value && typeof value === 'object') assign(node.style, value);
-    } else {
-        var [ name, namespace, attr ] = getFieldData(field, svg);
-        if (attr) {
-            if (namespace) {
-                setAttributeNS(node, namespace, name, value);
-            } else {
-                setAttribute(node, name, value);
-            }
-        } else {
-            if (namespace) {
-                node = (node as any)[namespace];
-                if (node) (node as any)[name] = value;
-            } else {
-                (node as any)[name] = value;
-            }
-        }
     }
 }

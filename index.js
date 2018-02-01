@@ -590,14 +590,20 @@ function setAttributeNS(node, namespace, name, value) {
 }
 
 var htmlFieldCache = {
-    class: ['className', null, false],
-    for: ['htmlFor', null, false],
-    onDoubleClick: ['ondblclick', null, false]
+    style: ['style', null, 3 /* Assign */],
+    ref: ['ref', null, 2 /* Ignore */],
+    fn: ['fn', null, 2 /* Ignore */],
+    class: ['className', null, 0 /* Property */],
+    for: ['htmlFor', null, 0 /* Property */],
+    onDoubleClick: ['ondblclick', null, 0 /* Property */]
 };
 var svgFieldCache = {
-    className: ['class', null, true],
-    htmlFor: ['for', null, true],
-    onDoubleClick: ['ondblclick', null, false]
+    style: ['style', null, 3 /* Assign */],
+    ref: ['ref', null, 2 /* Ignore */],
+    fn: ['fn', null, 2 /* Ignore */],
+    className: ['class', null, 1 /* Attribute */],
+    htmlFor: ['for', null, 1 /* Attribute */],
+    onDoubleClick: ['ondblclick', null, 0 /* Property */]
 };
 var attributeOnlyRx = /^(aria|data)[\-A-Z]/;
 var isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); };
@@ -614,7 +620,7 @@ var getPropName = function (attr) {
 var deepPropRx = /^(style)([A-Z])/;
 var buildPropData = function (prop) {
     var m = deepPropRx.exec(prop);
-    return m ? [m[2].toLowerCase() + prop.substr(m[0].length), m[1], false] : [prop, null, false];
+    return m ? [m[2].toLowerCase() + prop.substr(m[0].length), m[1], 0 /* Property */] : [prop, null, 0 /* Property */];
 };
 var attrNamespaces = {
     xlink: "http://www.w3.org/1999/xlink",
@@ -623,7 +629,7 @@ var attrNamespaces = {
 var attrNamespaceRx = new RegExp("^(" + Object.keys(attrNamespaces).join('|') + ")-(.*)");
 var buildAttrData = function (attr) {
     var m = attrNamespaceRx.exec(attr);
-    return m ? [m[2], attrNamespaces[m[1]], true] : [attr, null, true];
+    return m ? [m[2], attrNamespaces[m[1]], 1 /* Attribute */] : [attr, null, 1 /* Attribute */];
 };
 var getFieldData = function (field, svg) {
     var cache = svg ? svgFieldCache : htmlFieldCache, cached = cache[field];
@@ -649,33 +655,21 @@ function spread(node, obj, svg) {
     }
 }
 function setField(node, field, value, svg) {
-    if (field === 'ref' || field === 'fm') {
-        // ignore
+    var _a = getFieldData(field, svg), name = _a[0], namespace = _a[1], flags = _a[2], type = flags & 3;
+    if (type === 0 /* Property */) {
+        if (namespace)
+            node = node[namespace];
+        node[name] = value;
     }
-    else if (field === 'style') {
+    else if (type === 1 /* Attribute */) {
+        if (namespace)
+            setAttributeNS(node, namespace, name, value);
+        else
+            setAttribute(node, name, value);
+    }
+    else if (type === 3 /* Assign */) {
         if (value && typeof value === 'object')
             assign(node.style, value);
-    }
-    else {
-        var _a = getFieldData(field, svg), name = _a[0], namespace = _a[1], attr = _a[2];
-        if (attr) {
-            if (namespace) {
-                setAttributeNS(node, namespace, name, value);
-            }
-            else {
-                setAttribute(node, name, value);
-            }
-        }
-        else {
-            if (namespace) {
-                node = node[namespace];
-                if (node)
-                    node[name] = value;
-            }
-            else {
-                node[name] = value;
-            }
-        }
     }
 }
 

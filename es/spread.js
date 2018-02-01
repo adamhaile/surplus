@@ -16,32 +16,20 @@ export function spread(node, obj, svg) {
     }
 }
 function setField(node, field, value, svg) {
-    if (field === 'ref' || field === 'fm') {
-        // ignore
+    var _a = getFieldData(field, svg), name = _a[0], namespace = _a[1], flags = _a[2], type = flags & 3 /* Type */;
+    if (type === 0 /* Property */) {
+        if (namespace)
+            node = node[namespace];
+        node[name] = value;
     }
-    else if (field === 'style') {
+    else if (type === 1 /* Attribute */) {
+        if (namespace)
+            setAttributeNS(node, namespace, name, value);
+        else
+            setAttribute(node, name, value);
+    }
+    else if (type === 3 /* Assign */) {
         if (value && typeof value === 'object')
             assign(node.style, value);
-    }
-    else {
-        var _a = getFieldData(field, svg), name = _a[0], namespace = _a[1], attr = _a[2];
-        if (attr) {
-            if (namespace) {
-                setAttributeNS(node, namespace, name, value);
-            }
-            else {
-                setAttribute(node, name, value);
-            }
-        }
-        else {
-            if (namespace) {
-                node = node[namespace];
-                if (node)
-                    node[name] = value;
-            }
-            else {
-                node[name] = value;
-            }
-        }
     }
 }

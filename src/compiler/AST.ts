@@ -67,8 +67,6 @@ export const JSXStaticField = 'JSXStaticField' as 'JSXStaticField';
 export interface JSXStaticField {
     type : typeof JSXStaticField;
     name : string;
-    attr : boolean;
-    namespace : string | null;
     value : string;
 }
 
@@ -76,8 +74,6 @@ export const JSXDynamicField = 'JSXDynamicField' as 'JSXDynamicField';
 export interface JSXDynamicField {
     type : typeof JSXDynamicField;
     name : string;
-    attr : boolean;
-    namespace : string | null;
     code : EmbeddedCode;
     loc : LOC;
 }

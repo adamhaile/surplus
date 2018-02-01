@@ -80,9 +80,7 @@ const tf = [
     collapseExtraWhitespaceInTextNodes,
     removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
-    determinePropertiesAndAttributes,
-    promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateFields
+    promoteTextOnlyContentsToTextContentProperties
 ].reverse().reduce((tf, fn) => fn(tf), Copy);
 
 export const transform = (node : AST.Program, opt : Params) => tf.Program(node);
@@ -159,47 +157,6 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx : Copy) : Copy {
             return tx.JSXText.call(this, node);
         }
     }
-}
-
-function removeDuplicateFields(tx : Copy) : Copy {
-    return {
-        ...tx,
-        JSXElement(node, parent) {
-            const lastid = {} as { [ name : string ] : number };
-
-            node.fields.forEach((p, i) => p.type === AST.JSXSpread || p.type === AST.JSXStyleProperty || (lastid[p.name] = i));
-
-            const fields = node.fields.filter((p, i) => 
-                // spreads and styles can be repeated
-                p.type === AST.JSXSpread 
-                || p.type === AST.JSXStyleProperty 
-                // but named properties can't
-                || lastid[p.name] === i
-            );
-
-            if (fields.length !== node.fields.length) {
-                node = { ...node, fields };
-            }
-
-            return tx.JSXElement.call(this, node, parent);
-        }
-    }
-}
-
-function determinePropertiesAndAttributes(tx : Copy) : Copy {
-    // strategy: HTML prefers props, JSX attrs, unless not possible
-    // translate given field name into attr/prop appropriate versions (snake vs camel case)
-    // handle deep props and attr namespaces
-    return { 
-        ...tx, 
-        JSXField(node, parent) {
-            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) && parent.kind !== JSXElementKind.SubComponent) {
-                const [ name, namespace, attr ] = getFieldData(node.name, parent.kind === JSXElementKind.SVG)
-                node = { ...node, attr, name, namespace };
-            }
-            return tx.JSXField.call(this, node, parent);
-        }
-    };
 }
 
 function promoteTextOnlyContentsToTextContentProperties(tx : Copy) : Copy {

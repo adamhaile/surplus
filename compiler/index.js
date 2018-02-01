@@ -204,21 +204,21 @@ function parse(TOKS, opts) {
             if (IS('"') || IS("'")) {
                 if (rx.badStaticProp.test(name))
                     ERR("cannot name a static property '" + name + "' as it has a special meaning as a dynamic property", loc);
-                return { type: JSXStaticField, name: name, attr: false, namespace: null, value: quotedString() };
+                return { type: JSXStaticField, name: name, value: quotedString() };
             }
             else if (IS('{')) {
                 code = embeddedCode();
                 return rx.refProp.test(name) ? { type: JSXReference, code: code, loc: loc } :
                     rx.fnProp.test(name) ? { type: JSXFunction, code: code, loc: loc } :
                         rx.styleProp.test(name) ? { type: JSXStyleProperty, name: 'style', code: code, loc: loc } :
-                            { type: JSXDynamicField, name: name, attr: false, namespace: null, code: code, loc: loc };
+                            { type: JSXDynamicField, name: name, code: code, loc: loc };
             }
             else {
                 return ERR("unexepected value for JSX property");
             }
         }
         else {
-            return { type: JSXStaticField, name: name, attr: false, namespace: null, value: "true" };
+            return { type: JSXStaticField, name: name, value: "true" };
         }
     }
     function jsxSpreadProperty() {
@@ -473,6 +473,57 @@ function vlq(num) {
     return str;
 }
 
+var htmlFieldCache = {
+    style: ['style', null, 3 /* Assign */],
+    ref: ['ref', null, 2 /* Ignore */],
+    fn: ['fn', null, 2 /* Ignore */],
+    class: ['className', null, 0 /* Property */],
+    for: ['htmlFor', null, 0 /* Property */],
+    onDoubleClick: ['ondblclick', null, 0 /* Property */]
+};
+var svgFieldCache = {
+    style: ['style', null, 3 /* Assign */],
+    ref: ['ref', null, 2 /* Ignore */],
+    fn: ['fn', null, 2 /* Ignore */],
+    className: ['class', null, 1 /* Attribute */],
+    htmlFor: ['for', null, 1 /* Attribute */],
+    onDoubleClick: ['ondblclick', null, 0 /* Property */]
+};
+var attributeOnlyRx = /^(aria|data)[\-A-Z]/;
+var isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); };
+var propOnlyRx = /^(on|style)/;
+var isPropOnlyField = function (prop) { return propOnlyRx.test(prop); };
+var propPartRx = /[a-z][A-Z]/g;
+var getAttrName = function (prop) { return prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); };
+var jsxEventPropRx = /^on[A-Z]/;
+var attrPartRx = /\-(?:[a-z]|$)/g;
+var getPropName = function (attr) {
+    var prop = attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
+    return jsxEventPropRx.test(prop) ? prop.toLowerCase() : prop;
+};
+var deepPropRx = /^(style)([A-Z])/;
+var buildPropData = function (prop) {
+    var m = deepPropRx.exec(prop);
+    return m ? [m[2].toLowerCase() + prop.substr(m[0].length), m[1], 0 /* Property */] : [prop, null, 0 /* Property */];
+};
+var attrNamespaces = {
+    xlink: "http://www.w3.org/1999/xlink",
+    xml: "http://www.w3.org/XML/1998/namespace",
+};
+var attrNamespaceRx = new RegExp("^(" + Object.keys(attrNamespaces).join('|') + ")-(.*)");
+var buildAttrData = function (attr) {
+    var m = attrNamespaceRx.exec(attr);
+    return m ? [m[2], attrNamespaces[m[1]], 1 /* Attribute */] : [attr, null, 1 /* Attribute */];
+};
+var getFieldData = function (field, svg) {
+    var cache = svg ? svgFieldCache : htmlFieldCache, cached = cache[field];
+    if (cached)
+        return cached;
+    var attr = svg && !isPropOnlyField(field)
+        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field), data = attr ? buildAttrData(name) : buildPropData(name);
+    return cache[field] = data;
+};
+
 var __assign$1 = (undefined && undefined.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
         s = arguments[i];
@@ -618,8 +669,8 @@ var codeGen = function (ctl, opts) {
             else {
                 var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, fieldExprs_1 = fields.map(function (p) { return p.type === JSXStaticField ? '' : compileSegments(p.code); }), spreads_1 = fields.filter(function (p) { return p.type === JSXSpread || p.type === JSXStyleProperty; }), classField_1 = spreads_1.length === 0 && fields.filter(function (p) { return p.type === JSXStaticField && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, fieldsDynamic_1 = fieldExprs_1.some(function (e) { return !noApparentSignals(e); }), fieldStmts = fields.map(function (f, i) {
                     return f === classField_1 ? '' :
-                        f.type === JSXStaticField ? buildField(id_1, f, f.value) :
-                            f.type === JSXDynamicField ? buildField(id_1, f, fieldExprs_1[i]) :
+                        f.type === JSXStaticField ? buildField(id_1, f, f.value, node) :
+                            f.type === JSXDynamicField ? buildField(id_1, f, fieldExprs_1[i], node) :
                                 f.type === JSXStyleProperty ? buildStyle(f, id_1, fieldExprs_1[i], fieldsDynamic_1, spreads_1) :
                                     buildSpread(id_1, fieldExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
@@ -638,13 +689,16 @@ var codeGen = function (ctl, opts) {
                 }
                 functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
-        }, buildField = function (id, field, expr) {
-            return (field.attr ? buildAttribute : buildProperty)(id, field, expr);
-        }, buildProperty = function (id, field, expr) {
-            return field.namespace ? id + "." + field.namespace + "." + field.name + " = " + expr + ";" : id + "." + field.name + " = " + expr + ";";
-        }, buildAttribute = function (id, field, expr) {
-            return field.namespace ? "Surplus.setAttributeNS(" + id + ", " + codeStr(field.namespace) + ", " + codeStr(field.name) + ", " + expr + ");" :
-                "Surplus.setAttribute(" + id + ", " + codeStr(field.name) + ", " + expr + ");";
+        }, buildField = function (id, field, expr, parent) {
+            var _a = getFieldData(field.name, parent.kind === JSXElementKind.SVG), name = _a[0], namespace = _a[1], flags = _a[2], type = flags & 3;
+            return (type === 0 /* Property */ ? buildProperty(id, name, namespace, expr) :
+                type === 1 /* Attribute */ ? buildAttribute(id, name, namespace, expr) :
+                    '');
+        }, buildProperty = function (id, name, namespace, expr) {
+            return namespace ? id + "." + namespace + "." + name + " = " + expr + ";" : id + "." + name + " = " + expr + ";";
+        }, buildAttribute = function (id, name, namespace, expr) {
+            return namespace ? "Surplus.setAttributeNS(" + id + ", " + codeStr(namespace) + ", " + codeStr(name) + ", " + expr + ");" :
+                "Surplus.setAttribute(" + id + ", " + codeStr(name) + ", " + expr + ");";
         }, buildSpread = function (id, expr, svg) {
             return "Surplus.spread(" + id + ", " + expr + ", " + svg + ");";
         }, buildNodeFn = function (node, id) {
@@ -1224,51 +1278,6 @@ var htmlEntites = {
     diams: "\u2666",
 };
 
-var htmlFieldCache = {
-    class: ['className', null, false],
-    for: ['htmlFor', null, false],
-    onDoubleClick: ['ondblclick', null, false]
-};
-var svgFieldCache = {
-    className: ['class', null, true],
-    htmlFor: ['for', null, true],
-    onDoubleClick: ['ondblclick', null, false]
-};
-var attributeOnlyRx = /^(aria|data)[\-A-Z]/;
-var isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); };
-var propOnlyRx = /^(on|style)/;
-var isPropOnlyField = function (prop) { return propOnlyRx.test(prop); };
-var propPartRx = /[a-z][A-Z]/g;
-var getAttrName = function (prop) { return prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); };
-var jsxEventPropRx = /^on[A-Z]/;
-var attrPartRx = /\-(?:[a-z]|$)/g;
-var getPropName = function (attr) {
-    var prop = attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
-    return jsxEventPropRx.test(prop) ? prop.toLowerCase() : prop;
-};
-var deepPropRx = /^(style)([A-Z])/;
-var buildPropData = function (prop) {
-    var m = deepPropRx.exec(prop);
-    return m ? [m[2].toLowerCase() + prop.substr(m[0].length), m[1], false] : [prop, null, false];
-};
-var attrNamespaces = {
-    xlink: "http://www.w3.org/1999/xlink",
-    xml: "http://www.w3.org/XML/1998/namespace",
-};
-var attrNamespaceRx = new RegExp("^(" + Object.keys(attrNamespaces).join('|') + ")-(.*)");
-var buildAttrData = function (attr) {
-    var m = attrNamespaceRx.exec(attr);
-    return m ? [m[2], attrNamespaces[m[1]], true] : [attr, null, true];
-};
-var getFieldData = function (field, svg) {
-    var cache = svg ? svgFieldCache : htmlFieldCache, cached = cache[field];
-    if (cached)
-        return cached;
-    var attr = svg && !isPropOnlyField(field)
-        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field), data = attr ? buildAttrData(name) : buildPropData(name);
-    return cache[field] = data;
-};
-
 var __assign = (undefined && undefined.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
         s = arguments[i];
@@ -1345,9 +1354,7 @@ var tf = [
     collapseExtraWhitespaceInTextNodes,
     removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
-    determinePropertiesAndAttributes,
-    promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateFields
+    promoteTextOnlyContentsToTextContentProperties
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 var transform = function (node, opt) { return tf.Program(node); };
 function determineElementRole(tx) {
@@ -1401,35 +1408,6 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
             if (text !== node.text)
                 node = __assign({}, node, { text: text });
             return tx.JSXText.call(this, node);
-        } });
-}
-function removeDuplicateFields(tx) {
-    return __assign({}, tx, { JSXElement: function (node, parent) {
-            var lastid = {};
-            node.fields.forEach(function (p, i) { return p.type === JSXSpread || p.type === JSXStyleProperty || (lastid[p.name] = i); });
-            var fields = node.fields.filter(function (p, i) {
-                // spreads and styles can be repeated
-                return p.type === JSXSpread
-                    || p.type === JSXStyleProperty
-                    // but named properties can't
-                    || lastid[p.name] === i;
-            });
-            if (fields.length !== node.fields.length) {
-                node = __assign({}, node, { fields: fields });
-            }
-            return tx.JSXElement.call(this, node, parent);
-        } });
-}
-function determinePropertiesAndAttributes(tx) {
-    // strategy: HTML prefers props, JSX attrs, unless not possible
-    // translate given field name into attr/prop appropriate versions (snake vs camel case)
-    // handle deep props and attr namespaces
-    return __assign({}, tx, { JSXField: function (node, parent) {
-            if ((node.type === JSXDynamicField || node.type === JSXStaticField) && parent.kind !== JSXElementKind.SubComponent) {
-                var _a = getFieldData(node.name, parent.kind === JSXElementKind.SVG), name_1 = _a[0], namespace = _a[1], attr = _a[2];
-                node = __assign({}, node, { attr: attr, name: name_1, namespace: namespace });
-            }
-            return tx.JSXField.call(this, node, parent);
         } });
 }
 function promoteTextOnlyContentsToTextContentProperties(tx) {

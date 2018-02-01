@@ -19,6 +19,7 @@ import {
 import { LOC } from './parse';
 import { locationMark } from './sourcemap';
 import { Params } from './compile';
+import { getFieldData, FieldFlags } from './fieldData';
 
 export { codeGen, codeStr };
 
@@ -202,8 +203,8 @@ const codeGen = (ctl : Program, opts : Params) => {
                         fieldsDynamic = fieldExprs.some(e => !noApparentSignals(e)),
                         fieldStmts    = fields.map((f, i) => 
                             f === classField                 ? '' :
-                            f.type === JSXStaticField  ? buildField(id, f, f.value) :
-                            f.type === JSXDynamicField ? buildField(id, f, fieldExprs[i]) :
+                            f.type === JSXStaticField  ? buildField(id, f, f.value, node) :
+                            f.type === JSXDynamicField ? buildField(id, f, fieldExprs[i], node) :
                             f.type === JSXStyleProperty   ? buildStyle(f, id, fieldExprs[i], fieldsDynamic, spreads) :
                             buildSpread(id, fieldExprs[i], svg)
                         ).filter(s => s !== ''),
@@ -228,13 +229,20 @@ const codeGen = (ctl : Program, opts : Params) => {
                     functions.forEach(f => buildNodeFn(f, id));
                 }
             },
-            buildField = (id : string, field : JSXStaticField | JSXDynamicField, expr : string) =>
-                (field.attr ? buildAttribute : buildProperty)(id, field, expr),
-            buildProperty = (id : string, field : JSXStaticField | JSXDynamicField, expr : string) =>
-                field.namespace ? `${id}.${field.namespace}.${field.name} = ${expr};` : `${id}.${field.name} = ${expr};`,
-            buildAttribute = (id : string, field : JSXStaticField | JSXDynamicField, expr : string) =>
-                field.namespace ? `Surplus.setAttributeNS(${id}, ${codeStr(field.namespace)}, ${codeStr(field.name)}, ${expr});` :
-                `Surplus.setAttribute(${id}, ${codeStr(field.name)}, ${expr});`,
+            buildField = (id : string, field : JSXStaticField | JSXDynamicField, expr : string, parent : JSXElement) => {
+                const [ name, namespace, flags] = getFieldData(field.name, parent.kind === JSXElementKind.SVG),
+                    type = flags & FieldFlags.Type;
+                return (
+                    type === FieldFlags.Property ? buildProperty(id, name, namespace, expr) :
+                    type === FieldFlags.Attribute ? buildAttribute(id, name, namespace, expr) : 
+                    ''
+                );
+            },
+            buildProperty = (id : string, name : string, namespace : string | null, expr : string) =>
+                namespace ? `${id}.${namespace}.${name} = ${expr};` : `${id}.${name} = ${expr};`,
+            buildAttribute = (id : string, name : string, namespace : string | null, expr : string) =>
+                namespace ? `Surplus.setAttributeNS(${id}, ${codeStr(namespace)}, ${codeStr(name)}, ${expr});` :
+                `Surplus.setAttribute(${id}, ${codeStr(name)}, ${expr});`,
             buildSpread = (id : string, expr : string, svg : boolean) =>
                 `Surplus.spread(${id}, ${expr}, ${svg});`,
             buildNodeFn = (node : JSXFunction, id : string) => {

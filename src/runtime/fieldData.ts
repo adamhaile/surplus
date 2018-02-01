@@ -1,17 +1,33 @@
-// this file is common between compiler and runtime
-export type FieldData = [ string, string | null, boolean ];
+// WARNING: this file "lives" in the compiler source, and is copied into the runtime at build
+// If you modify this in runtime, your changes will be erased during build.
+export const enum FieldFlags {
+    // bottom 2 bits encode field type
+    Type      = 3,
+    Property  = 0,
+    Attribute = 1,
+    Ignore    = 2,
+    Assign    = 3
+}
+
+export type FieldData = [ string, string | null, FieldFlags ];
 
 const
     // pre-seed the caches with a few special cases, so we don't need to check for them in the common cases
     htmlFieldCache = {
-        class        : [ 'className' , null, false ],
-        for          : [ 'htmlFor'   , null, false ],
-        onDoubleClick: [ 'ondblclick', null, false ]
+        style        : [ 'style'     , null, FieldFlags.Assign ],
+        ref          : [ 'ref'       , null, FieldFlags.Ignore ],
+        fn           : [ 'fn'        , null, FieldFlags.Ignore ],
+        class        : [ 'className' , null, FieldFlags.Property ],
+        for          : [ 'htmlFor'   , null, FieldFlags.Property ],
+        onDoubleClick: [ 'ondblclick', null, FieldFlags.Property ]
     } as { [ field : string ] : FieldData },
     svgFieldCache = {
-        className    : [ 'class'     , null, true ],
-        htmlFor      : [ 'for'       , null, true ],
-        onDoubleClick: [ 'ondblclick', null, false ]
+        style        : [ 'style'     , null, FieldFlags.Assign ],
+        ref          : [ 'ref'       , null, FieldFlags.Ignore ],
+        fn           : [ 'fn'        , null, FieldFlags.Ignore ],
+        className    : [ 'class'     , null, FieldFlags.Attribute ],
+        htmlFor      : [ 'for'       , null, FieldFlags.Attribute ],
+        onDoubleClick: [ 'ondblclick', null, FieldFlags.Property ]
     } as { [ field : string ] : FieldData };
 
 const
@@ -30,7 +46,7 @@ const
     deepPropRx      = /^(style)([A-Z])/,
     buildPropData   = (prop : string) : FieldData => { 
         var m = deepPropRx.exec(prop); 
-        return m ? [ m[2].toLowerCase() + prop.substr(m[0].length), m[1], false ] : [ prop, null, false ]; 
+        return m ? [ m[2].toLowerCase() + prop.substr(m[0].length), m[1], FieldFlags.Property ] : [ prop, null, FieldFlags.Property ]; 
     },
     attrNamespaces  = {
         xlink: "http://www.w3.org/1999/xlink",
@@ -39,7 +55,7 @@ const
     attrNamespaceRx = new RegExp(`^(${Object.keys(attrNamespaces).join('|')})-(.*)`),
     buildAttrData   = (attr : string) : FieldData => { 
         var m = attrNamespaceRx.exec(attr); 
-        return m ? [ m[2], attrNamespaces[m[1]], true ] : [ attr, null, true ]; 
+        return m ? [ m[2], attrNamespaces[m[1]], FieldFlags.Attribute ] : [ attr, null, FieldFlags.Attribute ]; 
     };
 
 export const 
