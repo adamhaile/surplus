@@ -3,7 +3,7 @@ import * as AST from './AST';
 import { Params } from './compile';
 import { codeStr } from './codeGen';
 import { htmlEntites, svgOnlyTagRx, svgForeignTag } from './domRef';
-import { isAttrOnlyField, isPropOnlyField, getAttrName, getPropName, isDeepProp, isNSAttr } from './fieldNames';
+import { getFieldData, FieldData } from './fieldNames';
 import { JSXElementKind } from './AST';
 
 const rx = {
@@ -194,12 +194,7 @@ function determinePropertiesAndAttributes(tx : Copy) : Copy {
         ...tx, 
         JSXField(node, parent) {
             if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) && parent.kind !== JSXElementKind.SubComponent) {
-                let attr       =  parent.kind === JSXElementKind.SVG && !isPropOnlyField(node.name)
-                               || parent.kind === JSXElementKind.HTML && isAttrOnlyField(node.name),
-                    name       = attr ? getAttrName(node.name) : getPropName(node.name),
-                    namespace  = null as null | string,
-                    namespaced = attr ? isNSAttr(name) : isDeepProp(name);
-                if (namespaced) [ namespace, name ] = namespaced;
+                const [ name, namespace, attr ] = getFieldData(node.name, parent.kind === JSXElementKind.SVG)
                 node = { ...node, attr, name, namespace };
             }
             return tx.JSXField.call(this, node, parent);

@@ -1,5 +1,5 @@
 import { setAttribute } from './dom';
-import { isAttrOnlyField, isPropOnlyField, getAttrName, getPropName, isDeepProp, isNSAttr } from './fieldNames';
+import { getFieldData } from './fieldNames';
 import { setAttributeNS } from './index';
 export function assign(a, b) {
     var props = Object.keys(b);
@@ -15,37 +15,33 @@ export function spread(node, obj, svg) {
         setField(node, name, obj[name], svg);
     }
 }
-function setField(node, name, value, svg) {
-    var deep;
-    if (name === 'ref' || name === 'fm') {
+function setField(node, field, value, svg) {
+    if (field === 'ref' || field === 'fm') {
         // ignore
     }
-    else if (name === 'style') {
+    else if (field === 'style') {
         if (value && typeof value === 'object')
             assign(node.style, value);
     }
-    else if ((svg && !isPropOnlyField(name)) || (!svg && isAttrOnlyField(name))) {
-        // attribute
-        name = getAttrName(name);
-        deep = isNSAttr(name);
-        if (deep) {
-            setAttributeNS(node, deep[0], deep[1], value);
-        }
-        else {
-            setAttribute(node, name, value);
-        }
-    }
     else {
-        // property
-        name = getPropName(name);
-        deep = isDeepProp(name);
-        if (deep) {
-            node = node[deep[0]];
-            if (node)
-                node[deep[1]] = value;
+        var _a = getFieldData(field, svg), name = _a[0], namespace = _a[1], attr = _a[2];
+        if (attr) {
+            if (namespace) {
+                setAttributeNS(node, namespace, name, value);
+            }
+            else {
+                setAttribute(node, name, value);
+            }
         }
         else {
-            node[name] = value;
+            if (namespace) {
+                node = node[namespace];
+                if (node)
+                    node[name] = value;
+            }
+            else {
+                node[name] = value;
+            }
         }
     }
 }

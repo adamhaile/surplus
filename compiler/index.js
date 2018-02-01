@@ -1224,33 +1224,50 @@ var htmlEntites = {
     diams: "\u2666",
 };
 
-// this file is common between compiler and runtime
+var htmlFieldCache = {
+    class: ['className', null, false],
+    for: ['htmlFor', null, false],
+    onDoubleClick: ['ondblclick', null, false]
+};
+var svgFieldCache = {
+    className: ['class', null, true],
+    htmlFor: ['for', null, true],
+    onDoubleClick: ['ondblclick', null, false]
+};
 var attributeOnlyRx = /^(aria|data)[\-A-Z]/;
 var isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); };
 var propOnlyRx = /^(on|style)/;
 var isPropOnlyField = function (prop) { return propOnlyRx.test(prop); };
 var propPartRx = /[a-z][A-Z]/g;
-var getAttrName = function (prop) {
-    return prop === "className" ? "class" :
-        prop === "htmlFor" ? "for" :
-            prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase();
-};
+var getAttrName = function (prop) { return prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); };
 var jsxEventPropRx = /^on[A-Z]/;
 var attrPartRx = /\-(?:[a-z]|$)/g;
 var getPropName = function (attr) {
-    var prop = attr === "class" ? "className" :
-        attr === "for" ? "htmlFor" :
-            attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
-    return jsxEventPropRx.test(prop) ? (prop === "onDoubleClick" ? "ondblclick" : prop.toLowerCase()) : prop;
+    var prop = attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
+    return jsxEventPropRx.test(prop) ? prop.toLowerCase() : prop;
 };
 var deepPropRx = /^(style)([A-Z])/;
-var isDeepProp = function (prop) { var m = deepPropRx.exec(prop); return m ? [m[1], m[2].toLowerCase() + prop.substr(m[0].length)] : null; };
+var buildPropData = function (prop) {
+    var m = deepPropRx.exec(prop);
+    return m ? [m[2].toLowerCase() + prop.substr(m[0].length), m[1], false] : [prop, null, false];
+};
 var attrNamespaces = {
     xlink: "http://www.w3.org/1999/xlink",
     xml: "http://www.w3.org/XML/1998/namespace",
 };
-var nsAttrRx = new RegExp("^(" + Object.keys(attrNamespaces).join('|') + ")-(.*)");
-var isNSAttr = function (attr) { var m = nsAttrRx.exec(attr); return m ? [attrNamespaces[m[1]], m[2]] : null; };
+var attrNamespaceRx = new RegExp("^(" + Object.keys(attrNamespaces).join('|') + ")-(.*)");
+var buildAttrData = function (attr) {
+    var m = attrNamespaceRx.exec(attr);
+    return m ? [m[2], attrNamespaces[m[1]], true] : [attr, null, true];
+};
+var getFieldData = function (field, svg) {
+    var cache = svg ? svgFieldCache : htmlFieldCache, cached = cache[field];
+    if (cached)
+        return cached;
+    var attr = svg && !isPropOnlyField(field)
+        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field), data = attr ? buildAttrData(name) : buildPropData(name);
+    return cache[field] = data;
+};
 
 var __assign = (undefined && undefined.__assign) || Object.assign || function(t) {
     for (var s, i = 1, n = arguments.length; i < n; i++) {
@@ -1409,10 +1426,7 @@ function determinePropertiesAndAttributes(tx) {
     // handle deep props and attr namespaces
     return __assign({}, tx, { JSXField: function (node, parent) {
             if ((node.type === JSXDynamicField || node.type === JSXStaticField) && parent.kind !== JSXElementKind.SubComponent) {
-                var attr = parent.kind === JSXElementKind.SVG && !isPropOnlyField(node.name)
-                    || parent.kind === JSXElementKind.HTML && isAttrOnlyField(node.name), name_1 = attr ? getAttrName(node.name) : getPropName(node.name), namespace = null, namespaced = attr ? isNSAttr(name_1) : isDeepProp(name_1);
-                if (namespaced)
-                    namespace = namespaced[0], name_1 = namespaced[1];
+                var _a = getFieldData(node.name, parent.kind === JSXElementKind.SVG), name_1 = _a[0], namespace = _a[1], attr = _a[2];
                 node = __assign({}, node, { attr: attr, name: name_1, namespace: namespace });
             }
             return tx.JSXField.call(this, node, parent);

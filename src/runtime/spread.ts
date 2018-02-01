@@ -1,5 +1,5 @@
 import { setAttribute } from './dom';
-import { isAttrOnlyField, isPropOnlyField, getAttrName, getPropName, isDeepProp, isNSAttr } from './fieldNames';
+import { getFieldData, FieldData } from './fieldNames';
 import { setAttributeNS } from './index';
 
 export type PropObj = { [ name : string ] : any };
@@ -20,30 +20,26 @@ export function spread(node : HTMLElement, obj : PropObj, svg : boolean) {
     }
 }
 
-function setField(node : HTMLElement | SVGElement, name : string, value : any, svg : boolean) {
-    var deep : [ string, string ] | null;
-    if (name === 'ref' || name === 'fm') {
+function setField(node : HTMLElement | SVGElement, field : string, value : any, svg : boolean) {
+    if (field === 'ref' || field === 'fm') {
         // ignore
-    } else if (name === 'style') {
+    } else if (field === 'style') {
         if (value && typeof value === 'object') assign(node.style, value);
-    } else if ((svg && !isPropOnlyField(name)) || (!svg && isAttrOnlyField(name))) {
-        // attribute
-        name = getAttrName(name);
-        deep = isNSAttr(name);
-        if (deep) {
-            setAttributeNS(node, deep[0], deep[1], value);
-        } else {
-            setAttribute(node, name, value);
-        }
     } else {
-        // property
-        name = getPropName(name);
-        deep = isDeepProp(name); 
-        if (deep) {
-            node = (node as any)[deep[0]];
-            if (node) (node as any)[deep[1]] = value;
+        var [ name, namespace, attr ] = getFieldData(field, svg);
+        if (attr) {
+            if (namespace) {
+                setAttributeNS(node, namespace, name, value);
+            } else {
+                setAttribute(node, name, value);
+            }
         } else {
-            (node as any)[name] = value;
+            if (namespace) {
+                node = (node as any)[namespace];
+                if (node) (node as any)[name] = value;
+            } else {
+                (node as any)[name] = value;
+            }
         }
     }
 }

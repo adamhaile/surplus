@@ -589,33 +589,50 @@ function setAttributeNS(node, namespace, name, value) {
         node.setAttributeNS(namespace, name, value);
 }
 
-// this file is common between compiler and runtime
+var htmlFieldCache = {
+    class: ['className', null, false],
+    for: ['htmlFor', null, false],
+    onDoubleClick: ['ondblclick', null, false]
+};
+var svgFieldCache = {
+    className: ['class', null, true],
+    htmlFor: ['for', null, true],
+    onDoubleClick: ['ondblclick', null, false]
+};
 var attributeOnlyRx = /^(aria|data)[\-A-Z]/;
 var isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); };
 var propOnlyRx = /^(on|style)/;
 var isPropOnlyField = function (prop) { return propOnlyRx.test(prop); };
 var propPartRx = /[a-z][A-Z]/g;
-var getAttrName = function (prop) {
-    return prop === "className" ? "class" :
-        prop === "htmlFor" ? "for" :
-            prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase();
-};
+var getAttrName = function (prop) { return prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); };
 var jsxEventPropRx = /^on[A-Z]/;
 var attrPartRx = /\-(?:[a-z]|$)/g;
 var getPropName = function (attr) {
-    var prop = attr === "class" ? "className" :
-        attr === "for" ? "htmlFor" :
-            attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
-    return jsxEventPropRx.test(prop) ? (prop === "onDoubleClick" ? "ondblclick" : prop.toLowerCase()) : prop;
+    var prop = attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
+    return jsxEventPropRx.test(prop) ? prop.toLowerCase() : prop;
 };
 var deepPropRx = /^(style)([A-Z])/;
-var isDeepProp = function (prop) { var m = deepPropRx.exec(prop); return m ? [m[1], m[2].toLowerCase() + prop.substr(m[0].length)] : null; };
+var buildPropData = function (prop) {
+    var m = deepPropRx.exec(prop);
+    return m ? [m[2].toLowerCase() + prop.substr(m[0].length), m[1], false] : [prop, null, false];
+};
 var attrNamespaces = {
     xlink: "http://www.w3.org/1999/xlink",
     xml: "http://www.w3.org/XML/1998/namespace",
 };
-var nsAttrRx = new RegExp("^(" + Object.keys(attrNamespaces).join('|') + ")-(.*)");
-var isNSAttr = function (attr) { var m = nsAttrRx.exec(attr); return m ? [attrNamespaces[m[1]], m[2]] : null; };
+var attrNamespaceRx = new RegExp("^(" + Object.keys(attrNamespaces).join('|') + ")-(.*)");
+var buildAttrData = function (attr) {
+    var m = attrNamespaceRx.exec(attr);
+    return m ? [m[2], attrNamespaces[m[1]], true] : [attr, null, true];
+};
+var getFieldData = function (field, svg) {
+    var cache = svg ? svgFieldCache : htmlFieldCache, cached = cache[field];
+    if (cached)
+        return cached;
+    var attr = svg && !isPropOnlyField(field)
+        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field), data = attr ? buildAttrData(name) : buildPropData(name);
+    return cache[field] = data;
+};
 
 function assign(a, b) {
     var props = Object.keys(b);
@@ -631,37 +648,33 @@ function spread(node, obj, svg) {
         setField(node, name, obj[name], svg);
     }
 }
-function setField(node, name, value, svg) {
-    var deep;
-    if (name === 'ref' || name === 'fm') {
+function setField(node, field, value, svg) {
+    if (field === 'ref' || field === 'fm') {
         // ignore
     }
-    else if (name === 'style') {
+    else if (field === 'style') {
         if (value && typeof value === 'object')
             assign(node.style, value);
     }
-    else if ((svg && !isPropOnlyField(name)) || (!svg && isAttrOnlyField(name))) {
-        // attribute
-        name = getAttrName(name);
-        deep = isNSAttr(name);
-        if (deep) {
-            setAttributeNS(node, deep[0], deep[1], value);
-        }
-        else {
-            setAttribute(node, name, value);
-        }
-    }
     else {
-        // property
-        name = getPropName(name);
-        deep = isDeepProp(name);
-        if (deep) {
-            node = node[deep[0]];
-            if (node)
-                node[deep[1]] = value;
+        var _a = getFieldData(field, svg), name = _a[0], namespace = _a[1], attr = _a[2];
+        if (attr) {
+            if (namespace) {
+                setAttributeNS(node, namespace, name, value);
+            }
+            else {
+                setAttribute(node, name, value);
+            }
         }
         else {
-            node[name] = value;
+            if (namespace) {
+                node = node[namespace];
+                if (node)
+                    node[name] = value;
+            }
+            else {
+                node[name] = value;
+            }
         }
     }
 }

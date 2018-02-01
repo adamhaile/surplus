@@ -10,7 +10,7 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 import * as AST from './AST';
 import { codeStr } from './codeGen';
 import { htmlEntites, svgOnlyTagRx, svgForeignTag } from './domRef';
-import { isAttrOnlyField, isPropOnlyField, getAttrName, getPropName, isDeepProp, isNSAttr } from './fieldNames';
+import { getFieldData } from './fieldNames';
 import { JSXElementKind } from './AST';
 var rx = {
     trimmableWS: /^\s*?\n\s*|\s*?\n\s*$/g,
@@ -160,10 +160,7 @@ function determinePropertiesAndAttributes(tx) {
     // handle deep props and attr namespaces
     return __assign({}, tx, { JSXField: function (node, parent) {
             if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) && parent.kind !== JSXElementKind.SubComponent) {
-                var attr = parent.kind === JSXElementKind.SVG && !isPropOnlyField(node.name)
-                    || parent.kind === JSXElementKind.HTML && isAttrOnlyField(node.name), name_1 = attr ? getAttrName(node.name) : getPropName(node.name), namespace = null, namespaced = attr ? isNSAttr(name_1) : isDeepProp(name_1);
-                if (namespaced)
-                    namespace = namespaced[0], name_1 = namespaced[1];
+                var _a = getFieldData(node.name, parent.kind === JSXElementKind.SVG), name_1 = _a[0], namespace = _a[1], attr = _a[2];
                 node = __assign({}, node, { attr: attr, name: name_1, namespace: namespace });
             }
             return tx.JSXField.call(this, node, parent);
