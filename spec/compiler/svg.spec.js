@@ -188,7 +188,7 @@ describe("SVG nodes", function () {
 
     it("does translate HTML property names to attributes", function () {
         var code = window.SurplusCompiler.compile(`
-            var svg = <svg className="foo" htmlFor="baz" cx="100" cy="100" r="50" fill="red"></svg>
+            var svg = <svg className="foo" htmlFor="baz" cx="100" cy="100" r="50" fill="red"></svg>,
                 svg2 = <svg className={"foo"} htmlFor={"baz"} cx="100" cy="100" r="50" fill="red"></svg>,
                 svg3 = <svg {...{ className: "foo", htmlFor: "baz" }} cx="100" cy="100" r="50" fill="red"></svg>;
 
@@ -197,6 +197,21 @@ describe("SVG nodes", function () {
                 expect(svg.getAttribute("class")).toBe("foo");
                 expect(svg.hasAttribute("htmlFor")).toBe(false);
                 expect(svg.getAttribute("for")).toBe("baz");
+            });
+        `);
+
+        eval(code);
+    });
+
+    it("does translate JSX property names to attributes", function () {
+        var code = window.SurplusCompiler.compile(`
+            var svg = <line strokeWidth="100"></line>,
+                svg2 = <line strokeWidth={"100"}></line>,
+                svg3 = <line {...{ strokeWidth: "100" }}></line>;
+
+            [ svg, svg2, svg3 ].forEach(svg => {
+                expect(svg.hasAttribute("strokeWidth")).toBe(false);
+                expect(svg.getAttribute("stroke-width")).toBe("100");
             });
         `);
 

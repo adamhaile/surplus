@@ -1,5 +1,5 @@
 // Reference information for the HTML and SVG DOM
-export var HtmlTags = [
+export var htmlTags = [
     "a",
     "abbr",
     "acronym",
@@ -143,7 +143,7 @@ export var HtmlTags = [
     "video",
     "wbr",
     "xmp"
-], HtmlTagRx = new RegExp("^(" + HtmlTags.join("|") + ")$"), SvgTags = [
+], htmlTagRx = new RegExp("^(" + htmlTags.join("|") + ")$"), svgTags = [
     "a",
     "altGlyph",
     "altGlyphDef",
@@ -224,8 +224,7 @@ export var HtmlTags = [
     "use",
     "view",
     "vkern"
-], SvgTagRx = new RegExp("^(" + SvgTags.join("|") + ")$"), SvgOnlyTags = SvgTags.filter(function (t) { return !HtmlTagRx.test(t); }), SvgOnlyTagRx = new RegExp("^(" + SvgOnlyTags.join("|") + ")$"), SvgForeignTag = "foreignObject", AttributeRx = /-/, // TODO: better heuristic for attributes than name contains a hyphen
-IsAttribute = function (prop) { return AttributeRx.test(prop); }, HtmlEntites = {
+], svgTagRx = new RegExp("^(" + svgTags.join("|") + ")$"), svgOnlyTags = svgTags.filter(function (t) { return !htmlTagRx.test(t); }), svgOnlyTagRx = new RegExp("^(" + svgOnlyTags.join("|") + ")$"), svgForeignTag = "foreignObject", htmlEntites = {
     // support the same entites as Babel
     quot: "\u0022",
     amp: "&",

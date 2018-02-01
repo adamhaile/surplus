@@ -8,7 +8,6 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 };
 import { EmbeddedCode, CodeText, JSXElement, JSXElementKind, JSXText, JSXComment, JSXInsert, JSXStaticField, JSXDynamicField, JSXStyleProperty, JSXSpread } from './AST';
 import { locationMark } from './sourcemap';
-import { IsAttribute } from './domRef';
 export { codeGen, codeStr };
 // pre-compiled regular expressions
 var rx = {
@@ -147,8 +146,8 @@ var codeGen = function (ctl, opts) {
             else {
                 var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, fieldExprs_1 = fields.map(function (p) { return p.type === JSXStaticField ? '' : compileSegments(p.code); }), spreads_1 = fields.filter(function (p) { return p.type === JSXSpread || p.type === JSXStyleProperty; }), classField_1 = spreads_1.length === 0 && fields.filter(function (p) { return p.type === JSXStaticField && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, fieldsDynamic_1 = fieldExprs_1.some(function (e) { return !noApparentSignals(e); }), fieldStmts = fields.map(function (f, i) {
                     return f === classField_1 ? '' :
-                        f.type === JSXStaticField ? buildField(id_1, f.name, f.namespace, f.value, svg_1) :
-                            f.type === JSXDynamicField ? buildField(id_1, f.name, f.namespace, fieldExprs_1[i], svg_1) :
+                        f.type === JSXStaticField ? buildField(id_1, f, f.value) :
+                            f.type === JSXDynamicField ? buildField(id_1, f, fieldExprs_1[i]) :
                                 f.type === JSXStyleProperty ? buildStyle(f, id_1, fieldExprs_1[i], fieldsDynamic_1, spreads_1) :
                                     buildSpread(id_1, fieldExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
@@ -167,10 +166,13 @@ var codeGen = function (ctl, opts) {
                 }
                 functions.forEach(function (f) { return buildNodeFn(f, id_1); });
             }
-        }, buildField = function (id, prop, ns, expr, svg) {
-            return ns ? "Surplus.setAttributeNS(" + id + ", " + codeStr(ns) + ", " + codeStr(prop) + ", " + expr + ");" :
-                svg || IsAttribute(prop) ? "Surplus.setAttribute(" + id + ", " + codeStr(prop) + ", " + expr + ");"
-                    : id + "." + prop + " = " + expr + ";";
+        }, buildField = function (id, field, expr) {
+            return (field.attr ? buildAttribute : buildProperty)(id, field, expr);
+        }, buildProperty = function (id, field, expr) {
+            return field.namespace ? id + "." + field.namespace + "." + field.name + " = " + expr + ";" : id + "." + field.name + " = " + expr + ";";
+        }, buildAttribute = function (id, field, expr) {
+            return field.namespace ? "Surplus.setAttributeNS(" + id + ", " + codeStr(field.namespace) + ", " + codeStr(field.name) + ", " + expr + ");" :
+                "Surplus.setAttribute(" + id + ", " + codeStr(field.name) + ", " + expr + ");";
         }, buildSpread = function (id, expr, svg) {
             return "Surplus.spread(" + id + ", " + expr + ", " + svg + ");";
         }, buildNodeFn = function (node, id) {

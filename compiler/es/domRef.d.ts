@@ -1,3 +1,3 @@
-export declare const HtmlTags: string[], HtmlTagRx: RegExp, SvgTags: string[], SvgTagRx: RegExp, SvgOnlyTags: string[], SvgOnlyTagRx: RegExp, SvgForeignTag = "foreignObject", AttributeRx: RegExp, IsAttribute: (prop: string) => boolean, HtmlEntites: {
+export declare const htmlTags: string[], htmlTagRx: RegExp, svgTags: string[], svgTagRx: RegExp, svgOnlyTags: string[], svgOnlyTagRx: RegExp, svgForeignTag = "foreignObject", htmlEntites: {
     [name: string]: string;
 };

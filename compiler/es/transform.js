@@ -9,16 +9,12 @@ var __assign = (this && this.__assign) || Object.assign || function(t) {
 // Cross-browser compatibility shims
 import * as AST from './AST';
 import { codeStr } from './codeGen';
-import { HtmlEntites, SvgOnlyTagRx, SvgForeignTag } from './domRef';
-var namespaceAliases = {
-    xlink: "http://www.w3.org/1999/xlink",
-    xml: "http://www.w3.org/XML/1998/namespace",
-};
+import { htmlEntites, svgOnlyTagRx, svgForeignTag } from './domRef';
+import { isAttrOnlyField, isPropOnlyField, getAttrName, getPropName, isDeepProp, isNSAttr } from './fieldNames';
+import { JSXElementKind } from './AST';
 var rx = {
     trimmableWS: /^\s*?\n\s*|\s*?\n\s*$/g,
     extraWs: /\s\s+/g,
-    jsxEventProperty: /^on[A-Z]/,
-    namespacedAttr: new RegExp("^(" + Object.keys(namespaceAliases).join('|') + ")([A-Z])(.*)"),
     htmlEntity: /(?:&#(\d+);|&#x([\da-fA-F]+);|&(\w+);)/g,
     subcomponent: /(^[A-Z])|\./
 };
@@ -83,20 +79,16 @@ var tf = [
     collapseExtraWhitespaceInTextNodes,
     removeEmptyTextNodes,
     translateHTMLEntitiesToUnicodeInTextNodes,
-    translateJSXPropertyNames,
-    translateHTMLAttributeNames,
-    translateSVGPropertyNames,
-    translateNamespacedAttributes,
-    translateDeepStylePropertyNames,
+    determinePropertiesAndAttributes,
     promoteTextOnlyContentsToTextContentProperties,
-    removeDuplicateProperties
+    removeDuplicateFields
 ].reverse().reduce(function (tf, fn) { return fn(tf); }, Copy);
 export var transform = function (node, opt) { return tf.Program(node); };
 function determineElementRole(tx) {
     return __assign({}, tx, { JSXElement: function (node, parent) {
             var kind = rx.subcomponent.test(node.tag) ? AST.JSXElementKind.SubComponent :
-                SvgOnlyTagRx.test(node.tag) ? AST.JSXElementKind.SVG :
-                    parent && parent.kind === AST.JSXElementKind.SVG && parent.tag !== SvgForeignTag ? AST.JSXElementKind.SVG :
+                svgOnlyTagRx.test(node.tag) ? AST.JSXElementKind.SVG :
+                    parent && parent.kind === AST.JSXElementKind.SVG && parent.tag !== svgForeignTag ? AST.JSXElementKind.SVG :
                         AST.JSXElementKind.HTML;
             return tx.JSXElement.call(this, __assign({}, node, { kind: kind }), parent);
         } });
@@ -137,7 +129,7 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
             var text = node.text.replace(rx.htmlEntity, function (entity, dec, hex, named) {
                 return dec ? String.fromCharCode(parseInt(dec, 10)) :
                     hex ? String.fromCharCode(parseInt(hex, 16)) :
-                        HtmlEntites[named] ||
+                        htmlEntites[named] ||
                             entity;
             });
             if (text !== node.text)
@@ -145,7 +137,7 @@ function translateHTMLEntitiesToUnicodeInTextNodes(tx) {
             return tx.JSXText.call(this, node);
         } });
 }
-function removeDuplicateProperties(tx) {
+function removeDuplicateFields(tx) {
     return __assign({}, tx, { JSXElement: function (node, parent) {
             var lastid = {};
             node.fields.forEach(function (p, i) { return p.type === AST.JSXSpread || p.type === AST.JSXStyleProperty || (lastid[p.name] = i); });
@@ -162,54 +154,17 @@ function removeDuplicateProperties(tx) {
             return tx.JSXElement.call(this, node, parent);
         } });
 }
-function translateJSXPropertyNames(tx) {
-    return __assign({}, tx, { JSXDynamicField: function (node, parent) {
-            if (parent.kind === AST.JSXElementKind.HTML) {
-                node = __assign({}, node, { name: translateJSXPropertyName(node.name) });
-            }
-            return tx.JSXDynamicField.call(this, node, parent);
-        } });
-}
-function translateJSXPropertyName(name) {
-    return rx.jsxEventProperty.test(name) ? (name === "onDoubleClick" ? "ondblclick" : name.toLowerCase()) : name;
-}
-function translateHTMLAttributeNames(tx) {
+function determinePropertiesAndAttributes(tx) {
+    // strategy: HTML prefers props, JSX attrs, unless not possible
+    // translate given field name into attr/prop appropriate versions (snake vs camel case)
+    // handle deep props and attr namespaces
     return __assign({}, tx, { JSXField: function (node, parent) {
-            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField)
-                && parent.kind === AST.JSXElementKind.HTML) {
-                var name_1 = node.name === "class" ? "className" : node.name === "for" ? "htmlFor" : node.name;
-                node = __assign({}, node, { name: name_1 });
-            }
-            return tx.JSXField.call(this, node, parent);
-        } });
-}
-function translateSVGPropertyNames(tx) {
-    return __assign({}, tx, { JSXField: function (node, parent) {
-            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField)
-                && parent.kind === AST.JSXElementKind.SVG) {
-                var name_2 = node.name === "className" ? "class" : node.name === "htmlFor" ? "for" : node.name;
-                node = __assign({}, node, { name: name_2 });
-            }
-            return tx.JSXField.call(this, node, parent);
-        } });
-}
-function translateNamespacedAttributes(tx) {
-    return __assign({}, tx, { JSXField: function (node, parent) {
-            var m;
-            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField)
-                && (m = rx.namespacedAttr.exec(node.name))) {
-                var namespace = namespaceAliases[m[1]], name_3 = m[2].toLowerCase() + m[3];
-                node = __assign({}, node, { name: name_3, namespace: namespace });
-            }
-            return tx.JSXField.call(this, node, parent);
-        } });
-}
-function translateDeepStylePropertyNames(tx) {
-    return __assign({}, tx, { JSXField: function (node, parent) {
-            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField)
-                && parent.kind === AST.JSXElementKind.HTML
-                && node.name.substr(0, 6) === 'style-') {
-                node = __assign({}, node, { name: 'style.' + node.name.substr(6) });
+            if ((node.type === AST.JSXDynamicField || node.type === AST.JSXStaticField) && parent.kind !== JSXElementKind.SubComponent) {
+                var attr = parent.kind === JSXElementKind.SVG && !isPropOnlyField(node.name)
+                    || parent.kind === JSXElementKind.HTML && isAttrOnlyField(node.name), name_1 = attr ? getAttrName(node.name) : getPropName(node.name), namespace = null, namespaced = attr ? isNSAttr(name_1) : isDeepProp(name_1);
+                if (namespaced)
+                    namespace = namespaced[0], name_1 = namespaced[1];
+                node = __assign({}, node, { attr: attr, name: name_1, namespace: namespace });
             }
             return tx.JSXField.call(this, node, parent);
         } });
@@ -218,7 +173,7 @@ function promoteTextOnlyContentsToTextContentProperties(tx) {
     return __assign({}, tx, { JSXElement: function (node, parent) {
             var content0 = node.content[0];
             if (node.kind === AST.JSXElementKind.HTML && node.content.length === 1 && content0.type === AST.JSXText) {
-                var text = this.JSXText(content0), textContent = { type: AST.JSXStaticField, name: "textContent", namespace: null, value: codeStr(text.text) };
+                var text = this.JSXText(content0), textContent = { type: AST.JSXStaticField, name: "textContent", attr: false, namespace: null, value: codeStr(text.text) };
                 node = __assign({}, node, { fields: node.fields.concat([textContent]), content: [] });
             }
             return tx.JSXElement.call(this, node, parent);
