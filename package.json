@@ -1,6 +1,6 @@
 {
   "name": "surplus",
-  "version": "0.5.0-beta12",
+  "version": "0.5.0-beta13",
   "description": "High-performance JSX web views for S.js applications",
   "keywords": [
     "JSX",
