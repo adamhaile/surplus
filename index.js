@@ -590,9 +590,11 @@ function setAttributeNS(node, namespace, name, value) {
 }
 
 var htmlFieldCache = {
+    // special props
     style: ['style', null, 3 /* Assign */],
     ref: ['ref', null, 2 /* Ignore */],
     fn: ['fn', null, 2 /* Ignore */],
+    // attr compat
     class: ['className', null, 0 /* Property */],
     for: ['htmlFor', null, 0 /* Property */],
     // a few React oddities, mostly disagreeing about casing
@@ -603,12 +605,77 @@ var htmlFieldCache = {
     autoPlay: ['autoplay', null, 0 /* Property */],
 };
 var svgFieldCache = {
+    // special props
     style: ['style', null, 3 /* Assign */],
     ref: ['ref', null, 2 /* Ignore */],
     fn: ['fn', null, 2 /* Ignore */],
+    // property compat
     className: ['class', null, 1 /* Attribute */],
     htmlFor: ['for', null, 1 /* Attribute */],
-    onDoubleClick: ['ondblclick', null, 0 /* Property */]
+    // React compat
+    onDoubleClick: ['ondblclick', null, 0 /* Property */],
+    // attributes with eccentric casing - some SVG attrs are snake-cased, some camelCased
+    allowReorder: ['allowReorder', null, 1 /* Attribute */],
+    attributeName: ['attributeName', null, 1 /* Attribute */],
+    attributeType: ['attributeType', null, 1 /* Attribute */],
+    autoReverse: ['autoReverse', null, 1 /* Attribute */],
+    baseFrequency: ['baseFrequency', null, 1 /* Attribute */],
+    calcMode: ['calcMode', null, 1 /* Attribute */],
+    clipPathUnits: ['clipPathUnits', null, 1 /* Attribute */],
+    contentScriptType: ['contentScriptType', null, 1 /* Attribute */],
+    contentStyleType: ['contentStyleType', null, 1 /* Attribute */],
+    diffuseConstant: ['diffuseConstant', null, 1 /* Attribute */],
+    edgeMode: ['edgeMode', null, 1 /* Attribute */],
+    externalResourcesRequired: ['externalResourcesRequired', null, 1 /* Attribute */],
+    filterRes: ['filterRes', null, 1 /* Attribute */],
+    filterUnits: ['filterUnits', null, 1 /* Attribute */],
+    gradientTransform: ['gradientTransform', null, 1 /* Attribute */],
+    gradientUnits: ['gradientUnits', null, 1 /* Attribute */],
+    kernelMatrix: ['kernelMatrix', null, 1 /* Attribute */],
+    kernelUnitLength: ['kernelUnitLength', null, 1 /* Attribute */],
+    keyPoints: ['keyPoints', null, 1 /* Attribute */],
+    keySplines: ['keySplines', null, 1 /* Attribute */],
+    keyTimes: ['keyTimes', null, 1 /* Attribute */],
+    lengthAdjust: ['lengthAdjust', null, 1 /* Attribute */],
+    limitingConeAngle: ['limitingConeAngle', null, 1 /* Attribute */],
+    markerHeight: ['markerHeight', null, 1 /* Attribute */],
+    markerUnits: ['markerUnits', null, 1 /* Attribute */],
+    maskContentUnits: ['maskContentUnits', null, 1 /* Attribute */],
+    maskUnits: ['maskUnits', null, 1 /* Attribute */],
+    numOctaves: ['numOctaves', null, 1 /* Attribute */],
+    pathLength: ['pathLength', null, 1 /* Attribute */],
+    patternContentUnits: ['patternContentUnits', null, 1 /* Attribute */],
+    patternTransform: ['patternTransform', null, 1 /* Attribute */],
+    patternUnits: ['patternUnits', null, 1 /* Attribute */],
+    pointsAtX: ['pointsAtX', null, 1 /* Attribute */],
+    pointsAtY: ['pointsAtY', null, 1 /* Attribute */],
+    pointsAtZ: ['pointsAtZ', null, 1 /* Attribute */],
+    preserveAlpha: ['preserveAlpha', null, 1 /* Attribute */],
+    preserveAspectRatio: ['preserveAspectRatio', null, 1 /* Attribute */],
+    primitiveUnits: ['primitiveUnits', null, 1 /* Attribute */],
+    refX: ['refX', null, 1 /* Attribute */],
+    refY: ['refY', null, 1 /* Attribute */],
+    repeatCount: ['repeatCount', null, 1 /* Attribute */],
+    repeatDur: ['repeatDur', null, 1 /* Attribute */],
+    requiredExtensions: ['requiredExtensions', null, 1 /* Attribute */],
+    requiredFeatures: ['requiredFeatures', null, 1 /* Attribute */],
+    specularConstant: ['specularConstant', null, 1 /* Attribute */],
+    specularExponent: ['specularExponent', null, 1 /* Attribute */],
+    spreadMethod: ['spreadMethod', null, 1 /* Attribute */],
+    startOffset: ['startOffset', null, 1 /* Attribute */],
+    stdDeviation: ['stdDeviation', null, 1 /* Attribute */],
+    stitchTiles: ['stitchTiles', null, 1 /* Attribute */],
+    surfaceScale: ['surfaceScale', null, 1 /* Attribute */],
+    systemLanguage: ['systemLanguage', null, 1 /* Attribute */],
+    tableValues: ['tableValues', null, 1 /* Attribute */],
+    targetX: ['targetX', null, 1 /* Attribute */],
+    targetY: ['targetY', null, 1 /* Attribute */],
+    textLength: ['textLength', null, 1 /* Attribute */],
+    viewBox: ['viewBox', null, 1 /* Attribute */],
+    viewTarget: ['viewTarget', null, 1 /* Attribute */],
+    xChannelSelector: ['xChannelSelector', null, 1 /* Attribute */],
+    yChannelSelector: ['yChannelSelector', null, 1 /* Attribute */],
+    zoomAndPan: ['zoomAndPan', null, 1 /* Attribute */],
 };
 var attributeOnlyRx = /^(aria|data)[\-A-Z]/;
 var isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); };

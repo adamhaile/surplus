@@ -218,6 +218,20 @@ describe("SVG nodes", function () {
         eval(code);
     });
 
+    it("can handle eccentrically capitalized SVG attributes", function () {
+        var code = window.SurplusCompiler.compile(`
+            var line, svg = 
+                <svg viewBox="0 0 100 100">
+                    <line ref={line} x1={0} y1={50} x2={100} y2={50} stroke="black" strokeWidth={100} />
+                </svg>;
+                
+            expect(svg.getAttribute("viewBox")).toBe("0 0 100 100");
+            expect(line.getAttribute("stroke-width")).toBe("100");
+        `);
+
+        eval(code);
+    });
+
     it("can have refs", function () {
         var code = window.SurplusCompiler.compile(`
             var ref = null,
