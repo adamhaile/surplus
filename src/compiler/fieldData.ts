@@ -14,20 +14,25 @@ export type FieldData = [ string, string | null, FieldFlags ];
 const
     // pre-seed the caches with a few special cases, so we don't need to check for them in the common cases
     htmlFieldCache = {
-        style        : [ 'style'     , null, FieldFlags.Assign ],
-        ref          : [ 'ref'       , null, FieldFlags.Ignore ],
-        fn           : [ 'fn'        , null, FieldFlags.Ignore ],
-        class        : [ 'className' , null, FieldFlags.Property ],
-        for          : [ 'htmlFor'   , null, FieldFlags.Property ],
-        onDoubleClick: [ 'ondblclick', null, FieldFlags.Property ]
+        style          : [ 'style'          , null, FieldFlags.Assign    ],
+        ref            : [ 'ref'            , null, FieldFlags.Ignore    ],
+        fn             : [ 'fn'             , null, FieldFlags.Ignore    ],
+        class          : [ 'className'      , null, FieldFlags.Property  ],
+        for            : [ 'htmlFor'        , null, FieldFlags.Property  ],
+        // a few React oddities, mostly disagreeing about casing
+        onDoubleClick  : [ 'ondblclick'     , null, FieldFlags.Property  ],
+        spellCheck     : [ 'spellcheck'     , null, FieldFlags.Property  ],
+        allowFullScreen: [ 'allowFullscreen', null, FieldFlags.Property  ],
+        autoFocus      : [ 'autofocus'      , null, FieldFlags.Property  ],
+        autoPlay       : [ 'autoplay'       , null, FieldFlags.Property  ],
     } as { [ field : string ] : FieldData },
     svgFieldCache = {
-        style        : [ 'style'     , null, FieldFlags.Assign ],
-        ref          : [ 'ref'       , null, FieldFlags.Ignore ],
-        fn           : [ 'fn'        , null, FieldFlags.Ignore ],
-        className    : [ 'class'     , null, FieldFlags.Attribute ],
-        htmlFor      : [ 'for'       , null, FieldFlags.Attribute ],
-        onDoubleClick: [ 'ondblclick', null, FieldFlags.Property ]
+        style        : [ 'style'      , null, FieldFlags.Assign    ],
+        ref          : [ 'ref'        , null, FieldFlags.Ignore    ],
+        fn           : [ 'fn'         , null, FieldFlags.Ignore    ],
+        className    : [ 'class'      , null, FieldFlags.Attribute ],
+        htmlFor      : [ 'for'        , null, FieldFlags.Attribute ],
+        onDoubleClick: [ 'ondblclick' , null, FieldFlags.Property  ]
     } as { [ field : string ] : FieldData };
 
 const

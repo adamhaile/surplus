@@ -6,7 +6,12 @@ htmlFieldCache = {
     fn: ['fn', null, 2 /* Ignore */],
     class: ['className', null, 0 /* Property */],
     for: ['htmlFor', null, 0 /* Property */],
-    onDoubleClick: ['ondblclick', null, 0 /* Property */]
+    // a few React oddities, mostly disagreeing about casing
+    onDoubleClick: ['ondblclick', null, 0 /* Property */],
+    spellCheck: ['spellcheck', null, 0 /* Property */],
+    allowFullScreen: ['allowFullscreen', null, 0 /* Property */],
+    autoFocus: ['autofocus', null, 0 /* Property */],
+    autoPlay: ['autoplay', null, 0 /* Property */],
 }, svgFieldCache = {
     style: ['style', null, 3 /* Assign */],
     ref: ['ref', null, 2 /* Ignore */],

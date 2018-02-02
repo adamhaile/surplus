@@ -35,9 +35,10 @@ describe("JSX static property", function () {
     it("can use JSX property names as aliases for DOM properties", function () {
         eval(window.SurplusCompiler.compile(`
             var fn = () => {},
-                input = <input onClick={fn} />;
+                input = <input onClick={fn} spellCheck={true} />;
 
             expect(input.onclick).toBe(fn);
+            expect(input.spellcheck).toBe(true);
         `));
     });
 
