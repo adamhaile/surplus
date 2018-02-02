@@ -8,10 +8,19 @@ export function content(parent : HTMLElement, value : InsertValue, current : str
     if (current === value) {
         // nothing to do
     } else if (t === 'string') {
-        current = parent.textContent = value as string;
+        // if a Text node already exists, it's faster to set its .data than set the parent.textContent
+        if (current !== "" && typeof current === 'string') {
+            current = (parent.firstChild as Text).data = value as string;
+        } else {
+            current = parent.textContent = value as string;
+        }
     } else if (t === 'number') {
         value = value!.toString();
-        current = parent.textContent = value;
+        if (current !== "" && typeof current === 'string') {
+            current = (parent.firstChild as Text).data = value as string;
+        } else {
+            current = parent.textContent = value;
+        }
     } else if (value == null || t === 'boolean') { // null, undefined, true or false
         clear(parent);
         current = "";

@@ -44,6 +44,56 @@ describe("SVG nodes", function () {
         eval(code);
     });
 
+    it("can have static text content", function () {
+        var code = window.SurplusCompiler.compile(`
+            var text = <text>foo</text>;
+
+            expect(text instanceof SVGTextElement).toBe(true);
+            expect(text.textContent).toBe("foo");
+        `);
+
+        eval(code);
+    });
+
+    it("can have dynamic text content", function () {
+        var code = window.SurplusCompiler.compile(`
+            var foo = S.data("foo"),
+                text = <text>{foo()}</text>;
+
+            expect(text instanceof SVGTextElement).toBe(true);
+            expect(text.textContent).toBe("foo");
+            foo("bar");
+            expect(text.textContent).toBe("bar");
+        `);
+
+        eval(code);
+    });
+
+    it("can have static child content", function () {
+        var code = window.SurplusCompiler.compile(`
+            var svg = <g><text></text></g>;
+
+            expect(svg instanceof SVGGElement).toBe(true);
+            expect(svg.firstChild instanceof SVGTextElement).toBe(true);
+        `);
+
+        eval(code);
+    });
+
+    it("can have dynamic child content", function () {
+        var code = window.SurplusCompiler.compile(`
+            var child = S.data(<text></text>),
+                svg = <g>{child()}></g>;
+
+            expect(svg instanceof SVGGElement).toBe(true);
+            expect(svg.firstChild instanceof SVGTextElement).toBe(true);
+            child(<rect></rect>);
+            expect(svg.firstChild instanceof SVGRectElement).toBe(true);
+        `);
+
+        eval(code);
+    });
+
     it("can be an <svg> element that is the first child of an html element", function () {
         var code = window.SurplusCompiler.compile(`
             var div = 

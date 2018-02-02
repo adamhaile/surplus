@@ -5,11 +5,22 @@ export function content(parent, value, current) {
         // nothing to do
     }
     else if (t === 'string') {
-        current = parent.textContent = value;
+        // if a Text node already exists, it's faster to set its .data than set the parent.textContent
+        if (current !== "" && typeof current === 'string') {
+            current = parent.firstChild.data = value;
+        }
+        else {
+            current = parent.textContent = value;
+        }
     }
     else if (t === 'number') {
         value = value.toString();
-        current = parent.textContent = value;
+        if (current !== "" && typeof current === 'string') {
+            current = parent.firstChild.data = value;
+        }
+        else {
+            current = parent.textContent = value;
+        }
     }
     else if (value == null || t === 'boolean') {
         clear(parent);

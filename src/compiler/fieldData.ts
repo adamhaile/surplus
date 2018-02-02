@@ -132,16 +132,18 @@ const
 
 export const 
     getFieldData = (field : string, svg : boolean) : FieldData => {
-        const 
-            cache  = svg ? svgFieldCache : htmlFieldCache,
+        let cache  = svg ? svgFieldCache : htmlFieldCache,
             cached = cache[field];
 
         if (cached) return cached;
 
         let attr =  svg && !isPropOnlyField(field)
-                 || !svg && isAttrOnlyField(field),
-            name = attr ? getAttrName(field) : getPropName(field),
-            data = attr ? buildAttrData(name) : buildPropData(name);
+                || !svg && isAttrOnlyField(field),
+            name = attr ? getAttrName(field) : getPropName(field);
+
+        if (name !== field && (cached = cache[name])) return cached;
+
+        let data = attr ? buildAttrData(name) : buildPropData(name);
 
         return cache[field] = data;
     }

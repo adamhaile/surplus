@@ -105,6 +105,9 @@ export var getFieldData = function (field, svg) {
     if (cached)
         return cached;
     var attr = svg && !isPropOnlyField(field)
-        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field), data = attr ? buildAttrData(name) : buildPropData(name);
+        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field);
+    if (name !== field && (cached = cache[name]))
+        return cached;
+    var data = attr ? buildAttrData(name) : buildPropData(name);
     return cache[field] = data;
 };

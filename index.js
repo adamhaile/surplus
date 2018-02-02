@@ -165,11 +165,22 @@ function content(parent, value, current) {
         // nothing to do
     }
     else if (t === 'string') {
-        current = parent.textContent = value;
+        // if a Text node already exists, it's faster to set its .data than set the parent.textContent
+        if (current !== "" && typeof current === 'string') {
+            current = parent.firstChild.data = value;
+        }
+        else {
+            current = parent.textContent = value;
+        }
     }
     else if (t === 'number') {
         value = value.toString();
-        current = parent.textContent = value;
+        if (current !== "" && typeof current === 'string') {
+            current = parent.firstChild.data = value;
+        }
+        else {
+            current = parent.textContent = value;
+        }
     }
     else if (value == null || t === 'boolean') {
         clear(parent);
@@ -708,7 +719,10 @@ var getFieldData = function (field, svg) {
     if (cached)
         return cached;
     var attr = svg && !isPropOnlyField(field)
-        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field), data = attr ? buildAttrData(name) : buildPropData(name);
+        || !svg && isAttrOnlyField(field), name = attr ? getAttrName(field) : getPropName(field);
+    if (name !== field && (cached = cache[name]))
+        return cached;
+    var data = attr ? buildAttrData(name) : buildPropData(name);
     return cache[field] = data;
 };
 
