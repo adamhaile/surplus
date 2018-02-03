@@ -6,6 +6,7 @@ const rx = {
     identifier       : /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd : /[^\\](\\\\)*\\$/, // ending in odd number of escape slashes = next char of string escaped
     leadingWs        : /^\s+/,
+    hasNonWs         : /\S/,
     refProp          : /^ref\d*$/,
     fnProp           : /^fn\d*$/,
     styleProp        : /^style$/,
@@ -20,6 +21,7 @@ const parens : { [p : string] : string } = {
 };
 
 export interface LOC { line: number, col: number, pos: number };
+interface ContentFlags { hasContent : boolean }
 
 export function parse(TOKS : string[], opts : Params) : AST.Program {
     var i = 0,
@@ -69,8 +71,9 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
             references = [] as AST.JSXReference[],
             functions = [] as AST.JSXFunction[],
             content = [] as AST.JSXContent[],
+            hasContent = true,
             field : AST.JSXField | AST.JSXReference | AST.JSXFunction,
-            hasContent = true;
+            insert : AST.JSXInsert | null;
 
         NEXT(); // pass '<'
 
@@ -107,7 +110,8 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
                 if (IS('<')) {
                     content.push(jsxElement());
                 } else if (IS('{')) {
-                    content.push(jsxInsert());
+                    insert = jsxInsertOrComment();
+                    if (insert) content.push(insert);
                 } else if (IS('<!--')) {
                     content.push(jsxComment());
                 } else {
@@ -158,9 +162,14 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
         return { type: AST.JSXComment, text };
     }
 
-    function jsxInsert() : AST.JSXInsert {
-        var loc = LOC();
-        return { type: AST.JSXInsert, code: embeddedCode(), loc };
+    function jsxInsertOrComment() : AST.JSXInsert | null {
+        if (NOT('{')) ERR("not in JSX insert");
+
+        var loc = LOC(),
+            flags = { hasContent : false },
+            code = embeddedCode(flags);
+
+        return flags.hasContent ? { type: AST.JSXInsert, code, loc } : null;
     }
 
     function jsxField() : AST.JSXField | AST.JSXReference | AST.JSXFunction {
@@ -168,7 +177,8 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
 
         var loc = LOC(),
             name = SPLIT(rx.identifier),
-            code : AST.EmbeddedCode;
+            code : AST.EmbeddedCode,
+            flags : ContentFlags;
 
         SKIPWS(); // pass name
 
@@ -181,7 +191,9 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
                 if (rx.badStaticProp.test(name)) ERR(`cannot name a static property '${name}' as it has a special meaning as a dynamic property`, loc);
                 return { type: AST.JSXStaticField, name, value: quotedString() };
             } else if (IS('{')) {
-                code = embeddedCode();
+                flags = { hasContent : false };
+                code = embeddedCode(flags);
+                if (!flags.hasContent) ERR(`value for property '${name}' cannot be empty`, loc);
                 return rx.refProp.test(name) ? { type: AST.JSXReference, code, loc } :
                     rx.fnProp.test(name) ? { type: AST.JSXFunction, code, loc } : 
                     rx.styleProp.test(name) ? { type: AST.JSXStyleProperty, name: 'style', code, loc } :
@@ -197,18 +209,22 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
     function jsxSpreadProperty() : AST.JSXSpread {
         if (NOT('{...')) ERR("not at start of JSX spread");
 
-        var loc = LOC();
+        var loc = LOC(),
+            flags = { hasContent : false },
+            code = embeddedCode(flags);
 
-        return { type: AST.JSXSpread, code: embeddedCode(), loc };
+        if (!flags.hasContent) ERR("spread value cannot be empty", loc);
+
+        return { type: AST.JSXSpread, code, loc };
     }
 
-    function embeddedCode() : AST.EmbeddedCode {
+    function embeddedCode(flags : ContentFlags) : AST.EmbeddedCode {
         if (NOT('{') && NOT('{...')) ERR("not at start of JSX embedded code");
 
         var prefixLength = TOK.length,
             segments = [] as AST.CodeSegment[],
             loc = LOC(),
-            last = balancedParens(segments, "", loc);
+            last = balancedParens(segments, "", loc, flags);
         
         // remove closing '}'
         last = last.substr(0, last.length - 1);
@@ -222,7 +238,7 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
         return { type: AST.EmbeddedCode, segments };
     }
 
-    function balancedParens(segments : AST.CodeSegment[], text : string, loc : LOC) {
+    function balancedParens(segments : AST.CodeSegment[], text : string, loc : LOC, flags? : ContentFlags) {
         var start = LOC(),
             end = PARENS();
 
@@ -232,14 +248,17 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
 
         while (!EOF && NOT(end)) {
             if (IS("'") || IS('"')) {
+                if (flags) flags.hasContent = true;
                 text += quotedString();
             } else if (IS('`')) {
+                if (flags) flags.hasContent = true;
                 text = templateLiteral(segments, text, loc);
             } else if (IS('//')) {
                 text += codeSingleLineComment();
             } else if (IS('/*')) {
                 text += codeMultiLineComment();
             } else if (IS("<")) {
+                if (flags) flags.hasContent = true;
                 if (text) segments.push({ type: AST.CodeText, text, loc: { line: loc.line, col: loc.col, pos: loc.pos } });
                 text = "";
                 segments.push(jsxElement());
@@ -247,8 +266,10 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
                 loc.col = COL;
                 loc.pos = POS;
             } else if (PARENS()) {
-                text = balancedParens(segments, text, loc);
+                if (flags) flags.hasContent = true;
+                text = balancedParens(segments, text, loc, flags);
             } else {
+                if (flags) flags.hasContent = flags.hasContent || rx.hasNonWs.test(TOK);
                 text += TOK, NEXT();
             }
         }

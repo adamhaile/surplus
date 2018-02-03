@@ -102,6 +102,62 @@ describe("parser", function () {
         `);
         eval(code);
     });
+
+    it("handles // comments in children", function () {
+        var code = window.SurplusCompiler.compile(`
+            var span = <span>
+                1
+                { 
+                    // comment
+                } 
+            </span>;
+                                      
+            expect(span.childNodes.length).toBe(1);
+        `);
+        eval(code);
+    });
+
+    it("handles single-line { /* */ } comments in children", function () {
+        var code = window.SurplusCompiler.compile(`
+            var span = <span>
+                1
+                { /* comment */ }
+            </span>;
+                                      
+            expect(span.childNodes.length).toBe(1);
+        `);
+        eval(code);
+    });
+
+    it("handles multi-line /* */ comments in tags", function () {
+        var code = window.SurplusCompiler.compile(`
+            var span = <span>
+                1
+                { /*
+                    comment
+                */ }
+                </span>;
+                                      
+            expect(span.childNodes.length).toBe(1);
+        `);
+        eval(code);
+    });
+
+    it("throws on empty dynamic expressions", function () {
+        var code1 = `<span className={ }></span>`,
+            code2 = `<span className={ /* comment */ }></span>`;
+
+        expect(() => window.SurplusCompiler.compile(code1)).toThrowError(/empty/);
+        expect(() => window.SurplusCompiler.compile(code2)).toThrowError(/empty/);
+    });
+
+    it("throws on empty spread expressions", function () {
+        var code1 = `<span {... }></span>`,
+            code2 = `<span {... /* comment */ }></span>`;
+
+        expect(() => window.SurplusCompiler.compile(code1)).toThrowError(/empty/);
+        expect(() => window.SurplusCompiler.compile(code2)).toThrowError(/empty/);
+    });
 });
 
 function escape(c) {

@@ -66,6 +66,7 @@ var rx = {
     identifier: /^[a-zA-Z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+)*/,
     stringEscapedEnd: /[^\\](\\\\)*\\$/,
     leadingWs: /^\s+/,
+    hasNonWs: /\S/,
     refProp: /^ref\d*$/,
     fnProp: /^fn\d*$/,
     styleProp: /^style$/,
@@ -114,7 +115,7 @@ function parse(TOKS, opts) {
     function jsxElement() {
         if (NOT('<'))
             ERR("not at start of html element");
-        var start = LOC(), tag = "", fields = [], references = [], functions = [], content = [], field, hasContent = true;
+        var start = LOC(), tag = "", fields = [], references = [], functions = [], content = [], hasContent = true, field, insert;
         NEXT(); // pass '<'
         tag = SPLIT(rx.identifier);
         if (!tag)
@@ -149,7 +150,9 @@ function parse(TOKS, opts) {
                     content.push(jsxElement());
                 }
                 else if (IS('{')) {
-                    content.push(jsxInsert());
+                    insert = jsxInsertOrComment();
+                    if (insert)
+                        content.push(insert);
                 }
                 else if (IS('<!--')) {
                     content.push(jsxComment());
@@ -189,14 +192,16 @@ function parse(TOKS, opts) {
         NEXT(); // skip '-->'
         return { type: JSXComment, text: text };
     }
-    function jsxInsert() {
-        var loc = LOC();
-        return { type: JSXInsert, code: embeddedCode(), loc: loc };
+    function jsxInsertOrComment() {
+        if (NOT('{'))
+            ERR("not in JSX insert");
+        var loc = LOC(), flags = { hasContent: false }, code = embeddedCode(flags);
+        return flags.hasContent ? { type: JSXInsert, code: code, loc: loc } : null;
     }
     function jsxField() {
         if (!MATCH(rx.identifier))
             ERR("not at start of property declaration");
-        var loc = LOC(), name = SPLIT(rx.identifier), code;
+        var loc = LOC(), name = SPLIT(rx.identifier), code, flags;
         SKIPWS(); // pass name
         if (IS('=')) {
             NEXT(); // pass '='
@@ -207,7 +212,10 @@ function parse(TOKS, opts) {
                 return { type: JSXStaticField, name: name, value: quotedString() };
             }
             else if (IS('{')) {
-                code = embeddedCode();
+                flags = { hasContent: false };
+                code = embeddedCode(flags);
+                if (!flags.hasContent)
+                    ERR("value for property '" + name + "' cannot be empty", loc);
                 return rx.refProp.test(name) ? { type: JSXReference, code: code, loc: loc } :
                     rx.fnProp.test(name) ? { type: JSXFunction, code: code, loc: loc } :
                         rx.styleProp.test(name) ? { type: JSXStyleProperty, name: 'style', code: code, loc: loc } :
@@ -224,13 +232,15 @@ function parse(TOKS, opts) {
     function jsxSpreadProperty() {
         if (NOT('{...'))
             ERR("not at start of JSX spread");
-        var loc = LOC();
-        return { type: JSXSpread, code: embeddedCode(), loc: loc };
+        var loc = LOC(), flags = { hasContent: false }, code = embeddedCode(flags);
+        if (!flags.hasContent)
+            ERR("spread value cannot be empty", loc);
+        return { type: JSXSpread, code: code, loc: loc };
     }
-    function embeddedCode() {
+    function embeddedCode(flags) {
         if (NOT('{') && NOT('{...'))
             ERR("not at start of JSX embedded code");
-        var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc);
+        var prefixLength = TOK.length, segments = [], loc = LOC(), last = balancedParens(segments, "", loc, flags);
         // remove closing '}'
         last = last.substr(0, last.length - 1);
         segments.push({ type: CodeText, text: last, loc: loc });
@@ -240,16 +250,20 @@ function parse(TOKS, opts) {
         segments[0] = { type: CodeText, text: first.text.substr(prefixLength), loc: first.loc };
         return { type: EmbeddedCode, segments: segments };
     }
-    function balancedParens(segments, text, loc) {
+    function balancedParens(segments, text, loc, flags) {
         var start = LOC(), end = PARENS();
         if (end === undefined)
             ERR("not in parentheses");
         text += TOK, NEXT();
         while (!EOF && NOT(end)) {
             if (IS("'") || IS('"')) {
+                if (flags)
+                    flags.hasContent = true;
                 text += quotedString();
             }
             else if (IS('`')) {
+                if (flags)
+                    flags.hasContent = true;
                 text = templateLiteral(segments, text, loc);
             }
             else if (IS('//')) {
@@ -259,6 +273,8 @@ function parse(TOKS, opts) {
                 text += codeMultiLineComment();
             }
             else if (IS("<")) {
+                if (flags)
+                    flags.hasContent = true;
                 if (text)
                     segments.push({ type: CodeText, text: text, loc: { line: loc.line, col: loc.col, pos: loc.pos } });
                 text = "";
@@ -268,9 +284,13 @@ function parse(TOKS, opts) {
                 loc.pos = POS;
             }
             else if (PARENS()) {
-                text = balancedParens(segments, text, loc);
+                if (flags)
+                    flags.hasContent = true;
+                text = balancedParens(segments, text, loc, flags);
             }
             else {
+                if (flags)
+                    flags.hasContent = flags.hasContent || rx.hasNonWs.test(TOK);
                 text += TOK, NEXT();
             }
         }
