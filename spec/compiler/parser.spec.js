@@ -62,6 +62,46 @@ describe("parser", function () {
         ');
         eval(code);
     });
+
+    it("handles // comments in tags", function () {
+        var code = window.SurplusCompiler.compile(`
+            var span = <span 
+                        // comment 1
+                        className
+                        // comment 2
+                        =
+                        // comment 3
+                        "foo"
+                        // comment 4
+                        ></span>;
+                                      
+            expect(span.className).toBe("foo");
+        `);
+        eval(code);
+    });
+
+    it("handles single-line /* */ comments in tags", function () {
+        var code = window.SurplusCompiler.compile(`
+            var span = <span /* comment 1 */ className /* comment 2 */ = /* comment 3 */ "foo" /* comment 4 */ ></span>;
+                                      
+            expect(span.className).toBe("foo");
+        `);
+        eval(code);
+    });
+
+    it("handles multi-line /* */ comments in tags", function () {
+        var code = window.SurplusCompiler.compile(`
+            var span = <span /* comment 1 
+                        */ className /* comment 2 
+                        */ = /* comment 3 
+                        */ "foo" /* comment 4 
+                        */ 
+                        ></span>;
+                                      
+            expect(span.className).toBe("foo");
+        `);
+        eval(code);
+    });
 });
 
 function escape(c) {

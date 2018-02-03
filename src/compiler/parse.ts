@@ -374,7 +374,9 @@ export function parse(TOKS : string[], opts : Params) : AST.Program {
 
     function SKIPWS() {
         while (true) {
-            if (IS('\n')) NEXT();
+            if (IS('//')) codeSingleLineComment();
+            else if (IS('/*')) codeMultiLineComment();
+            else if (IS('\n')) NEXT();
             else if (MATCHES(rx.leadingWs)) SPLIT(rx.leadingWs);
             else break;
         }

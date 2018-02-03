@@ -308,7 +308,11 @@ export function parse(TOKS, opts) {
     }
     function SKIPWS() {
         while (true) {
-            if (IS('\n'))
+            if (IS('//'))
+                codeSingleLineComment();
+            else if (IS('/*'))
+                codeMultiLineComment();
+            else if (IS('\n'))
                 NEXT();
             else if (MATCHES(rx.leadingWs))
                 SPLIT(rx.leadingWs);
