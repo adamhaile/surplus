@@ -27,6 +27,9 @@ const
         allowFullScreen: [ 'allowFullscreen', null, FieldFlags.Property  ],
         autoFocus      : [ 'autofocus'      , null, FieldFlags.Property  ],
         autoPlay       : [ 'autoplay'       , null, FieldFlags.Property  ],
+        // other
+        // role is part of the ARIA spec but not caught by the aria- attr filter
+        role           : [ 'role'           , null, FieldFlags.Attribute ]
     } as { [ field : string ] : FieldData },
     svgFieldCache = {
         // special props
