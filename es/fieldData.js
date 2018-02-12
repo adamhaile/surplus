@@ -8,12 +8,18 @@ htmlFieldCache = {
     // attr compat
     class: ['className', null, 0 /* Property */],
     for: ['htmlFor', null, 0 /* Property */],
+    "accept-charset": ['acceptCharset', null, 0 /* Property */],
+    "http-equiv": ['httpEquiv', null, 0 /* Property */],
     // a few React oddities, mostly disagreeing about casing
     onDoubleClick: ['ondblclick', null, 0 /* Property */],
     spellCheck: ['spellcheck', null, 0 /* Property */],
     allowFullScreen: ['allowFullscreen', null, 0 /* Property */],
+    autoCapitalize: ['autocapitalize', null, 0 /* Property */],
     autoFocus: ['autofocus', null, 0 /* Property */],
     autoPlay: ['autoplay', null, 0 /* Property */],
+    // other
+    // role is part of the ARIA spec but not caught by the aria- attr filter
+    role: ['role', null, 1 /* Attribute */]
 }, svgFieldCache = {
     // special props
     style: ['style', null, 3 /* Assign */],
@@ -22,6 +28,7 @@ htmlFieldCache = {
     // property compat
     className: ['class', null, 1 /* Attribute */],
     htmlFor: ['for', null, 1 /* Attribute */],
+    tabIndex: ['tabindex', null, 1 /* Attribute */],
     // React compat
     onDoubleClick: ['ondblclick', null, 0 /* Property */],
     // attributes with eccentric casing - some SVG attrs are snake-cased, some camelCased
@@ -87,8 +94,8 @@ htmlFieldCache = {
     yChannelSelector: ['yChannelSelector', null, 1 /* Attribute */],
     zoomAndPan: ['zoomAndPan', null, 1 /* Attribute */],
 };
-var attributeOnlyRx = /^(aria|data)[\-A-Z]/, isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); }, propOnlyRx = /^(on|style)/, isPropOnlyField = function (prop) { return propOnlyRx.test(prop); }, propPartRx = /[a-z][A-Z]/g, getAttrName = function (prop) { return prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); }, jsxEventPropRx = /^on[A-Z]/, attrPartRx = /\-(?:[a-z]|$)/g, getPropName = function (attr) {
-    var prop = attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
+var attributeOnlyRx = /-/, deepAttrRx = /^style-/, isAttrOnlyField = function (field) { return attributeOnlyRx.test(field) && !deepAttrRx.test(field); }, propOnlyRx = /^(on|style)/, isPropOnlyField = function (field) { return propOnlyRx.test(field); }, propPartRx = /[a-z][A-Z]/g, getAttrName = function (field) { return field.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); }, jsxEventPropRx = /^on[A-Z]/, attrPartRx = /\-(?:[a-z]|$)/g, getPropName = function (field) {
+    var prop = field.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
     return jsxEventPropRx.test(prop) ? prop.toLowerCase() : prop;
 }, deepPropRx = /^(style)([A-Z])/, buildPropData = function (prop) {
     var m = deepPropRx.exec(prop);

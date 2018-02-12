@@ -51,6 +51,14 @@ describe("JSX static property", function () {
         `));
     });
 
+    it("can set custom attributes (identified by containing a dash '-')", function () {
+        eval(window.SurplusCompiler.compile(`
+            var input = <input custom-attribute="foo" />;
+
+            expect(input.getAttribute("custom-attribute")).toBe("foo");
+        `));
+    });
+
     it("can set sub-properties", function () {
         eval(window.SurplusCompiler.compile(`
             var input = <input style.width="50%" />;

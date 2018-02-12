@@ -505,12 +505,18 @@ var htmlFieldCache = {
     // attr compat
     class: ['className', null, 0 /* Property */],
     for: ['htmlFor', null, 0 /* Property */],
+    "accept-charset": ['acceptCharset', null, 0 /* Property */],
+    "http-equiv": ['httpEquiv', null, 0 /* Property */],
     // a few React oddities, mostly disagreeing about casing
     onDoubleClick: ['ondblclick', null, 0 /* Property */],
     spellCheck: ['spellcheck', null, 0 /* Property */],
     allowFullScreen: ['allowFullscreen', null, 0 /* Property */],
+    autoCapitalize: ['autocapitalize', null, 0 /* Property */],
     autoFocus: ['autofocus', null, 0 /* Property */],
     autoPlay: ['autoplay', null, 0 /* Property */],
+    // other
+    // role is part of the ARIA spec but not caught by the aria- attr filter
+    role: ['role', null, 1 /* Attribute */]
 };
 var svgFieldCache = {
     // special props
@@ -520,6 +526,7 @@ var svgFieldCache = {
     // property compat
     className: ['class', null, 1 /* Attribute */],
     htmlFor: ['for', null, 1 /* Attribute */],
+    tabIndex: ['tabindex', null, 1 /* Attribute */],
     // React compat
     onDoubleClick: ['ondblclick', null, 0 /* Property */],
     // attributes with eccentric casing - some SVG attrs are snake-cased, some camelCased
@@ -585,16 +592,17 @@ var svgFieldCache = {
     yChannelSelector: ['yChannelSelector', null, 1 /* Attribute */],
     zoomAndPan: ['zoomAndPan', null, 1 /* Attribute */],
 };
-var attributeOnlyRx = /^(aria|data)[\-A-Z]/;
-var isAttrOnlyField = function (prop) { return attributeOnlyRx.test(prop); };
+var attributeOnlyRx = /-/;
+var deepAttrRx = /^style-/;
+var isAttrOnlyField = function (field) { return attributeOnlyRx.test(field) && !deepAttrRx.test(field); };
 var propOnlyRx = /^(on|style)/;
-var isPropOnlyField = function (prop) { return propOnlyRx.test(prop); };
+var isPropOnlyField = function (field) { return propOnlyRx.test(field); };
 var propPartRx = /[a-z][A-Z]/g;
-var getAttrName = function (prop) { return prop.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); };
+var getAttrName = function (field) { return field.replace(propPartRx, function (m) { return m[0] + '-' + m[1]; }).toLowerCase(); };
 var jsxEventPropRx = /^on[A-Z]/;
 var attrPartRx = /\-(?:[a-z]|$)/g;
-var getPropName = function (attr) {
-    var prop = attr.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
+var getPropName = function (field) {
+    var prop = field.replace(attrPartRx, function (m) { return m.length === 1 ? '' : m[1].toUpperCase(); });
     return jsxEventPropRx.test(prop) ? prop.toLowerCase() : prop;
 };
 var deepPropRx = /^(style)([A-Z])/;

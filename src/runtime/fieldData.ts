@@ -15,18 +15,24 @@ const
     // pre-seed the caches with a few special cases, so we don't need to check for them in the common cases
     htmlFieldCache = {
         // special props
-        style          : [ 'style'          , null, FieldFlags.Assign    ],
-        ref            : [ 'ref'            , null, FieldFlags.Ignore    ],
-        fn             : [ 'fn'             , null, FieldFlags.Ignore    ],
+        style           : [ 'style'          , null, FieldFlags.Assign    ],
+        ref             : [ 'ref'            , null, FieldFlags.Ignore    ],
+        fn              : [ 'fn'             , null, FieldFlags.Ignore    ],
         // attr compat
-        class          : [ 'className'      , null, FieldFlags.Property  ],
-        for            : [ 'htmlFor'        , null, FieldFlags.Property  ],
+        class           : [ 'className'      , null, FieldFlags.Property  ],
+        for             : [ 'htmlFor'        , null, FieldFlags.Property  ],
+        "accept-charset": [ 'acceptCharset'  , null, FieldFlags.Property  ],
+        "http-equiv"    : [ 'httpEquiv'      , null, FieldFlags.Property  ],
         // a few React oddities, mostly disagreeing about casing
-        onDoubleClick  : [ 'ondblclick'     , null, FieldFlags.Property  ],
-        spellCheck     : [ 'spellcheck'     , null, FieldFlags.Property  ],
-        allowFullScreen: [ 'allowFullscreen', null, FieldFlags.Property  ],
-        autoFocus      : [ 'autofocus'      , null, FieldFlags.Property  ],
-        autoPlay       : [ 'autoplay'       , null, FieldFlags.Property  ],
+        onDoubleClick   : [ 'ondblclick'     , null, FieldFlags.Property  ],
+        spellCheck      : [ 'spellcheck'     , null, FieldFlags.Property  ],
+        allowFullScreen : [ 'allowFullscreen', null, FieldFlags.Property  ],
+        autoCapitalize  : [ 'autocapitalize' , null, FieldFlags.Property  ],
+        autoFocus       : [ 'autofocus'      , null, FieldFlags.Property  ],
+        autoPlay        : [ 'autoplay'       , null, FieldFlags.Property  ],
+        // other
+        // role is part of the ARIA spec but not caught by the aria- attr filter
+        role           : [ 'role'           , null, FieldFlags.Attribute ]
     } as { [ field : string ] : FieldData },
     svgFieldCache = {
         // special props
@@ -36,6 +42,7 @@ const
         // property compat
         className    : [ 'class'      , null, FieldFlags.Attribute ],
         htmlFor      : [ 'for'        , null, FieldFlags.Attribute ],
+        tabIndex     : [ 'tabindex'   , null, FieldFlags.Attribute ],
         // React compat
         onDoubleClick: [ 'ondblclick' , null, FieldFlags.Property  ],
         // attributes with eccentric casing - some SVG attrs are snake-cased, some camelCased
@@ -103,16 +110,17 @@ const
     } as { [ field : string ] : FieldData };
 
 const
-    attributeOnlyRx = /^(aria|data)[\-A-Z]/,
-    isAttrOnlyField = (prop : string) => attributeOnlyRx.test(prop),
+    attributeOnlyRx = /-/,
+    deepAttrRx = /^style-/,
+    isAttrOnlyField = (field : string) => attributeOnlyRx.test(field) && !deepAttrRx.test(field),
     propOnlyRx      = /^(on|style)/,
-    isPropOnlyField = (prop : string) => propOnlyRx.test(prop),
+    isPropOnlyField = (field : string) => propOnlyRx.test(field),
     propPartRx      = /[a-z][A-Z]/g,
-    getAttrName     = (prop : string) => prop.replace(propPartRx, m => m[0] + '-' + m[1]).toLowerCase(),
+    getAttrName     = (field : string) => field.replace(propPartRx, m => m[0] + '-' + m[1]).toLowerCase(),
     jsxEventPropRx  = /^on[A-Z]/,
     attrPartRx      = /\-(?:[a-z]|$)/g,
-    getPropName     = (attr : string) => {
-        var prop = attr.replace(attrPartRx, m => m.length === 1 ? '' : m[1].toUpperCase());
+    getPropName     = (field : string) => {
+        var prop = field.replace(attrPartRx, m => m.length === 1 ? '' : m[1].toUpperCase());
         return jsxEventPropRx.test(prop) ? prop.toLowerCase() : prop;
     },
     deepPropRx      = /^(style)([A-Z])/,
