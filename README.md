@@ -49,7 +49,7 @@ var Todo = t => ({               // our Todo constructor
        newTitle("");             // clear new title
     },
     view =                       // declarative main view
-       <div>                     
+       <div>
           <h2>Minimalist ToDos in Surplus</h2>
           <input type="text" fn={data(newTitle)}/>
           <a onClick={addTodo}> + </a>
@@ -91,7 +91,7 @@ If your Surplus JSX expression references any S signals, then Surplus creates an
 
 ```javascript
 var text = S.data("foo"),
-    node = <span>{text()}</span>; 
+    node = <span>{text()}</span>;
 
 // node starts out equal to <span>foo</span>
 
@@ -125,7 +125,7 @@ var div       = <div></div>, // an HTMLDivElement
     // ... etc
 ```
 
-JSX expressions with *lower-cased* tags create elements.  These are HTML elements, unless their tag name or context is known to be SVG (see next entry).  
+JSX expressions with *lower-cased* tags create elements.  These are HTML elements, unless their tag name or context is known to be SVG (see next entry).
 
 There are no unclosed tags in JSX: all elements must either have a closing tag `</...>` or end in `/>`,
 
@@ -147,7 +147,7 @@ var title = <title></title>; // an HTMLTitleElement
 Children of SVG elements are also SVG elements, unless their parent is the `<foreignObject>` element, in which case they are DOM elements again.
 
 ```javascript
-var svg = 
+var svg =
     <svg>
         <text>an SVGTextElement</text>
         <foreignObject>
@@ -180,7 +180,7 @@ var props = { type: "text" },
     input3 = <input {...props} />;
 ```
 
-Since Surplus creates DOM elements, the property names generally refer to DOM element properties, although there are a few special cases: 
+Since Surplus creates DOM elements, the property names generally refer to DOM element properties, although there are a few special cases:
 
 1. If Surplus can tell that the given name belongs to an attribute not a property, it will set the attribute instead.  Currently, the heuristic used to distinguish attributes from properties is &ldquo;does it have a hyphen.&rdquo;  So `<div aria-hidden="true">` will set the `aria-hidden` attribute.
 2. Some properties have aliases.  See below.
@@ -253,15 +253,15 @@ JSX defines two kinds of children, static and dynamic.
 
 ```javascript
 // static
-var div = 
+var div =
     <div>
         <span>a static child</span>
         Static child text
     </div>;
 
-// { dynamic } 
+// { dynamic }
 var span = <span>a dynamic child</span>,
-    div = 
+    div =
         <div>
             {span}
         </div>;
@@ -280,7 +280,7 @@ Like React, Surplus removes all-whitespace nodes, and text nodes are trimmed.
 
 ### Embedded function calls, aka &ldquo;Components&rdquo;
 
-JSX expressions with *upper-cased* tag names are syntactic sugar for embedded function calls.  
+JSX expressions with *upper-cased* tag names are syntactic sugar for embedded function calls.
 
 ```jsx
 <div>
@@ -335,7 +335,7 @@ If one of the build tools listed above doesn't work for you, you may need to wor
 import { compiler } from 'surplus/compiler';
 
 // simple string -> string translation, no sourcemap
-var out = compiler.compile(in); 
+var out = compiler.compile(in);
 
 // w/ appended sourcemap
 var out = compiler.compile(in, { sourcemap: 'append' });
@@ -403,7 +403,7 @@ import * as Surplus from 'surplus'; Surplus; // <- stops TS from stripping impor
 
 ### Why isn't the Surplus compiler built on Babel?
 
-Mostly for historical reasons: Surplus was originally started about 4 years ago, before Babel had become the swiss army knife of JS extension.  Surplus therefore has its own hand-written compiler, a fairly classic tokenize-parse-transform-compile implementation.  Surplus may switch to Babel in the future.  The current compiler only parses the JSX expressions, not the JS code itself, which limits the optimizations available.  
+Mostly for historical reasons: Surplus was originally started about 4 years ago, before Babel had become the swiss army knife of JS extension.  Surplus therefore has its own hand-written compiler, a fairly classic tokenize-parse-transform-compile implementation.  Surplus may switch to Babel in the future.  The current compiler only parses the JSX expressions, not the JS code itself, which limits the optimizations available.
 
 -----
 &copy; Adam Haile, 2017.  MIT License.
