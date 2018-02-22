@@ -1,6 +1,6 @@
 # Surplus
 
-```javascript
+```jsx
 var name = S.data("world"),
     view = <h1>Hello {name()}!</h1>;
 document.body.appendChild(view);
@@ -76,7 +76,7 @@ For a slighlty longer example, see the standard [TodoMVC in Surplus](https://git
 
 Surplus JSX expressions create real DOM elements, not virtual elements like React or other vdom libraries.
 
-```javascript
+```jsx
 var node = <span>foo</span>;
 // since node is a real HTMLSpanElement, we can use its properties
 node.className = "bar";
@@ -89,7 +89,7 @@ Creating real DOM nodes removes the entire &ldquo;middle layer&rdquo; from Surpl
 
 If your Surplus JSX expression references any S signals, then Surplus creates an S computation to keep that part of the DOM up to date:
 
-```javascript
+```jsx
 var text = S.data("foo"),
     node = <span>{text()}</span>;
 
@@ -119,7 +119,7 @@ Surplus apps generally rank at or near the top of most javascript benchmarks.  T
 
 ### Creating HTML Elements
 
-```javascript
+```jsx
 var div       = <div></div>, // an HTMLDivElement
     input     = <input/>;    // an HTMLInputElement
     // ... etc
@@ -131,7 +131,7 @@ There are no unclosed tags in JSX: all elements must either have a closing tag `
 
 ### Creating SVG Elements
 
-```javascript
+```jsx
 var svg       = <svg></svg>, // SVGSVGElement
     svgCircle = <circle/>,   // SVGCircleElement
     svgLine   = <line/>;     // SVGLineElement
@@ -140,13 +140,13 @@ var svg       = <svg></svg>, // SVGSVGElement
 
 If the tag name matches a known SVG element, Surplus will create an SVG element instead of an HTML one.  For the small set of tag names that belong to both -- `<a>`, `<font>`, `<title>`, `<script>` and `<style>` -- Surplus creates an HTML element.
 
-```javascript
+```jsx
 var title = <title></title>; // an HTMLTitleElement
 ```
 
 Children of SVG elements are also SVG elements, unless their parent is the `<foreignObject>` element, in which case they are DOM elements again.
 
-```javascript
+```jsx
 var svg =
     <svg>
         <text>an SVGTextElement</text>
@@ -158,7 +158,7 @@ var svg =
 
 To create the SVG version of an ambiguous tag name, put it under a known SVG tag and extract it.
 
-```javascript
+```jsx
 var svg      = <svg><title>an SVGTitleElement</title></svg>,
     svgTitle = svg.firstChild;
 ```
@@ -188,7 +188,7 @@ Since Surplus creates DOM elements, the property names generally refer to DOM el
 
 You can set a property with an unknown name, and it will be assigned to the node, but it will have no effect on the DOM:
 
-```javascript
+```jsx
 var input = <input myProperty={true} />;
 input.myProperty === true;
 ```
@@ -206,7 +206,7 @@ For static and dynamic properties, aliases are normalized at compile time, for s
 
 If the same property is set multiple times on a node, the last one takes precedence:
 
-```javascript
+```jsx
 var props = { type: "radio" },
     input = <input {...props} type="text" />;
 input.type === "text";
@@ -216,7 +216,7 @@ input.type === "text";
 
 A `ref` property specifies a variable to which the given node is assigned.  This makes it easy to get a reference to internal nodes.
 
-```javascript
+```jsx
 var input,
     div = <div>
             <input ref={input} type="text" />
@@ -230,7 +230,7 @@ The `ref` property fulfills a very similar role to the `ref` property in React, 
 
 A `fn` property specifies a function to be applied to a node.  It is useful for encapsulating a bit of reusable behavior or properties.
 
-```javascript
+```jsx
 import { data } from 'surplus-fn-data'; // two-way data binding utility
 var value = S.data("foo"),
     input = <input type="text" fn={data(value)} />;
@@ -251,7 +251,7 @@ The `fn` property may be specified multiple times for a node.  Surplus provides 
 
 JSX defines two kinds of children, static and dynamic.
 
-```javascript
+```jsx
 // static
 var div =
     <div>
@@ -375,7 +375,7 @@ Surplus does have its own tradeoffs, the largest of which is that automatic upda
 
 The same way functions usually have state, via closures:
 
-```javascript
+```jsx
 const Counter = init => {
     const count = S.data(init);
     return (
