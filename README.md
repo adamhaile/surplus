@@ -255,12 +255,14 @@ JSX defines two kinds of children, static and dynamic.
 // static
 var div =
     <div>
-        <span>a static child</span>
-        Static child text
+        <span>a static span child</span>
+        Some static child div text
     </div>;
+```
 
+```jsx
 // { dynamic }
-var span = <span>a dynamic child</span>,
+var span = <span>child of a dynamic div</span>,
     div =
         <div>
             {span}
