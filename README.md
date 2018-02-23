@@ -37,7 +37,7 @@ If you aren't using one of these tools, or if you want to write your own plugin,
 
 ## Example
 
-Here is a minimalist ToDo application, which you can run on [CodePen](https://codepen.io/adamhaile/pen/ppvdGa?editors=0010).
+Here is a minimalist ToDo application, with [a demo on CodePen](https://codepen.io/adamhaile/pen/ppvdGa?editors=0010):
 ```jsx
 var Todo = t => ({               // our Todo constructor
        title: S.data(t.title),   // properties are S data signals
