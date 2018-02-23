@@ -39,31 +39,42 @@ If you aren't using one of these tools, or if you want to write your own plugin,
 
 Here is a minimalist ToDo application, with [a demo on CodePen](https://codepen.io/adamhaile/pen/ppvdGa?editors=0010):
 ```jsx
-var Todo = t => ({               // our Todo constructor
-       title: S.data(t.title),   // properties are S data signals
-       done: S.data(t.done)
+const Todo = t => ({            // our Todo constructor
+        title: S.data(t.title), // properties are data signals
+        done: S.data(t.done)
     }),
-    todos = SArray([]),          // our todos, using SArray
-    newTitle = S.data(""),       // title for new todos
-    addTodo = () => {            // push new title onto list
-       todos.push(Todo({ title: newTitle(), done: false }));
-       newTitle("");             // clear new title
-    },
-    view =                       // declarative main view
-       <div>
-          <h2>Minimalist ToDos in Surplus</h2>
-          <input type="text" fn={data(newTitle)}/>
-          <a onClick={addTodo}> + </a>
-          {todos.map(todo =>     // insert todo views
-             <div>
+    todos = SArray([]),         // our array of todos
+    newTitle = S.data(''),      // title for new todos
+    addTodo = () => {           // push new title onto list
+        todos.push(Todo({ title: newTitle(), done: false }));
+        newTitle('');           // clear new title
+    }
+
+const view =                    // declarative main view
+    <div>
+        <h3>Minimalist ToDos in Surplus</h3>
+        <input type="text" placeholder="enter todo and click +" fn={data(newTitle)}/>
+        <a onClick={addTodo}> + </a>
+        {todos.map(todo =>      // insert todo views
+            <div>
                 <input type="checkbox" fn={data(todo.done)}/>
                 <input type="text" fn={data(todo.title)}/>
                 <a onClick={() => todos.remove(todo)}>&times;</a>
-             </div>
-          )}
-       </div>;
+            </div>
+        )}
+   </div>
 
-document.body.appendChild(view); // add view to document
+document.body.appendChild(view) // add view to document
+```
+
+To add persistence in localStorage (already part of [the demo on CodePen](https://codepen.io/adamhaile/pen/ppvdGa?editors=0010)):
+```javascript
+if (localStorage.todos) // load stored todos on start
+    todos(JSON.parse(localStorage.todos).map(Todo))
+S(() =>                 // store todos whenever they change
+    localStorage.todos = JSON.stringify(todos().map(t =>
+        ({ title: t.title(), done: t.done() }))
+    ))
 ```
 
 Some things to note:
