@@ -5,6 +5,7 @@ var name = S.data("world"),
     view = <h1>Hello {name()}!</h1>;
 document.body.appendChild(view);
 ```
+
 Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, the views are clear, declarative definitions of your UI.  Thanks to S, they update automatically and efficiently as your data changes.
 
 ## Installation
@@ -64,6 +65,7 @@ var Todo = t => ({               // our Todo constructor
 
 document.body.appendChild(view); // add view to document
 ```
+
 Some things to note:
 - There is no `.mount()` or `.render()` command: Surplus JSX expressions return real nodes, which can be attached to the page with standard DOM commands, `document.body.appendChild(view)`.
 - There is no `.update()` command: Surplus uses [S](https://github.com/adamhaile/S) computations to build the view, so the view responds automatically to changes in S signals.
@@ -81,6 +83,7 @@ var node = <span>foo</span>;
 // since node is a real HTMLSpanElement, we can use its properties
 node.className = "bar";
 ```
+
 For a longer discussion, see [why real DOM nodes?](#why-real-dom-nodes)
 
 Creating real DOM nodes removes the entire &ldquo;middle layer&rdquo; from Surplus: there are no components, no &ldquo;lifecycle,&rdquo; no mount or diff/patch.  DOM nodes are values like any other, &ldquo;components&rdquo; are plain old functions that return DOM nodes.
