@@ -8,6 +8,55 @@ document.body.appendChild(view);
 
 Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, the views are clear, declarative definitions of your UI.  Thanks to S, they update automatically and efficiently as your data changes.
 
+## The Gist
+
+Surplus treats JSX like a macro language for native DOM calls.
+
+```jsx
+const div = <div/>;
+// ... compiles to ...
+const div = document.createElement("div");
+
+// more complicated expressions are wrapped in a function
+const input = <input type="text"/>;
+// ... compiles to ...
+const input = (() => {
+    var __ = document.createElement("input");
+    __.type = "text";
+    return __;
+})();
+```
+
+DOM updates are handled by [S computations](https://github.com/adamhaile/S#computations) that perform direct, fine-grained, idempotent changes to the DOM nodes.
+
+```jsx
+const className = S.data("foo"),
+      div = <div className={className()}/>;
+// ... compiles to ...
+const className = S.data("foo"),
+      div = (() => {
+          var __ = document.createElement("div");
+          S(() => { 
+              __.className = className(); // re-runs if className() changes
+          });
+          return __;
+      })();
+```
+
+Finally, Surplus has a small runtime to help with more complex JSX features, like spreads and children that come and go.
+
+```jsx
+import * as Surplus from 'surplus';
+
+const div = <div {...props} />;
+// ... compiles to ...
+const div = (() => {
+    var __ = document.createElement("div");
+    Surplus.spread(__, props);
+    return __;
+})();
+```
+
 ## Installation
 
 ```sh
@@ -92,7 +141,7 @@ Creating real DOM nodes removes the entire &ldquo;middle layer&rdquo; from Surpl
 
 ### Automatic Updates
 
-If your Surplus JSX expression references any S signals, then Surplus creates an S computation to keep that part of the DOM up to date:
+If your Surplus JSX expression references any S signals, then Surplus creates S computations to keep those parts of the DOM up to date:
 
 ```jsx
 const text = S.data("foo"),
