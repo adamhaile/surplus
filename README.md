@@ -1,8 +1,8 @@
 # Surplus
 
 ```jsx
-var name = S.data("world"),
-    view = <h1>Hello {name()}!</h1>;
+const name = S.data("world"),
+      view = <h1>Hello {name()}!</h1>;
 document.body.appendChild(view);
 ```
 
@@ -21,7 +21,7 @@ The Surplus runtime must be imported as `Surplus` into any module using Surplus 
 
 ```javascript
 import * as Surplus from 'surplus'; // ES2015 modules
-var Surplus = require('surplus');   // CommonJS modules
+const Surplus = require('surplus');   // CommonJS modules
 ```
 
 ### Compiler
@@ -39,7 +39,8 @@ If you aren't using one of these tools, or if you want to write your own plugin,
 
 Here is a minimalist ToDo application, with [a demo on CodePen](https://codepen.io/adamhaile/pen/ppvdGa?editors=0010):
 ```jsx
-var Todo = t => ({               // our Todo constructor
+const 
+    Todo = t => ({               // our Todo constructor
        title: S.data(t.title),   // properties are S data signals
        done: S.data(t.done)
     }),
@@ -70,7 +71,7 @@ Some things to note:
 - There is no `.mount()` or `.render()` command: Surplus JSX expressions return real nodes, which can be attached to the page with standard DOM commands, `document.body.appendChild(view)`.
 - There is no `.update()` command: Surplus uses [S](https://github.com/adamhaile/S) computations to build the view, so the view responds automatically to changes in S signals.
 
-For a slighlty longer example, see the standard [TodoMVC in Surplus](https://github.com/adamhaile/surplus-todomvc), which you can run [here](https://adamhaile.github.io/surplus-todomvc).
+For a slightly longer example, see the standard [TodoMVC in Surplus](https://github.com/adamhaile/surplus-todomvc), which you can run [here](https://adamhaile.github.io/surplus-todomvc).
 
 ## Features
 
@@ -79,7 +80,7 @@ For a slighlty longer example, see the standard [TodoMVC in Surplus](https://git
 Surplus JSX expressions create real DOM elements, not virtual elements like React or other vdom libraries.
 
 ```jsx
-var node = <span>foo</span>;
+const node = <span>foo</span>;
 // since node is a real HTMLSpanElement, we can use its properties
 node.className = "bar";
 ```
@@ -93,8 +94,8 @@ Creating real DOM nodes removes the entire &ldquo;middle layer&rdquo; from Surpl
 If your Surplus JSX expression references any S signals, then Surplus creates an S computation to keep that part of the DOM up to date:
 
 ```jsx
-var text = S.data("foo"),
-    node = <span>{text()}</span>;
+const text = S.data("foo"),
+      node = <span>{text()}</span>;
 
 // node starts out equal to <span>foo</span>
 
@@ -116,16 +117,16 @@ Surplus apps generally rank at or near the top of most javascript benchmarks.  T
 
 1. Surplus&rsquo; compiler does as much work as it can at compile time, so that the runtime code can focus on the truly dynamic operations.
 
-1. Targetting real DOM nodes removes the cost of the vdom &ldquo;middle layer.&rdquo;  For instance, Surplus can compile property assignments down to direct JIT-friendly statements like `node.type = "text"`.
+1. Targeting real DOM nodes removes the cost of the vdom &ldquo;middle layer.&rdquo;  For instance, Surplus can compile property assignments down to direct JIT-friendly statements like `input.type = "text"`.
 
 ## Documentation
 
 ### Creating HTML Elements
 
 ```jsx
-var div       = <div></div>, // an HTMLDivElement
-    input     = <input/>;    // an HTMLInputElement
-    // ... etc
+const div       = <div></div>, // an HTMLDivElement
+      input     = <input/>;    // an HTMLInputElement
+      // ... etc
 ```
 
 JSX expressions with *lower-cased* tags create elements.  These are HTML elements, unless their tag name or context is known to be SVG (see next entry).
@@ -135,22 +136,22 @@ There are no unclosed tags in JSX: all elements must either have a closing tag `
 ### Creating SVG Elements
 
 ```jsx
-var svg       = <svg></svg>, // SVGSVGElement
-    svgCircle = <circle/>,   // SVGCircleElement
-    svgLine   = <line/>;     // SVGLineElement
-    // ... etc
+const svg       = <svg></svg>, // SVGSVGElement
+      svgCircle = <circle/>,   // SVGCircleElement
+      svgLine   = <line/>;     // SVGLineElement
+      // ... etc
 ```
 
 If the tag name matches a known SVG element, Surplus will create an SVG element instead of an HTML one.  For the small set of tag names that belong to both -- `<a>`, `<font>`, `<title>`, `<script>` and `<style>` -- Surplus creates an HTML element.
 
 ```jsx
-var title = <title></title>; // an HTMLTitleElement
+const title = <title></title>; // an HTMLTitleElement
 ```
 
 Children of SVG elements are also SVG elements, unless their parent is the `<foreignObject>` element, in which case they are DOM elements again.
 
 ```jsx
-var svg =
+const svg =
     <svg>
         <text>an SVGTextElement</text>
         <foreignObject>
@@ -162,8 +163,8 @@ var svg =
 To create the SVG version of an ambiguous tag name, put it under a known SVG tag and extract it.
 
 ```jsx
-var svg      = <svg><title>an SVGTitleElement</title></svg>,
-    svgTitle = svg.firstChild;
+const svg      = <svg><title>an SVGTitleElement</title></svg>,
+      svgTitle = svg.firstChild;
 ```
 
 ### Setting properties
@@ -172,15 +173,15 @@ JSX allows static, dynamic and spread properties:
 
 ```jsx
 // static
-var input1 = <input type="text" />;
+const input1 = <input type="text" />;
 
 // dynamic
-var text = "text",
-    input2 = <input type={text} />;
+const text   = "text",
+      input2 = <input type={text} />;
 
 // spread
-var props = { type: "text" },
-    input3 = <input {...props} />;
+const props  = { type: "text" },
+      input3 = <input {...props} />;
 ```
 
 Since Surplus creates DOM elements, the property names generally refer to DOM element properties, although there are a few special cases:
@@ -192,13 +193,13 @@ Since Surplus creates DOM elements, the property names generally refer to DOM el
 You can set a property with an unknown name, and it will be assigned to the node, but it will have no effect on the DOM:
 
 ```jsx
-var input = <input myProperty={true} />;
+const input = <input myProperty={true} />;
 input.myProperty === true;
 ```
 
 ### Property aliases
 
-In order to provide greater source compatibility with React and HTML, Surplus allows some properties to be referenced via aliases.
+In order to provide greater source compatibility with React and HTML, Surplus allows some properties to be referenced via alternate names.
 
 1. For compatibility with React, Surplus allows the React alternate property names as aliases for the corresponding DOM property.  So `onClick` is an alias for the native `onclick`.
 2. For compatibility with HTML, Surplus allows `class` and `for` as aliases for the `className` and `htmlFor` properties.
@@ -210,8 +211,8 @@ For static and dynamic properties, aliases are normalized at compile time, for s
 If the same property is set multiple times on a node, the last one takes precedence:
 
 ```jsx
-var props = { type: "radio" },
-    input = <input {...props} type="text" />;
+const props = { type: "radio" },
+      input = <input {...props} type="text" />;
 input.type === "text";
 ```
 
@@ -220,7 +221,7 @@ input.type === "text";
 A `ref` property specifies a variable to which the given node is assigned.  This makes it easy to get a reference to internal nodes.
 
 ```jsx
-var input,
+let input,
     div = <div>
             <input ref={input} type="text" />
           </div>;
@@ -235,8 +236,8 @@ A `fn` property specifies a function to be applied to a node.  It is useful for 
 
 ```jsx
 import { data } from 'surplus-fn-data'; // two-way data binding utility
-var value = S.data("foo"),
-    input = <input type="text" fn={data(value)} />;
+const value = S.data("foo"),
+      input = <input type="text" fn={data(value)} />;
 input.value === "foo";
 // user enters "bar" in input
 input.value === "bar";
@@ -255,26 +256,29 @@ The `fn` property may be specified multiple times for a node.  Surplus provides 
 JSX defines two kinds of children, static and dynamic.
 
 ```jsx
-// static
-var div =
+// static, created in place, never change
+const div =
     <div>
-        <span>a static span child</span>
-        Some static child div text
+        <span>a static span created in the div</span>
+        Some static text
     </div>;
 ```
 
 ```jsx
-// { dynamic }
-var span = <span>child of a dynamic div</span>,
-    div =
+// { dynamic }, inserted into place, can change
+const span = <span>a span to insert in the div</span>,
+      text = S.data("some text that will change"),
+      div =
         <div>
             {span}
+            {text()}
         </div>;
+text("the changed text");
 ```
 
 With a dynamic child, the given expression is evaluated, and its result is inserted into the child nodes according to the following rules:
 
-- `null` or `undefined` -> nothing
+- `null`, `undefined` or a boolean -> nothing
 - a DOM node -> the node
 - an array -> all items in array
 - a function -> the value from calling the function
@@ -289,12 +293,12 @@ JSX expressions with *upper-cased* tag names are syntactic sugar for embedded fu
 
 ```jsx
 <div>
-    <Foo bar="1">Bleck</Foo>
+    <Foo bar="1">baz</Foo>
 </div>;
 
 // ... is equivalent to ...
 <div>
-    {Foo({ bar: "1", children: [ "Bleck" ] })}
+    {Foo({ bar: "1", children: "baz" })}
 </div>
 ```
 
@@ -318,7 +322,7 @@ Surplus detects which parts of your view may change and constructs S computation
 
 The surplus module has several functions which provide runtime support for the code emitted by the compiler.  These functions *can and will change*, even in minor point releases.  You have been warned :).
 
-A corrolary of this is that the runtime only supports code compiled by the same version of the compiler.  Switching to a new version of Surplus requires re-compiling your JSX code.
+A corollary of this is that the runtime only supports code compiled by the same version of the compiler.  Switching to a new version of Surplus requires re-compiling your JSX code.
 
 ### Differences from React
 
@@ -332,6 +336,8 @@ Many React Stateless Functional Components can be dropped into Surplus with no o
 
 4. Surplus is a little more liberal in the property names it accepts, like `onClick`/`onclick`, `className`/`class`, etc.
 
+5. If you set an unknown field with a name that doesn't contain a dash, like `<div mycustomfield="1" />`, React will set an attribute while Surplus will set a property.
+
 ### Calling the surplus compiler
 
 If one of the build tools listed above doesn't work for you, you may need to work the surplus compiler into your build chain on your own.  The compiler has a very small API:
@@ -340,14 +346,14 @@ If one of the build tools listed above doesn't work for you, you may need to wor
 import { compiler } from 'surplus/compiler';
 
 // simple string -> string translation, no sourcemap
-var out = compiler.compile(in);
+const out = compiler.compile(in);
 
 // w/ appended sourcemap
-var out = compiler.compile(in, { sourcemap: 'append' });
+const out = compiler.compile(in, { sourcemap: 'append' });
 
 // w/ extracted sourcemap
 // note that output is different, to return map and src
-var { out, map } = compiler.compile(in, { sourcemap: 'extract' });
+const { out, map } = compiler.compile(in, { sourcemap: 'extract' });
 ```
 
 ## FAQs
@@ -400,11 +406,18 @@ The Surplus compiler works on javascript, not TypeScript, so be sure to do the T
 
 ### I'm using Surplus with Typescript, and I'm getting a runtime error &lsquo;Surplus is not defined&rsquo; even though I imported it?
 
-Typescript strips imports that aren't referenced in your code.  Since the references to Surplus haven't been made when Typescript runs (see question above) it removes the import.  The workaround is to add a reference to the symbol somewhere in your code.  I use right after the import:
+Typescript strips imports that aren't referenced in your code.  Since the references to Surplus haven't been made when Typescript runs (see question above) it removes the import.  The workaround is to tell Typescript that Surplus is your `jsxFactory` in your tsconfig.json:
 
-```javascript
-import * as Surplus from 'surplus'; Surplus; // <- stops TS from stripping import
+```json
+{
+    "compilerOptions": {
+        ...
+        "jsx": "preserve",
+        "jsxFactory": "Surplus",
+    }
+}
 ```
+Technically, we're not asking Typescript to compile our JSX, so the `jsxFactory` setting shouldn't matter, but it has the useful side-effect of letting Typescript know not to strip Surplus from the compiled module.
 
 ### Why isn't the Surplus compiler built on Babel?
 
