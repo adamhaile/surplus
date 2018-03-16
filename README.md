@@ -26,7 +26,7 @@ const Surplus = require('surplus');   // CommonJS modules
 
 ### Compiler
 
-The easiest way to run Surplus' compiler is via a plugin for your build tool:
+The easiest way to run the Surplus compiler is via a plugin for your build tool:
 
 - Webpack: [surplus-loader](https://github.com/adamhaile/surplus-loader)
 - Rollup: [rollup-plugin-surplus](https://github.com/adamhaile/rollup-plugin-surplus)
@@ -49,20 +49,21 @@ const
     addTodo = () => {            // push new title onto list
        todos.push(Todo({ title: newTitle(), done: false }));
        newTitle("");             // clear new title
-    },
-    view =                       // declarative main view
-       <div>
-          <h2>Minimalist ToDos in Surplus</h2>
-          <input type="text" fn={data(newTitle)}/>
-          <a onClick={addTodo}> + </a>
-          {todos.map(todo =>     // insert todo views
-             <div>
+    };
+
+const view =                     // declarative main view
+    <div>
+        <h2>Minimalist ToDos in Surplus</h2>
+        <input type="text" fn={data(newTitle)}/>
+        <a onClick={addTodo}> + </a>
+        {todos.map(todo =>       // insert todo views
+            <div>
                 <input type="checkbox" fn={data(todo.done)}/>
                 <input type="text" fn={data(todo.title)}/>
                 <a onClick={() => todos.remove(todo)}>&times;</a>
-             </div>
-          )}
-       </div>;
+            </div>
+        )}
+    </div>;
 
 document.body.appendChild(view); // add view to document
 ```
