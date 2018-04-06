@@ -36,7 +36,7 @@ const className = S.data("foo"),
 const className = S.data("foo"),
       div = (() => {
           var __ = document.createElement("div");
-          S(() => { 
+          S(() => {
               __.className = className(); // re-runs if className() changes
           });
           return __;
@@ -81,6 +81,7 @@ The easiest way to run the Surplus compiler is via a plugin for your build tool:
 - Rollup: [rollup-plugin-surplus](https://github.com/adamhaile/rollup-plugin-surplus)
 - Gulp: [gulp-surplus](https://github.com/adamhaile/gulp-surplus)
 - Browserify: [surplusify](https://github.com/adamhaile/surplusify)
+- Parcel: [parcel](https://github.com/tinchoz49/surplus)
 
 If you aren't using one of these tools, or if you want to write your own plugin, see [Calling the surplus compiler](#calling-the-surplus-compiler).
 
@@ -88,7 +89,7 @@ If you aren't using one of these tools, or if you want to write your own plugin,
 
 Here is a minimalist ToDo application, with [a demo on CodePen](https://codepen.io/adamhaile/pen/ppvdGa?editors=0010):
 ```jsx
-const 
+const
     Todo = t => ({               // our Todo constructor
        title: S.data(t.title),   // properties are S data signals
        done: S.data(t.done)
