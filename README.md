@@ -6,11 +6,11 @@ const name = S.data("world"),
 document.body.appendChild(view);
 ```
 
-Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, the views are clear, declarative definitions of your UI.  Thanks to S, they update automatically and efficiently as your data changes.
+Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, your views are clear, declarative definitions of your UI.  Thanks to Surplus' compiler, they are converted into direct DOM instructions that run fast.  Thanks to S, they update automatically and efficiently as your data changes.
 
 ## The Gist
 
-Surplus treats JSX like a macro language for native DOM calls.
+Surplus treats JSX like a macro language for native DOM instructions.
 
 ```jsx
 const div = <div/>;
@@ -27,7 +27,9 @@ const input = (() => {
 })();
 ```
 
-DOM updates are handled by [S computations](https://github.com/adamhaile/S#computations) that perform direct, fine-grained, idempotent changes to the DOM nodes.
+These DOM instructions create real DOM nodes that match your JSX.  Surplus removes the complexity and cost of the virtual DOM "middle layer" that usually stands between your JSX and the DOM.
+
+DOM updates are handled by [S computations](https://github.com/adamhaile/S#computations).
 
 ```jsx
 const className = S.data("foo"),
@@ -42,6 +44,8 @@ const className = S.data("foo"),
           return __;
       })();
 ```
+
+The computations perform direct, fine-grained, idempotent changes to the DOM nodes.  Updates run fast while keeping JSX's declarative semantics.
 
 Finally, Surplus has a small runtime to help with more complex JSX features, like spreads and children that come and go.
 
