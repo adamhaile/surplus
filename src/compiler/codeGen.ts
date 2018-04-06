@@ -90,12 +90,11 @@ const codeGen = (ctl : Program, opts : Params) => {
                     + `Surplus.create${svg ? 'Svg' : ''}Element('${node.tag}', null, null)` :
                 // optimization: don't need IIFE for simple single nodes with a single class attribute
                 (node.fields.length === 1 
-                    && node.fields[0].type === JSXStaticField 
-                    && (node.fields[0] as JSXStaticField).name === (svg ? "class" : "className")
+                    && isStaticClassField(node.fields[0], svg)
                     && node.functions.length === 0
                     && node.content.length === 0) ?
                     node.references.map(r => compileSegments(r.code) + ' = ').join('')
-                    + `Surplus.create${svg ? 'Svg' : ''}Element('${node.tag}', ${(node.fields[0] as JSXStaticField).value}, null)` :
+                    + `Surplus.create${svg ? 'Svg' : ''}Element(${codeStr(node.tag)}, ${(node.fields[0] as JSXStaticField).value}, null)` :
                 emitDOMExpression(buildDOMExpression(node), indent)
             );
         },
@@ -199,18 +198,18 @@ const codeGen = (ctl : Program, opts : Params) => {
                         svg           = node.kind === JSXElementKind.SVG,
                         fieldExprs    = fields.map(p => p.type === JSXStaticField ? '' : compileSegments(p.code)), 
                         spreads       = fields.filter(p => p.type === JSXSpread || p.type === JSXStyleProperty),
-                        classField    = spreads.length === 0 && fields.filter(p => p.type === JSXStaticField && (svg ? p.name === 'class' : p.name === 'className'))[0] as JSXStaticField || null,
+                        classField    = spreads.length === 0 && fields.filter(p => isStaticClassField(p, svg))[0] as JSXStaticField || null,
                         fieldsDynamic = fieldExprs.some(e => !noApparentSignals(e)),
                         fieldStmts    = fields.map((f, i) => 
-                            f === classField                 ? '' :
-                            f.type === JSXStaticField  ? buildField(id, f, f.value, node) :
-                            f.type === JSXDynamicField ? buildField(id, f, fieldExprs[i], node) :
-                            f.type === JSXStyleProperty   ? buildStyle(f, id, fieldExprs[i], fieldsDynamic, spreads) :
+                            f === classField            ? '' :
+                            f.type === JSXStaticField   ? buildField(id, f, f.value, node) :
+                            f.type === JSXDynamicField  ? buildField(id, f, fieldExprs[i], node) :
+                            f.type === JSXStyleProperty ? buildStyle(f, id, fieldExprs[i], fieldsDynamic, spreads) :
                             buildSpread(id, fieldExprs[i], svg)
                         ).filter(s => s !== ''),
                         refStmts     = references.map(r => compileSegments(r.code) + ' = ').join('');
 
-                    addStatement(`${id} = ${refStmts}Surplus.create${svg ? 'Svg' : ''}Element('${tag}', ${classField && classField.value}, ${parent || null});`);
+                    addStatement(`${id} = ${refStmts}Surplus.create${svg ? 'Svg' : ''}Element(${codeStr(tag)}, ${classField && classField.value}, ${parent || null});`);
                     
                     if (!fieldsDynamic) {
                         fieldStmts.forEach(addStatement);
@@ -230,7 +229,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                 }
             },
             buildField = (id : string, field : JSXStaticField | JSXDynamicField, expr : string, parent : JSXElement) => {
-                const [ name, namespace, flags] = getFieldData(field.name, parent.kind === JSXElementKind.SVG),
+                const [ name, namespace, flags ] = getFieldData(field.name, parent.kind === JSXElementKind.SVG),
                     type = flags & FieldFlags.Type;
                 return (
                     type === FieldFlags.Property ? buildProperty(id, name, namespace, expr) :
@@ -316,6 +315,8 @@ const codeGen = (ctl : Program, opts : Params) => {
     };
 
 const
+    isStaticClassField = (p : JSXField, svg : boolean) =>
+        p.type === JSXStaticField && getFieldData(p.name, svg)[0] === (svg ? 'class' : 'className'),
     noApparentSignals = (code : string) =>
         !rx.hasParen.test(code) || (rx.loneFunction.test(code) && !rx.endsInParen.test(code)),
     indent = (previousCode : string) : Indents => {

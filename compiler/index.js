@@ -701,12 +701,11 @@ var codeGen = function (ctl, opts) {
                 + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', null, null)") :
             // optimization: don't need IIFE for simple single nodes with a single class attribute
             (node.fields.length === 1
-                && node.fields[0].type === JSXStaticField
-                && node.fields[0].name === (svg ? "class" : "className")
+                && isStaticClassField(node.fields[0], svg)
                 && node.functions.length === 0
                 && node.content.length === 0) ?
                 node.references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('')
-                    + ("Surplus.create" + (svg ? 'Svg' : '') + "Element('" + node.tag + "', " + node.fields[0].value + ", null)") :
+                    + ("Surplus.create" + (svg ? 'Svg' : '') + "Element(" + codeStr(node.tag) + ", " + node.fields[0].value + ", null)") :
                 emitDOMExpression(buildDOMExpression(node), indent));
     }, buildSubComponent = function (node) {
         var refs = node.references.map(function (r) { return compileSegments(r.code); }), fns = node.functions.map(function (r) { return compileSegments(r.code); }), 
@@ -774,14 +773,14 @@ var codeGen = function (ctl, opts) {
                 buildInsertedSubComponent(node, parent, n);
             }
             else {
-                var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, fieldExprs_1 = fields.map(function (p) { return p.type === JSXStaticField ? '' : compileSegments(p.code); }), spreads_1 = fields.filter(function (p) { return p.type === JSXSpread || p.type === JSXStyleProperty; }), classField_1 = spreads_1.length === 0 && fields.filter(function (p) { return p.type === JSXStaticField && (svg_1 ? p.name === 'class' : p.name === 'className'); })[0] || null, fieldsDynamic_1 = fieldExprs_1.some(function (e) { return !noApparentSignals(e); }), fieldStmts = fields.map(function (f, i) {
+                var id_1 = addId(parent, tag, n), svg_1 = node.kind === JSXElementKind.SVG, fieldExprs_1 = fields.map(function (p) { return p.type === JSXStaticField ? '' : compileSegments(p.code); }), spreads_1 = fields.filter(function (p) { return p.type === JSXSpread || p.type === JSXStyleProperty; }), classField_1 = spreads_1.length === 0 && fields.filter(function (p) { return isStaticClassField(p, svg_1); })[0] || null, fieldsDynamic_1 = fieldExprs_1.some(function (e) { return !noApparentSignals(e); }), fieldStmts = fields.map(function (f, i) {
                     return f === classField_1 ? '' :
                         f.type === JSXStaticField ? buildField(id_1, f, f.value, node) :
                             f.type === JSXDynamicField ? buildField(id_1, f, fieldExprs_1[i], node) :
                                 f.type === JSXStyleProperty ? buildStyle(f, id_1, fieldExprs_1[i], fieldsDynamic_1, spreads_1) :
                                     buildSpread(id_1, fieldExprs_1[i], svg_1);
                 }).filter(function (s) { return s !== ''; }), refStmts = references.map(function (r) { return compileSegments(r.code) + ' = '; }).join('');
-                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element('" + tag + "', " + (classField_1 && classField_1.value) + ", " + (parent || null) + ");");
+                addStatement(id_1 + " = " + refStmts + "Surplus.create" + (svg_1 ? 'Svg' : '') + "Element(" + codeStr(tag) + ", " + (classField_1 && classField_1.value) + ", " + (parent || null) + ");");
                 if (!fieldsDynamic_1) {
                     fieldStmts.forEach(addStatement);
                 }
@@ -864,6 +863,9 @@ var codeGen = function (ctl, opts) {
         return markLoc(code, loc, opts);
     };
     return compileSegments(ctl);
+};
+var isStaticClassField = function (p, svg) {
+    return p.type === JSXStaticField && getFieldData(p.name, svg)[0] === (svg ? 'class' : 'className');
 };
 var noApparentSignals = function (code) {
     return !rx$2.hasParen.test(code) || (rx$2.loneFunction.test(code) && !rx$2.endsInParen.test(code));

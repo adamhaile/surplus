@@ -51,6 +51,36 @@ describe("JSX static property", function () {
         `));
     });
 
+    it("identifies class attribute for simple calls to Surplus.createElement()", function () {
+        var code = window.SurplusCompiler.compile(`<div className="foo"/>`);
+        expect(code).toBe('Surplus.createElement("div", "foo", null)');
+        code = window.SurplusCompiler.compile(`<div class="foo"/>`);
+        expect(code).toBe('Surplus.createElement("div", "foo", null)');
+    });
+
+    it("identifies class attribute for deep calls to Surplus.createElement()", function () {
+        var code = window.SurplusCompiler.compile(`<div className="foo" id="bar"/>`);
+        // class property should be handled by Surplus.createElement(), not any call to .className or .setAttribute(..., "class", ...)
+        expect(code).not.toContain('class');
+        code = window.SurplusCompiler.compile(`<div class="foo" id="bar"/>`);
+        expect(code).not.toContain('class');
+    });
+
+    it("identifies class attribute for simple calls to Surplus.createSVGElement()", function () {
+        var code = window.SurplusCompiler.compile(`<svg className="foo"/>`);
+        expect(code).toBe('Surplus.createSvgElement("svg", "foo", null)');
+        var code = window.SurplusCompiler.compile(`<svg class="foo"/>`);
+        expect(code).toBe('Surplus.createSvgElement("svg", "foo", null)');
+    });
+
+    it("identifies class attribute for deep calls to Surplus.createSvgElement()", function () {
+        var code = window.SurplusCompiler.compile(`<svg className="foo" id="bar"/>`);
+        // class property should be handled by Surplus.createElement(), not any call to .className or .setAttribute(..., "class", ...)
+        expect(code).not.toContain('class');
+        code = window.SurplusCompiler.compile(`<svg class="foo" id="bar"/>`);
+        expect(code).not.toContain('class');
+    });
+
     it("can set custom attributes (identified by containing a dash '-')", function () {
         eval(window.SurplusCompiler.compile(`
             var input = <input custom-attribute="foo" />;
