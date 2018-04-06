@@ -694,7 +694,6 @@ declare global {
 			"style-layoutGridMode"?: string | null;
 			"style-layoutGridType"?: string | null;
 			"style-left"?: string | null;
-			"style-readonly length"?: number;
 			"style-letterSpacing"?: string | null;
 			"style-lightingColor"?: string | null;
 			"style-lineBreak"?: string | null;
