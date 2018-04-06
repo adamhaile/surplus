@@ -99,7 +99,7 @@ var codeGen = function (ctl, opts) {
             var _a;
         }, []), children = node.content.map(function (c) {
             return c.type === JSXElement ? compileJSXElement(c, indent("")) :
-                c.type === JSXText ? codeStr(c.text.trim()) :
+                c.type === JSXText ? codeStr(c.text) :
                     c.type === JSXInsert ? compileSegments(c.code) :
                         "document.createComment(" + codeStr(c.text) + ")";
         });

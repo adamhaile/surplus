@@ -123,7 +123,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                 }, []),
                 children = node.content.map(c => 
                     c.type === JSXElement ? compileJSXElement(c, indent("")) :
-                    c.type === JSXText    ? codeStr(c.text.trim()) :
+                    c.type === JSXText    ? codeStr(c.text) :
                     c.type === JSXInsert  ? compileSegments(c.code) :
                     `document.createComment(${codeStr(c.text)})`
                 ); 
