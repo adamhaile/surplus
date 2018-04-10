@@ -81,7 +81,7 @@ The easiest way to run the Surplus compiler is via a plugin for your build tool:
 - Rollup: [rollup-plugin-surplus](https://github.com/adamhaile/rollup-plugin-surplus)
 - Gulp: [gulp-surplus](https://github.com/adamhaile/gulp-surplus)
 - Browserify: [surplusify](https://github.com/adamhaile/surplusify)
-- Parcel: [parcel](https://github.com/tinchoz49/surplus)
+- Parcel: [parcel](https://github.com/tinchoz49/parcel-plugin-surplus)
 
 If you aren't using one of these tools, or if you want to write your own plugin, see [Calling the surplus compiler](#calling-the-surplus-compiler).
 
