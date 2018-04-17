@@ -6,7 +6,7 @@ const name = S.data("world"),
 document.body.appendChild(view);
 ```
 
-Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, your views are clear, declarative definitions of your UI.  Thanks to Surplus' compiler, they are converted into direct DOM instructions that run fast.  Thanks to S, they update automatically and efficiently as your data changes.
+Surplus is a compiler and runtime to allow [S.js](https://github.com/adamhaile/S) applications to create high-performance web views using JSX.  Thanks to JSX, your views are clear, declarative definitions of your UI.  Thanks to Surplus' compiler, they are converted into direct DOM instructions that run fast.  Thanks to S, they react automatically and efficiently as your data changes.
 
 ## The Gist
 
@@ -27,7 +27,7 @@ const input = (() => {
 })();
 ```
 
-These DOM instructions create real DOM nodes that match your JSX.  Surplus removes the complexity and cost of the virtual DOM "middle layer" that usually stands between your JSX and the DOM.
+These DOM instructions create real DOM nodes that match your JSX.  There's no virtual DOM middle layer standing between your JSX and the DOM.
 
 DOM updates are handled by [S computations](https://github.com/adamhaile/S#computations).
 
@@ -45,9 +45,9 @@ const className = S.data("foo"),
       })();
 ```
 
-The computations perform direct, fine-grained, idempotent changes to the DOM nodes.  Updates run fast while keeping JSX's declarative semantics.
+The computations perform direct, fine-grained changes to the DOM nodes.  Updates run fast while keeping the DOM in sync with your JSX.
 
-Finally, Surplus has a small runtime to help with more complex JSX features, like spreads and children that come and go.
+Finally, Surplus has a small runtime to help with more complex JSX features, like property spreads and variable children.
 
 ```jsx
 import * as Surplus from 'surplus';
@@ -122,57 +122,39 @@ const view =                     // declarative main view
 document.body.appendChild(view); // add view to document
 ```
 
-Some things to note:
-- There is no `.mount()` or `.render()` command: Surplus JSX expressions return real nodes, which can be attached to the page with standard DOM commands, `document.body.appendChild(view)`.
-- There is no `.update()` command: Surplus uses [S](https://github.com/adamhaile/S) computations to build the view, so the view responds automatically to changes in S signals.
+Note that there is no `.mount()` or `.render()` command.  Since the JSX returns real nodes, we can attach them to the page with standard DOM commands, `document.body.appendChild(view)`.
 
-For a slightly longer example, see the standard [TodoMVC in Surplus](https://github.com/adamhaile/surplus-todomvc), which you can run [here](https://adamhaile.github.io/surplus-todomvc).
+Note also that there's no code to handle updating the application: no `.update()` command, no `.setState()`, no change event subscription.  Other than a liberal sprinkling of `()`'s, this could be static code.  
 
-## Features
+This is because S is designed to enable *declarative programming*, where we focus on defining how things should be and S handles updating the app from one state to the next as our data changes.  
 
-### Real DOM Elements, not Virtual
+Surplus lets us extend that model to the DOM.  We write JSX definitions of what the DOM should be, and Surplus generates runtime code to maintain those definitions.
 
-Surplus JSX expressions create real DOM elements, not virtual elements like React or other vdom libraries.
+Declarative programs aren't just clear, they're also flexible.  Because they aren't written with any specific changes in mind, they can often adapt easily to new behaviors.  For instance, we can add localStorage persistence with zero changes to the code above and only a handful of new lines:
 
-```jsx
-const node = <span>foo</span>;
-// since node is a real HTMLSpanElement, we can use its properties
-node.className = "bar";
+```javascript
+if (localStorage.todos) { // load stored todos on start
+    todos(JSON.parse(localStorage.todos).map(Todo));
+}
+
+S(() => {                // store todos whenever they change
+    localStorage.todos = JSON.stringify(todos().map(t => 
+        ({ title: t.title(), done: t.done() })));
+});
 ```
 
-For a longer discussion, see [why real DOM nodes?](#why-real-dom-nodes)
+More examples of Surplus programs:
+- The standard [TodoMVC in Surplus](https://github.com/adamhaile/surplus-todomvc), which you can run [here](https://adamhaile.github.io/surplus-todomvc)
+- [Surplus Demos](https://github.com/adamhaile/surplus-demos), a collection of tiny Surplus example apps, from [Hello World](https://github.com/adamhaile/surplus-demos/helloworld.html) to [Asteroids](https://github.com/adamhaile/surplus-demos/asteroids.html).
+- The [Realworld Demo in Surplus](https://github.com/adamhaile/surplus-realworld), a full-fledged Medium-like app demonstrating routing, authentication and server interaction, based on the [Realworld spec](https://github.com/gothinkster/realworld).
 
-Creating real DOM nodes removes the entire &ldquo;middle layer&rdquo; from Surplus: there are no components, no &ldquo;lifecycle,&rdquo; no mount or diff/patch.  DOM nodes are values like any other, &ldquo;components&rdquo; are plain old functions that return DOM nodes.
+## Benchmarks
 
-### Automatic Updates
+Direct DOM instructions plus S.js's highly optimized reactivity means that Surplus apps generally place at or near the top of various performance benchmarks.
 
-If your Surplus JSX expression references any S signals, then Surplus creates S computations to keep those parts of the DOM up to date:
+For example, Surplus is currently the top framework in Stefan Krause's [js-framework-benchmark](https://github.com/krausest/js-framework-benchmark):
 
-```jsx
-const text = S.data("foo"),
-      node = <span>{text()}</span>;
-
-// node starts out equal to <span>foo</span>
-
-text("bar");
-
-// now it's <span>bar</span>
-```
-
-### JSX
-
-Surplus is not a React &ldquo;work-alike,&rdquo; but it uses the JSX syntax popularized by React to define its views.  This has several advantages:
-
-1. JSX is declarative.  In a reactive system, it's important that we only need to know *what* our data is, not *how* or *when* we got here.
-2. JSX has well-established tooling: syntax highlighters, type checkers (Surplus has full Typescript support), linters, etc. all work with Surplus JSX.
-3. JSX mitigates some of the risk of adopting (or abandoning) Surplus.  Much Surplus JSX code already works as React stateless functional components, and vice versa.  Surplus avoids arbitrary differences with React when feasible.
-
-### Performance
-Surplus apps generally rank at or near the top of most javascript benchmarks.  This has two reasons:
-
-1. Surplus&rsquo; compiler does as much work as it can at compile time, so that the runtime code can focus on the truly dynamic operations.
-
-1. Targeting real DOM nodes removes the cost of the vdom &ldquo;middle layer.&rdquo;  For instance, Surplus can compile property assignments down to direct JIT-friendly statements like `input.type = "text"`.
+![js-framework-benchmark results](benchmark2.png)
 
 ## Documentation
 
@@ -413,6 +395,10 @@ const { out, map } = compiler.compile(in, { sourcemap: 'extract' });
 
 ## FAQs
 
+### Can I use the standard Babel or Typescript JSX compilers for Surplus?
+
+No. Surplus isn't just the runtime library, it's the library+compiler, which are tightly coupled.  It's not just cosmetic differences.  The standard JSX compilation format was designed for virtual DOM and doesn't have the features Surplus needs.  In particular, Surplus wraps dynamic expressions -- `{ ... }` -- in lambdas, so that it can create S computations that detect when the expressions change and make targeted updates.  The usual format doesn't do that, since it relies on external notification of change (`.setState()`) followed by a diffing phase to detect what changed.
+
 ### Why real DOM nodes?
 
 Virtual DOM is a powerful and proven approach to building a web framework.  However, Surplus elects to use real DOM elements for two reasons:
@@ -429,7 +415,7 @@ Surplus is built on [S.js](https://github.com/adamhaile/S), and it takes advanta
 
 Performance: virtual DOM libraries throw away information about what has changed, then reconstruct it in the diff phase.  Some smart engineers have made diffing surprisingly fast, but the cost can never be zero.
 
-Complexity: the separation between a virtual and a real layer brings with it a host of abstractions, such as component &lsquo;lifecycle&rsquo; and &lsquo;refs,&rsquo; which are essentially hooks into the reconciler's work.  The standard programming model of values and functions gets mirrored with a whole abstraction layer of virtual values and function-like components.
+Complexity: the separation between a virtual and a real layer brings with it a host of abstractions, such as component &lsquo;lifecycle&rsquo; and &lsquo;refs,&rsquo; which are essentially hooks into the reconciler's work.  The standard programming model of values and functions gets mirrored with a parallel layer of virtual values and function-like components.
 
 Interop: communication between different virtual DOM libraries, or between virtual values and your own code, is complicated by the fact that the common layer upon which they operate, the DOM, is held within the library.  The library only allows access to the DOM at certain moments and through certain ports, like &lsquo;refs.&rsquo;
 
