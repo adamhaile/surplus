@@ -191,6 +191,19 @@ describe("subcomponent", function () {
         eval(code);
     });
 
+    it("can have multiple fn properties", function () {
+        var code = window.SurplusCompiler.compile(`
+            var fn1 = el => el.p1 = "foo",
+                fn2 = el => el.p2 = "bar",
+                fn3 = el => el.p3 = "blech",
+                SubComponent = p => props = p,
+                sub = <SubComponent fn={fn1} fn={fn2} fn={fn3} />;
+
+            expect(props).toEqual({p1: "foo", p2: "bar", p3: "blech"});
+        `);
+        eval(code);
+    });
+
     it("is re-called when a child and a property changes", function () {
         var code = window.SurplusCompiler.compile(`
             var props = null,

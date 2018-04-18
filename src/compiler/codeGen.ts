@@ -176,7 +176,7 @@ const codeGen = (ctl : Program, opts : Params) => {
                 
                 expr = `(function (__) {${
                     nli}var __ = ${expr};${
-                    nli}${comps.map(comp => emitComputation(comp, indent) + nli)}${
+                    nli}${comps.map(comp => emitComputation(comp, indent)).join(nli)}${
                     nli}return __;${
                 nl}})()`;
             }
