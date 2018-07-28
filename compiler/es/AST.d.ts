@@ -21,7 +21,7 @@ export declare type JSXContent = JSXElement | JSXComment | JSXText | JSXInsert;
 export declare enum JSXElementKind {
     HTML = 0,
     SVG = 1,
-    SubComponent = 2,
+    SubComponent = 2
 }
 export declare const JSXElement: "JSXElement";
 export interface JSXElement {

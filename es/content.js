@@ -22,7 +22,7 @@ export function content(parent, value, current) {
             current = parent.textContent = value;
         }
     }
-    else if (value == null || t === 'boolean') {
+    else if (value == null || t === 'boolean') { // null, undefined, true or false
         clear(parent);
         current = "";
     }
@@ -335,7 +335,7 @@ function normalizeIncomingArray(normalized, array) {
         if (item instanceof Node) {
             normalized.push(item);
         }
-        else if (item == null || item === true || item === false) {
+        else if (item == null || item === true || item === false) { // matches null, undefined, true or false
             // skip
         }
         else if (Array.isArray(item)) {

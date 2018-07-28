@@ -83,6 +83,7 @@ var codeGen = function (ctl, opts) {
         // group successive properties into property objects, but spreads stand alone
         // e.g. a="1" b={foo} {...spread} c="3" gets combined into [{a: "1", b: foo}, spread, {c: "3"}]
         properties = node.fields.reduce(function (props, p) {
+            var _a;
             var lastSegment = props.length > 0 ? props[props.length - 1] : null, value = p.type === JSXStaticField ? p.value : compileSegments(p.code);
             if (p.type === JSXSpread) {
                 props.push(value);
@@ -96,7 +97,6 @@ var codeGen = function (ctl, opts) {
                 lastSegment[p.name] = value;
             }
             return props;
-            var _a;
         }, []), children = node.content.map(function (c) {
             return c.type === JSXElement ? compileJSXElement(c, indent("")) :
                 c.type === JSXText ? codeStr(c.text) :
@@ -230,7 +230,7 @@ var codeGen = function (ctl, opts) {
         var statements = comp.statements, loc = comp.loc, stateVar = comp.stateVar, seed = comp.seed;
         if (stateVar)
             statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
-        var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli), code = "Surplus.S(function (" + (stateVar || '') + ") {" + body + "}" + (seed !== null ? ", " + seed : '') + ");";
+        var body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli), code = "Surplus.S.effect(function (" + (stateVar || '') + ") {" + body + "}" + (seed !== null ? ", " + seed : '') + ");";
         return markLoc(code, loc, opts);
     };
     return compileSegments(ctl);
