@@ -1,6 +1,6 @@
 {
   "name": "surplus",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "High-performance JSX web views for S.js applications",
   "keywords": [
     "JSX",
@@ -25,7 +25,7 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "s-js": "file:../S"
+    "s-js": "^0.4.9"
   },
   "devDependencies": {
     "jasmine": "^3.1.0",
