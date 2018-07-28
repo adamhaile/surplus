@@ -746,7 +746,7 @@
             // build computations for fns
             if (sub.fns.length > 0) {
                 var comps = sub.fns.map(function (fn) { return new Computation(["(" + fn + ")(__, __state);"], sub.loc, '__state', null); });
-                expr = "(function (__) {" + nli + "var __ = " + expr + ";" + nli + comps.map(function (comp) { return emitComputation(comp, indent) + nli; }) + nli + "return __;" + nl + "})()";
+                expr = "(function (__) {" + nli + "var __ = " + expr + ";" + nli + comps.map(function (comp) { return emitComputation(comp, indent); }).join(nli) + nli + "return __;" + nl + "})()";
             }
             return expr;
         }, buildDOMExpression = function (top) {
