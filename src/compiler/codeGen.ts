@@ -306,7 +306,7 @@ const codeGen = (ctl : Program, opts : Params) => {
             if (stateVar) statements[statements.length - 1] = 'return ' + statements[statements.length - 1];
 
             const body = statements.length === 1 ? (' ' + statements[0] + ' ') : (nlii + statements.join(nlii) + nli),
-                code = `Surplus.S(function (${stateVar || ''}) {${body}}${seed !== null ? `, ${seed}` : ''});`;
+                code = `Surplus.S.effect(function (${stateVar || ''}) {${body}}${seed !== null ? `, ${seed}` : ''});`;
 
             return markLoc(code, loc, opts);
         };
