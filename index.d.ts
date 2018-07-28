@@ -221,6 +221,7 @@ declare global {
 
 		interface SurplusAtributes<T> {
 			ref?: T;
+			model?: any;
 			fn?: <U>(node : T, state? : U) => any;
 			fn0?: <U>(node : T, state? : U) => any;
 			fn1?: <U>(node : T, state? : U) => any;
