@@ -272,7 +272,7 @@ The `ref` property fulfills a very similar role to the `ref` property in React, 
 A `fn` property specifies a function to be applied to a node.  It is useful for encapsulating a bit of reusable behavior or properties.
 
 ```jsx
-import { data } from 'surplus-fn-data'; // two-way data binding utility
+import data from 'surplus-mixin-data'; // two-way data binding utility
 const value = S.data("foo"),
       input = <input type="text" fn={data(value)} />;
 input.value === "foo";
