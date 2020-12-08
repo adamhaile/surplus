@@ -390,7 +390,7 @@ const out = compiler.compile(in, { sourcemap: 'append' });
 
 // w/ extracted sourcemap
 // note that output is different, to return map and src
-const { out, map } = compiler.compile(in, { sourcemap: 'extract' });
+const { src, map } = compiler.compile(in, { sourcemap: 'extract' });
 ```
 
 ## FAQs
